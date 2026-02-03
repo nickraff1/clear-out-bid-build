@@ -247,7 +247,7 @@ export default function Index() {
                   <ArrowRight className="h-5 w-5" />
                 </Link>
               </Button>
-              <Button size="xl" variant="outline" className="border-secondary-foreground/20 text-secondary-foreground hover:bg-secondary-foreground/10" asChild>
+              <Button size="xl" variant="hero-outline" asChild>
                 <Link to="/marketplace">
                   Browse Marketplace
                 </Link>
