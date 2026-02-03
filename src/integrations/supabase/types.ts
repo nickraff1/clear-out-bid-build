@@ -659,6 +659,65 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount_charged: number
+          base_amount: number
+          buyer_fee: number
+          created_at: string
+          error_message: string | null
+          id: string
+          order_id: string
+          payment_method: string | null
+          seller_fee: number
+          seller_payout: number
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id: string | null
+          stripe_payment_intent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_charged: number
+          base_amount: number
+          buyer_fee?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          order_id: string
+          payment_method?: string | null
+          seller_fee?: number
+          seller_payout?: number
+          status?: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_charged?: number
+          base_amount?: number
+          buyer_fee?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          order_id?: string
+          payment_method?: string | null
+          seller_fee?: number
+          seller_payout?: number
+          status?: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pickup_confirmations: {
         Row: {
           confirmed_at: string
@@ -804,6 +863,47 @@ export type Database = {
           },
         ]
       }
+      seller_stripe_accounts: {
+        Row: {
+          created_at: string
+          details_submitted: boolean | null
+          id: string
+          onboarding_complete: boolean | null
+          org_id: string
+          payouts_enabled: boolean | null
+          stripe_account_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          details_submitted?: boolean | null
+          id?: string
+          onboarding_complete?: boolean | null
+          org_id: string
+          payouts_enabled?: boolean | null
+          stripe_account_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          details_submitted?: boolean | null
+          id?: string
+          onboarding_complete?: boolean | null
+          org_id?: string
+          payouts_enabled?: boolean | null
+          stripe_account_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_stripe_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -894,6 +994,12 @@ export type Database = {
         | "cancelled"
         | "disputed"
       org_type: "seller" | "buyer" | "fabricator"
+      payment_status:
+        | "pending"
+        | "processing"
+        | "succeeded"
+        | "failed"
+        | "refunded"
       pricing_type: "fixed" | "auction"
     }
     CompositeTypes: {
@@ -1041,6 +1147,13 @@ export const Constants = {
         "disputed",
       ],
       org_type: ["seller", "buyer", "fabricator"],
+      payment_status: [
+        "pending",
+        "processing",
+        "succeeded",
+        "failed",
+        "refunded",
+      ],
       pricing_type: ["fixed", "auction"],
     },
   },
