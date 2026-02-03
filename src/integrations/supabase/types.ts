@@ -1067,6 +1067,11 @@ export type Database = {
       }
     }
     Functions: {
+      get_event_org_id: { Args: { _event_id: string }; Returns: string }
+      has_order_for_event: {
+        Args: { _event_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
