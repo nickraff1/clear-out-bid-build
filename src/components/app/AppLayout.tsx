@@ -4,10 +4,13 @@ import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PortalSwitcher } from './PortalSwitcher';
+import { useActivePortal } from '@/hooks/useActivePortal';
 
 export default function AppLayout() {
   const { user, isLoading, isAdmin, isSeller, isBuyer, profile } = useAuth();
   const location = useLocation();
+  const [activePortal, setActivePortal] = useActivePortal();
 
   if (isLoading) {
     return (
@@ -52,14 +55,21 @@ export default function AppLayout() {
     { to: '/app/settings', label: 'Settings', icon: Settings },
   ];
 
-  // Determine which nav to show
+  // Determine which nav to show based on active portal (not just roles)
   let navItems = buyerNav;
   let portalTitle = 'Buyer Portal';
   
   if (isAdmin) {
     navItems = adminNav;
     portalTitle = 'Admin Portal';
+  } else if (activePortal === 'seller' && isSeller) {
+    navItems = sellerNav;
+    portalTitle = 'Seller Portal';
+  } else if (activePortal === 'buyer' || isBuyer) {
+    navItems = buyerNav;
+    portalTitle = 'Buyer Portal';
   } else if (isSeller) {
+    // Fallback for sellers who somehow have no active portal set
     navItems = sellerNav;
     portalTitle = 'Seller Portal';
   }
@@ -68,23 +78,37 @@ export default function AppLayout() {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
+  // Check if user has dual roles (both buyer and seller)
+  const hasDualRoles = isSeller && isBuyer;
+
   return (
     <Layout hideFooter>
       <div className="flex flex-1">
         {/* Sidebar */}
         <aside className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar">
           <div className="p-4 border-b border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-lg font-bold text-primary-foreground">
-                  {profile?.full_name?.[0]?.toUpperCase() ?? 'U'}
-                </span>
+            {/* Portal Switcher for users with roles (or potential to add roles) */}
+            {!isAdmin && (isSeller || isBuyer) && (
+              <PortalSwitcher 
+                activePortal={activePortal} 
+                onPortalChange={setActivePortal} 
+              />
+            )}
+            
+            {/* Admin header (no switcher for admins) */}
+            {isAdmin && (
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-lg font-bold text-primary-foreground">
+                    {profile?.full_name?.[0]?.toUpperCase() ?? 'A'}
+                  </span>
+                </div>
+                <div className="overflow-hidden">
+                  <p className="font-medium text-sidebar-foreground truncate">{profile?.full_name ?? 'Admin'}</p>
+                  <p className="text-sm text-sidebar-foreground/60 truncate">Admin Portal</p>
+                </div>
               </div>
-              <div className="overflow-hidden">
-                <p className="font-medium text-sidebar-foreground truncate">{profile?.full_name ?? 'User'}</p>
-                <p className="text-sm text-sidebar-foreground/60 truncate">{portalTitle}</p>
-              </div>
-            </div>
+            )}
           </div>
           
           <nav className="flex-1 p-4 space-y-1">
@@ -123,7 +147,7 @@ export default function AppLayout() {
             </div>
 
             {/* Quick Actions */}
-            {isSeller && (
+            {activePortal === 'seller' && isSeller && (
               <div className="pt-4 mt-4 border-t border-sidebar-border">
                 <Button asChild className="w-full" size="sm">
                   <Link to="/app/seller/events/new">
