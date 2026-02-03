@@ -1,1 +1,4 @@
 project_id = "uiusztanyjwmccdabtvs"
+
+[functions.auction-engine]
+verify_jwt = false

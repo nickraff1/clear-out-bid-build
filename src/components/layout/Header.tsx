@@ -48,7 +48,7 @@ export function Header() {
           <Link to="/how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             How It Works
           </Link>
-          <Link to="/for-sellers" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/app" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             For Sellers
           </Link>
         </nav>
@@ -158,7 +158,7 @@ export function Header() {
               How It Works
             </Link>
             <Link
-              to="/for-sellers"
+              to="/app"
               className="block px-3 py-2 text-sm font-medium rounded-md hover:bg-muted"
               onClick={() => setMobileMenuOpen(false)}
             >

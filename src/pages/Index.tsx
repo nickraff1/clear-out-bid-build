@@ -41,7 +41,7 @@ export default function Index() {
                 </Link>
               </Button>
               <Button size="xl" variant="hero-outline" asChild>
-                <Link to="/for-sellers">
+                <Link to="/app">
                   Start Selling
                 </Link>
               </Button>
