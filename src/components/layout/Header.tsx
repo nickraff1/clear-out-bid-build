@@ -66,12 +66,12 @@ export function Header() {
               {user ? (
                 <>
                   <Button variant="ghost" size="icon" asChild>
-                    <Link to="/dashboard/watchlist">
+                    <Link to="/app/buyer/watchlist">
                       <Heart className="h-5 w-5" />
                     </Link>
                   </Button>
                   <Button variant="ghost" size="icon" asChild>
-                    <Link to="/dashboard/notifications">
+                    <Link to="/app">
                       <Bell className="h-5 w-5" />
                     </Link>
                   </Button>
@@ -95,13 +95,13 @@ export function Header() {
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link to="/dashboard" className="cursor-pointer">
+                        <Link to="/app" className="cursor-pointer">
                           <LayoutDashboard className="mr-2 h-4 w-4" />
                           Dashboard
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link to="/dashboard/profile" className="cursor-pointer">
+                        <Link to="/app/settings" className="cursor-pointer">
                           <User className="mr-2 h-4 w-4" />
                           Profile
                         </Link>
@@ -168,7 +168,7 @@ export function Header() {
               {user ? (
                 <>
                   <Link
-                    to="/dashboard"
+                    to="/app"
                     className="block px-3 py-2 text-sm font-medium rounded-md hover:bg-muted"
                     onClick={() => setMobileMenuOpen(false)}
                   >

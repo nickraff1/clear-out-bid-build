@@ -381,7 +381,11 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
     })
   }
 
-  // Create order for winner
+  // Create order for winner (with 10% buyer fee)
+  const baseAmount = winningBid.amount
+  const buyerFee = baseAmount * 0.10
+  const totalAmount = baseAmount + buyerFee
+
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
@@ -389,8 +393,9 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
       event_id: lot.event_id,
       buyer_id: winningBid.user_id,
       buyer_org_id: winningBid.org_id,
-      amount: winningBid.amount,
-      status: 'pending_payment'
+      amount: totalAmount, // Total including 10% buyer fee
+      status: 'pending_payment',
+      notes: `Winning bid: $${baseAmount.toFixed(2)}, Buyer fee (10%): $${buyerFee.toFixed(2)}`
     })
     .select()
     .single()
@@ -429,8 +434,8 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
       user_id: winningBid.user_id,
       type: 'auction_won',
       title: 'You won an auction!',
-      message: `Congratulations! You won "${lot.title}" for $${winningBid.amount.toFixed(2)}`,
-      data: { lot_id, order_id: order.id, amount: winningBid.amount }
+      message: `Congratulations! You won "${lot.title}" for $${totalAmount.toFixed(2)} (including 10% buyer fee)`,
+      data: { lot_id, order_id: order.id, amount: totalAmount, base_amount: baseAmount, buyer_fee: buyerFee }
     })
 
   console.log(`[AUCTION] Lot ${lot_id} sold to ${winningBid.user_id} for $${winningBid.amount}`)

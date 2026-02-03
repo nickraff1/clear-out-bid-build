@@ -194,17 +194,35 @@ export default function CreateLot() {
 
       if (lotError) throw lotError;
 
-      // Upload photos
+      // Upload photos to Supabase Storage
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
         const fileExt = photo.file.name.split('.').pop();
-        const filePath = `lots/${lot.id}/${i}.${fileExt}`;
+        const fileName = `${lot.id}/${Date.now()}-${i}.${fileExt}`;
 
-        // For now, we'll use placeholder URLs since storage isn't set up
-        // In production, upload to Supabase Storage
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('lot-photos')
+          .upload(fileName, photo.file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          // Continue with other photos even if one fails
+          continue;
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('lot-photos')
+          .getPublicUrl(fileName);
+
+        // Save to lot_media table
         await supabase.from('lot_media').insert({
           lot_id: lot.id,
-          url: photo.preview, // In production: storage URL
+          url: urlData.publicUrl,
           type: 'image',
           is_primary: i === 0,
           sort_order: i,
