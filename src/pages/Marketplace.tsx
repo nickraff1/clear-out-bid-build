@@ -48,7 +48,11 @@ export default function Marketplace() {
         .select(`
           *,
           media:lot_media(*),
-          event:clearance_events(*),
+          event:clearance_events(
+            id, org_id, title, description,
+            site_address, suburb, state, postcode,
+            pickup_start, pickup_end, status
+          ),
           category:categories(*)
         `)
         .eq('status', 'active');

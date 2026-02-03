@@ -442,6 +442,13 @@ export type Database = {
             referencedRelation: "clearance_events"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lots_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "clearance_events_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notifications: {
@@ -548,6 +555,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "clearance_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "clearance_events_public"
             referencedColumns: ["id"]
           },
           {
@@ -796,6 +810,13 @@ export type Database = {
             referencedRelation: "clearance_events"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pickup_slots_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "clearance_events_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -960,6 +981,72 @@ export type Database = {
       }
     }
     Views: {
+      clearance_events_public: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string | null
+          org_id: string | null
+          pickup_end: string | null
+          pickup_start: string | null
+          postcode: string | null
+          site_address: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["event_status"] | null
+          suburb: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string | null
+          org_id?: string | null
+          pickup_end?: string | null
+          pickup_start?: string | null
+          postcode?: string | null
+          site_address?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["event_status"] | null
+          suburb?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string | null
+          org_id?: string | null
+          pickup_end?: string | null
+          pickup_start?: string | null
+          postcode?: string | null
+          site_address?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["event_status"] | null
+          suburb?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clearance_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clearance_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lot_bid_stats: {
         Row: {
           bid_count: number | null

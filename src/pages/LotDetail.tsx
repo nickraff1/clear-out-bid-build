@@ -71,7 +71,12 @@ export default function LotDetail() {
         .select(`
           *,
           media:lot_media(*),
-          event:clearance_events(*, organization:organizations(*)),
+          event:clearance_events(
+            id, org_id, created_by, title, description,
+            site_address, suburb, state, postcode,
+            pickup_start, pickup_end, status, created_at, updated_at,
+            organization:organizations(id, name, suburb, state)
+          ),
           category:categories(*)
         `)
         .eq('id', id)
