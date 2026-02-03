@@ -1,0 +1,448 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+}
+
+// Auction configuration
+const AUCTION_CONFIG = {
+  SOFT_CLOSE_THRESHOLD_SECONDS: 60, // If bid within last 60 seconds
+  SOFT_CLOSE_EXTENSION_SECONDS: 120, // Extend by 2 minutes
+  MIN_BID_INCREMENT_PERCENT: 5, // 5% minimum increment
+  RATE_LIMIT_PER_MINUTE: 10, // Max bids per user per minute per lot
+}
+
+// Bid increment tiers
+const BID_INCREMENTS = [
+  { maxPrice: 10, increment: 1 },
+  { maxPrice: 50, increment: 2 },
+  { maxPrice: 100, increment: 5 },
+  { maxPrice: 500, increment: 10 },
+  { maxPrice: 1000, increment: 25 },
+  { maxPrice: 5000, increment: 50 },
+  { maxPrice: 10000, increment: 100 },
+  { maxPrice: Infinity, increment: 250 },
+]
+
+function getMinimumIncrement(currentBid: number): number {
+  for (const tier of BID_INCREMENTS) {
+    if (currentBid < tier.maxPrice) {
+      return tier.increment
+    }
+  }
+  return 250
+}
+
+interface BidRequest {
+  lot_id: string
+  amount: number
+  org_id: string
+}
+
+interface CloseAuctionRequest {
+  lot_id: string
+}
+
+serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
+    // Create admin client for server-side operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    
+    // Get user from auth header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const supabaseAnonKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    })
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const url = new URL(req.url)
+    const path = url.pathname.split('/').pop()
+
+    // Route to different actions
+    if (req.method === 'POST') {
+      if (path === 'place-bid') {
+        return await handlePlaceBid(req, supabaseAdmin, user.id)
+      } else if (path === 'close-auction') {
+        return await handleCloseAuction(req, supabaseAdmin, user.id)
+      }
+    }
+
+    return new Response(JSON.stringify({ error: 'Not found' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error) {
+    console.error('Auction engine error:', error)
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+})
+
+async function handlePlaceBid(req: Request, supabase: any, userId: string) {
+  const body: BidRequest = await req.json()
+  const { lot_id, amount, org_id } = body
+
+  console.log(`[AUCTION] Bid request: user=${userId}, lot=${lot_id}, amount=${amount}`)
+
+  // Validate input
+  if (!lot_id || !amount || !org_id) {
+    return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // 1. Check rate limiting
+  const oneMinuteAgo = new Date(Date.now() - 60000).toISOString()
+  const { count: recentBidsCount } = await supabase
+    .from('bids')
+    .select('*', { count: 'exact', head: true })
+    .eq('lot_id', lot_id)
+    .eq('user_id', userId)
+    .gte('created_at', oneMinuteAgo)
+
+  if (recentBidsCount && recentBidsCount >= AUCTION_CONFIG.RATE_LIMIT_PER_MINUTE) {
+    console.log(`[AUCTION] Rate limit exceeded for user ${userId}`)
+    return new Response(JSON.stringify({ 
+      error: 'Rate limit exceeded. Please wait before placing another bid.' 
+    }), {
+      status: 429,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // 2. Get lot details
+  const { data: lot, error: lotError } = await supabase
+    .from('lots')
+    .select('*, event:clearance_events(*)')
+    .eq('id', lot_id)
+    .single()
+
+  if (lotError || !lot) {
+    console.log(`[AUCTION] Lot not found: ${lot_id}`)
+    return new Response(JSON.stringify({ error: 'Lot not found' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // 3. Validate lot is an active auction
+  if (lot.pricing_type !== 'auction') {
+    return new Response(JSON.stringify({ error: 'This lot is not an auction' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  if (lot.status !== 'active') {
+    return new Response(JSON.stringify({ error: 'This auction is not active' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  const now = new Date()
+  const auctionEnd = new Date(lot.auction_end)
+  
+  // Check if auction has ended (without soft close consideration)
+  if (now > auctionEnd) {
+    return new Response(JSON.stringify({ error: 'This auction has ended' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // 4. Validate bid amount
+  const currentPrice = lot.current_bid || lot.start_price || 0
+  const minimumIncrement = getMinimumIncrement(currentPrice)
+  const minimumBid = currentPrice + minimumIncrement
+
+  if (amount < minimumBid) {
+    return new Response(JSON.stringify({ 
+      error: `Bid must be at least $${minimumBid.toFixed(2)}. Minimum increment is $${minimumIncrement}.`
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // 5. Check soft close - extend if bid in final 60 seconds
+  const secondsRemaining = (auctionEnd.getTime() - now.getTime()) / 1000
+  let newAuctionEnd = lot.auction_end
+  let softCloseExtended = false
+
+  if (secondsRemaining <= AUCTION_CONFIG.SOFT_CLOSE_THRESHOLD_SECONDS) {
+    const extendedEnd = new Date(now.getTime() + (AUCTION_CONFIG.SOFT_CLOSE_EXTENSION_SECONDS * 1000))
+    newAuctionEnd = extendedEnd.toISOString()
+    softCloseExtended = true
+    console.log(`[AUCTION] Soft close triggered, extending to ${newAuctionEnd}`)
+  }
+
+  // 6. Mark previous winning bid as not winning
+  await supabase
+    .from('bids')
+    .update({ is_winning: false })
+    .eq('lot_id', lot_id)
+    .eq('is_winning', true)
+
+  // 7. Insert new bid
+  const { data: newBid, error: bidError } = await supabase
+    .from('bids')
+    .insert({
+      lot_id,
+      user_id: userId,
+      org_id,
+      amount,
+      is_winning: true
+    })
+    .select()
+    .single()
+
+  if (bidError) {
+    console.error('[AUCTION] Error inserting bid:', bidError)
+    return new Response(JSON.stringify({ error: 'Failed to place bid' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // 8. Update lot with new current bid and bid count
+  const updateData: any = {
+    current_bid: amount,
+    bid_count: (lot.bid_count || 0) + 1
+  }
+  
+  if (softCloseExtended) {
+    updateData.auction_end = newAuctionEnd
+  }
+
+  await supabase
+    .from('lots')
+    .update(updateData)
+    .eq('id', lot_id)
+
+  // 9. Record bid event in audit log
+  await supabase
+    .from('bid_events')
+    .insert({
+      bid_id: newBid.id,
+      lot_id,
+      user_id: userId,
+      org_id,
+      amount,
+      event_type: 'bid_placed',
+      metadata: {
+        soft_close_extended: softCloseExtended,
+        new_auction_end: softCloseExtended ? newAuctionEnd : null,
+        previous_bid: currentPrice
+      }
+    })
+
+  // 10. Create outbid notification for previous high bidder
+  if (lot.current_bid) {
+    const { data: previousHighBid } = await supabase
+      .from('bids')
+      .select('user_id')
+      .eq('lot_id', lot_id)
+      .eq('amount', lot.current_bid)
+      .neq('user_id', userId)
+      .single()
+
+    if (previousHighBid) {
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: previousHighBid.user_id,
+          type: 'outbid',
+          title: 'You have been outbid!',
+          message: `Someone placed a higher bid of $${amount.toFixed(2)} on "${lot.title}"`,
+          data: { lot_id, new_amount: amount }
+        })
+    }
+  }
+
+  console.log(`[AUCTION] Bid placed successfully: bid_id=${newBid.id}`)
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    bid: newBid,
+    soft_close_extended: softCloseExtended,
+    new_auction_end: softCloseExtended ? newAuctionEnd : null
+  }), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+async function handleCloseAuction(req: Request, supabase: any, userId: string) {
+  const body: CloseAuctionRequest = await req.json()
+  const { lot_id } = body
+
+  console.log(`[AUCTION] Close auction request: lot=${lot_id}`)
+
+  // Get lot details
+  const { data: lot, error: lotError } = await supabase
+    .from('lots')
+    .select('*, event:clearance_events(*)')
+    .eq('id', lot_id)
+    .single()
+
+  if (lotError || !lot) {
+    return new Response(JSON.stringify({ error: 'Lot not found' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Check if auction has ended
+  const now = new Date()
+  const auctionEnd = new Date(lot.auction_end)
+  
+  if (now < auctionEnd) {
+    return new Response(JSON.stringify({ error: 'Auction has not ended yet' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Get winning bid
+  const { data: winningBid } = await supabase
+    .from('bids')
+    .select('*, bidder:profiles(*)')
+    .eq('lot_id', lot_id)
+    .eq('is_winning', true)
+    .single()
+
+  if (!winningBid) {
+    // No bids - mark as unsold
+    await supabase
+      .from('lots')
+      .update({ status: 'unsold' })
+      .eq('id', lot_id)
+
+    console.log(`[AUCTION] Lot ${lot_id} ended with no bids - marked unsold`)
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      result: 'unsold',
+      message: 'Auction ended with no bids'
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Check reserve price
+  if (lot.reserve_price && winningBid.amount < lot.reserve_price) {
+    await supabase
+      .from('lots')
+      .update({ status: 'unsold' })
+      .eq('id', lot_id)
+
+    console.log(`[AUCTION] Lot ${lot_id} reserve not met - marked unsold`)
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      result: 'reserve_not_met',
+      message: 'Reserve price was not met'
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Create order for winner
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .insert({
+      lot_id,
+      event_id: lot.event_id,
+      buyer_id: winningBid.user_id,
+      buyer_org_id: winningBid.org_id,
+      amount: winningBid.amount,
+      status: 'pending_payment'
+    })
+    .select()
+    .single()
+
+  if (orderError) {
+    console.error('[AUCTION] Error creating order:', orderError)
+    return new Response(JSON.stringify({ error: 'Failed to create order' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Update lot status to sold
+  await supabase
+    .from('lots')
+    .update({ status: 'sold' })
+    .eq('id', lot_id)
+
+  // Record bid event
+  await supabase
+    .from('bid_events')
+    .insert({
+      bid_id: winningBid.id,
+      lot_id,
+      user_id: winningBid.user_id,
+      org_id: winningBid.org_id,
+      amount: winningBid.amount,
+      event_type: 'auction_won',
+      metadata: { order_id: order.id }
+    })
+
+  // Notify winner
+  await supabase
+    .from('notifications')
+    .insert({
+      user_id: winningBid.user_id,
+      type: 'auction_won',
+      title: 'You won an auction!',
+      message: `Congratulations! You won "${lot.title}" for $${winningBid.amount.toFixed(2)}`,
+      data: { lot_id, order_id: order.id, amount: winningBid.amount }
+    })
+
+  console.log(`[AUCTION] Lot ${lot_id} sold to ${winningBid.user_id} for $${winningBid.amount}`)
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    result: 'sold',
+    order,
+    winner: {
+      user_id: winningBid.user_id,
+      amount: winningBid.amount
+    }
+  }), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}

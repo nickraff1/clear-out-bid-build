@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 
 // Public Pages
 import Index from "./pages/Index";
@@ -56,6 +57,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <OnboardingWizard />
         <BrowserRouter>
           <Routes>
             {/* Public Routes */}
@@ -68,78 +70,78 @@ const App = () => (
             
             {/* App Portal Routes */}
             <Route path="/app" element={<AppRedirect />} />
-            <Route path="/app" element={<AppLayout />}>
+            <Route element={<AppLayout />}>
               {/* Seller Routes */}
-              <Route path="seller/overview" element={
+              <Route path="/app/seller/overview" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <SellerOverview />
                 </RoleGuard>
               } />
-              <Route path="seller/events" element={
+              <Route path="/app/seller/events" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <SellerEvents />
                 </RoleGuard>
               } />
-              <Route path="seller/events/new" element={
+              <Route path="/app/seller/events/new" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <CreateEvent />
                 </RoleGuard>
               } />
-              <Route path="seller/events/:id" element={
+              <Route path="/app/seller/events/:id" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <EventDetail />
                 </RoleGuard>
               } />
-              <Route path="seller/lots" element={
+              <Route path="/app/seller/lots" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <SellerLots />
                 </RoleGuard>
               } />
-              <Route path="seller/lots/new" element={
+              <Route path="/app/seller/lots/new" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <CreateLot />
                 </RoleGuard>
               } />
-              <Route path="seller/orders" element={
+              <Route path="/app/seller/orders" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <SellerOrders />
                 </RoleGuard>
               } />
-              <Route path="seller/pickups" element={
+              <Route path="/app/seller/pickups" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <SellerPickups />
                 </RoleGuard>
               } />
 
               {/* Buyer Routes */}
-              <Route path="buyer/overview" element={
+              <Route path="/app/buyer/overview" element={
                 <RoleGuard allowedRoles={['buyer', 'admin']}>
                   <BuyerOverview />
                 </RoleGuard>
               } />
-              <Route path="buyer/bids" element={
+              <Route path="/app/buyer/bids" element={
                 <RoleGuard allowedRoles={['buyer', 'admin']}>
                   <BuyerBids />
                 </RoleGuard>
               } />
-              <Route path="buyer/orders" element={
+              <Route path="/app/buyer/orders" element={
                 <RoleGuard allowedRoles={['buyer', 'admin']}>
                   <BuyerOrders />
                 </RoleGuard>
               } />
-              <Route path="buyer/watchlist" element={
+              <Route path="/app/buyer/watchlist" element={
                 <RoleGuard allowedRoles={['buyer', 'admin']}>
                   <BuyerWatchlist />
                 </RoleGuard>
               } />
-              <Route path="buyer/alerts" element={
+              <Route path="/app/buyer/alerts" element={
                 <RoleGuard allowedRoles={['buyer', 'admin']}>
                   <BuyerAlerts />
                 </RoleGuard>
               } />
 
               {/* Common Routes */}
-              <Route path="settings" element={<AppSettings />} />
+              <Route path="/app/settings" element={<AppSettings />} />
             </Route>
 
             {/* Legacy Dashboard Routes */}
