@@ -23,19 +23,26 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Check localStorage for recently selected role (handles fresh onboarding)
+  const storedRole = user ? localStorage.getItem(`user_role_${user.id}`) : null;
+  
+  // Determine actual roles including localStorage fallback
+  const effectiveIsSeller = isSeller || storedRole === 'seller';
+  const effectiveIsBuyer = isBuyer || storedRole === 'buyer';
+
   const hasAccess = 
     (allowedRoles.includes('admin') && isAdmin) ||
-    (allowedRoles.includes('seller') && isSeller) ||
-    (allowedRoles.includes('buyer') && isBuyer) ||
+    (allowedRoles.includes('seller') && effectiveIsSeller) ||
+    (allowedRoles.includes('buyer') && effectiveIsBuyer) ||
     // If user has no role, default to buyer access
-    (allowedRoles.includes('buyer') && !isAdmin && !isSeller);
+    (allowedRoles.includes('buyer') && !isAdmin && !effectiveIsSeller);
 
   if (!hasAccess) {
     // Redirect to appropriate portal
     if (isAdmin) {
       return <Navigate to="/app/admin/overview" replace />;
     }
-    if (isSeller) {
+    if (effectiveIsSeller) {
       return <Navigate to="/app/seller/overview" replace />;
     }
     return <Navigate to="/app/buyer/overview" replace />;

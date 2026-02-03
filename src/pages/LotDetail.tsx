@@ -142,8 +142,21 @@ export default function LotDetail() {
 
   const handleBid = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !primaryOrg || !lot) {
+    
+    // Check if user is logged in
+    if (!user) {
       navigate('/login');
+      return;
+    }
+    
+    // Check if user has completed onboarding
+    if (!primaryOrg) {
+      setBidError('Please complete your account setup first. Go to the Dashboard to set up your account.');
+      return;
+    }
+    
+    if (!lot) {
+      setBidError('Lot not found');
       return;
     }
 
@@ -159,7 +172,10 @@ export default function LotDetail() {
     }
 
     setBidLoading(true);
+    
     try {
+      console.log('[Bid] Placing bid:', { lot_id: lot.id, amount, org_id: primaryOrg.id });
+      
       // Use auction engine edge function for server-side validation
       const { data, error } = await supabase.functions.invoke('auction-engine', {
         body: {
@@ -170,26 +186,33 @@ export default function LotDetail() {
         }
       });
 
-      if (error) throw error;
+      console.log('[Bid] Response:', { data, error });
+
+      // Handle edge function invocation errors
+      if (error) {
+        console.error('[Bid] Edge function error:', error);
+        setBidError(error.message || 'Failed to place bid. Please try again.');
+        return;
+      }
       
+      // Handle application-level errors from the function
       if (data?.error) {
+        console.log('[Bid] Application error:', data.error);
         setBidError(data.error);
         return;
       }
 
+      // Success
+      console.log('[Bid] Success:', data);
       setBidSuccess(true);
       setBidAmount('');
       
-      // Show soft close extension message if applicable
-      if (data?.soft_close_extended) {
-        setBidError(''); // Clear any error
-        // The success message will show that bid was placed
-      }
-      
+      // Refresh lot data
       fetchLot();
       fetchBids();
     } catch (error: any) {
-      setBidError(error.message || 'Failed to place bid');
+      console.error('[Bid] Unexpected error:', error);
+      setBidError('Network error. Please check your connection and try again.');
     } finally {
       setBidLoading(false);
     }
