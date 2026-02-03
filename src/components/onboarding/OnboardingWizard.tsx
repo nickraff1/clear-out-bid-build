@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,8 @@ import {
   Check,
   Package,
   Gavel,
-  Plus
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,10 +33,12 @@ interface OnboardingState {
 export function OnboardingWizard() {
   const { user, profile, isSeller, isBuyer, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState<'buyer' | 'seller' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingRole, setLoadingRole] = useState<'buyer' | 'seller' | null>(null);
 
   // Check if user needs onboarding
   useEffect(() => {
@@ -77,54 +81,117 @@ export function OnboardingWizard() {
   }, [isSeller, isBuyer]);
 
   const handleRoleSelect = async (role: 'buyer' | 'seller') => {
+    if (!user) {
+      toast({
+        title: 'Not authenticated',
+        description: 'Please log in to continue',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setSelectedRole(role);
     setIsLoading(true);
+    setLoadingRole(role);
 
     try {
+      console.log('[Onboarding] Starting role selection:', role);
+      
       // Create organization for the user
+      const orgName = profile?.full_name 
+        ? `${profile.full_name}'s ${role === 'seller' ? 'Business' : 'Account'}` 
+        : `My ${role === 'seller' ? 'Business' : 'Account'}`;
+      
+      console.log('[Onboarding] Creating organization:', orgName);
+      
       const { data: org, error: orgError } = await supabase
         .from('organizations')
         .insert({
-          name: profile?.full_name ? `${profile.full_name}'s ${role === 'seller' ? 'Business' : 'Account'}` : `My ${role === 'seller' ? 'Business' : 'Account'}`,
+          name: orgName,
           org_type: role,
-          email: profile?.email,
-          is_approved: true, // Auto-approve for MVP
+          email: profile?.email || user.email,
+          is_approved: true,
         })
         .select()
         .single();
 
-      if (orgError) throw orgError;
+      if (orgError) {
+        console.error('[Onboarding] Org creation error:', orgError);
+        toast({
+          title: 'Error creating organization',
+          description: orgError.message,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      console.log('[Onboarding] Organization created:', org.id);
 
       // Add user as org member
       const { error: memberError } = await supabase
         .from('org_members')
         .insert({
           org_id: org.id,
-          user_id: user!.id,
+          user_id: user.id,
           is_primary: true
         });
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('[Onboarding] Member creation error:', memberError);
+        toast({
+          title: 'Error joining organization',
+          description: memberError.message,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      console.log('[Onboarding] Org member created');
 
       // Add user role
       const roleValue = role === 'seller' ? 'seller_admin' : 'buyer_admin';
       const { error: roleError } = await supabase
         .from('user_roles')
         .insert({
-          user_id: user!.id,
+          user_id: user.id,
           role: roleValue
         });
 
-      if (roleError) throw roleError;
+      if (roleError) {
+        console.error('[Onboarding] Role creation error:', roleError);
+        toast({
+          title: 'Error assigning role',
+          description: roleError.message,
+          variant: 'destructive'
+        });
+        return;
+      }
 
-      // Refresh auth context
+      console.log('[Onboarding] User role created:', roleValue);
+
+      // Store role selection in localStorage for immediate navigation
+      localStorage.setItem(`user_role_${user.id}`, role);
+
+      // Refresh auth context to get new roles
       await refreshProfile();
       
+      toast({
+        title: 'Setup complete!',
+        description: `You're now set up as a ${role}`,
+      });
+
+      console.log('[Onboarding] Setup complete, moving to step 2');
       setStep(2);
-    } catch (error) {
-      console.error('Error setting up role:', error);
+    } catch (error: any) {
+      console.error('[Onboarding] Error setting up role:', error);
+      toast({
+        title: 'Setup failed',
+        description: error.message || 'Please try again',
+        variant: 'destructive'
+      });
     } finally {
       setIsLoading(false);
+      setLoadingRole(null);
     }
   };
 
@@ -219,11 +286,17 @@ export function OnboardingWizard() {
               className={cn(
                 'flex items-center gap-4 p-4 rounded-lg border-2 transition-all text-left',
                 'hover:border-primary hover:bg-primary/5',
-                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                loadingRole === 'buyer' && 'border-primary bg-primary/5'
               )}
             >
               <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <ShoppingCart className="h-6 w-6 text-primary" />
+                {loadingRole === 'buyer' ? (
+                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                ) : (
+                  <ShoppingCart className="h-6 w-6 text-primary" />
+                )}
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">I want to buy</h3>
@@ -231,7 +304,11 @@ export function OnboardingWizard() {
                   Browse and bid on construction surplus materials
                 </p>
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              {loadingRole === 'buyer' ? (
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              ) : (
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              )}
             </button>
 
             <button
@@ -240,11 +317,17 @@ export function OnboardingWizard() {
               className={cn(
                 'flex items-center gap-4 p-4 rounded-lg border-2 transition-all text-left',
                 'hover:border-primary hover:bg-primary/5',
-                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                loadingRole === 'seller' && 'border-primary bg-primary/5'
               )}
             >
               <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                <Building2 className="h-6 w-6 text-secondary-foreground" />
+                {loadingRole === 'seller' ? (
+                  <Loader2 className="h-6 w-6 text-secondary-foreground animate-spin" />
+                ) : (
+                  <Building2 className="h-6 w-6 text-secondary-foreground" />
+                )}
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">I want to sell</h3>
@@ -252,7 +335,11 @@ export function OnboardingWizard() {
                   Clear out surplus materials from your construction projects
                 </p>
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              {loadingRole === 'seller' ? (
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              ) : (
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              )}
             </button>
           </div>
         )}
