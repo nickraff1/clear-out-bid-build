@@ -92,41 +92,17 @@ export default function Checkout() {
   const handlePayment = async () => {
     if (!data?.order) return;
 
-    setIsProcessing(true);
-
-    try {
-      // For now, simulate payment processing
-      // This will be replaced with actual Stripe integration later
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Update order status to paid
-      const { error } = await supabase
-        .from('orders')
-        .update({ 
-          status: 'paid',
-          payment_reference: `manual_${Date.now()}`
-        })
-        .eq('id', data.order.id);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Payment successful!',
-        description: 'Your order has been confirmed. Check your email for pickup details.',
-      });
-
-      navigate('/app/buyer/orders');
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      toast({
-        title: 'Payment failed',
-        description: error.message,
-        variant: 'destructive'
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+    // Payment integration not yet configured
+    // This button is disabled until Stripe is connected
+    toast({
+      title: 'Payment Not Available',
+      description: 'Payment processing is not yet configured. Please contact support.',
+      variant: 'destructive'
+    });
   };
+
+  // Check if payment system is ready (Stripe configured)
+  const isPaymentSystemReady = false; // Will be true once Stripe is integrated
 
   if (isLoading) {
     return (
@@ -308,16 +284,20 @@ export default function Checkout() {
               className="w-full" 
               size="lg"
               onClick={handlePayment}
-              disabled={isProcessing}
+              disabled={!isPaymentSystemReady || isProcessing}
             >
               {isProcessing ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing...
                 </>
+              ) : !isPaymentSystemReady ? (
+                <>
+                  Payment System Not Configured
+                </>
               ) : (
                 <>
-                  Confirm Order - ${totalAmount.toFixed(2)}
+                  Pay ${totalAmount.toFixed(2)}
                 </>
               )}
             </Button>
