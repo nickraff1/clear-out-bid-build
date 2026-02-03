@@ -10,6 +10,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import Index from "./pages/Index";
 import Marketplace from "./pages/Marketplace";
 import LotDetail from "./pages/LotDetail";
+import HowItWorks from "./pages/HowItWorks";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import ResetPassword from "./pages/auth/ResetPassword";
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/lot/:id" element={<LotDetail />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/reset-password" element={<ResetPassword />} />

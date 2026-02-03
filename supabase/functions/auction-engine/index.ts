@@ -67,7 +67,7 @@ serve(async (req) => {
       })
     }
 
-    const supabaseAnonKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     })
@@ -80,34 +80,37 @@ serve(async (req) => {
       })
     }
 
-    const url = new URL(req.url)
-    const path = url.pathname.split('/').pop()
+    // Parse action from request body
+    const body = await req.json()
+    const action = body.action || 'place-bid' // Default to place-bid for backwards compatibility
+
+    console.log(`[AUCTION] Action: ${action}, User: ${user.id}`)
 
     // Route to different actions
     if (req.method === 'POST') {
-      if (path === 'place-bid') {
-        return await handlePlaceBid(req, supabaseAdmin, user.id)
-      } else if (path === 'close-auction') {
-        return await handleCloseAuction(req, supabaseAdmin, user.id)
+      if (action === 'place-bid') {
+        return await handlePlaceBid(body, supabaseAdmin, user.id)
+      } else if (action === 'close-auction') {
+        return await handleCloseAuction(body, supabaseAdmin, user.id)
       }
     }
 
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Auction engine error:', error)
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return new Response(JSON.stringify({ error: 'Internal server error', details: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 })
 
-async function handlePlaceBid(req: Request, supabase: any, userId: string) {
-  const body: BidRequest = await req.json()
+async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
   const { lot_id, amount, org_id } = body
 
   console.log(`[AUCTION] Bid request: user=${userId}, lot=${lot_id}, amount=${amount}`)
@@ -302,8 +305,7 @@ async function handlePlaceBid(req: Request, supabase: any, userId: string) {
   })
 }
 
-async function handleCloseAuction(req: Request, supabase: any, userId: string) {
-  const body: CloseAuctionRequest = await req.json()
+async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, userId: string) {
   const { lot_id } = body
 
   console.log(`[AUCTION] Close auction request: lot=${lot_id}`)
