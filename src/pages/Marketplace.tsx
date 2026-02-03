@@ -167,35 +167,35 @@ export default function Marketplace() {
 
             {/* Desktop Filters */}
             <div className="hidden sm:flex gap-2">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <Select value={categoryFilter || 'all'} onValueChange={(v) => setCategoryFilter(v === 'all' ? '' : v)}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   {DEFAULT_CATEGORIES.map(cat => (
                     <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              <Select value={pricingType} onValueChange={setPricingType}>
+              <Select value={pricingType || 'all'} onValueChange={(v) => setPricingType(v === 'all' ? '' : v)}>
                 <SelectTrigger className="w-[130px]">
                   <SelectValue placeholder="Buy Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="auction">Auction</SelectItem>
                   <SelectItem value="fixed">Buy Now</SelectItem>
                 </SelectContent>
               </Select>
 
-              <Select value={stateFilter} onValueChange={setStateFilter}>
+              <Select value={stateFilter || 'all'} onValueChange={(v) => setStateFilter(v === 'all' ? '' : v)}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="State" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All States</SelectItem>
+                  <SelectItem value="all">All States</SelectItem>
                   {AUSTRALIAN_STATES.map(state => (
                     <SelectItem key={state.value} value={state.value}>{state.value}</SelectItem>
                   ))}
@@ -220,35 +220,35 @@ export default function Marketplace() {
         {/* Mobile Filters Panel */}
         {showFilters && (
           <div className="sm:hidden mb-6 p-4 bg-muted/50 rounded-lg space-y-3">
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={categoryFilter || 'all'} onValueChange={(v) => setCategoryFilter(v === 'all' ? '' : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {DEFAULT_CATEGORIES.map(cat => (
                   <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select value={pricingType} onValueChange={setPricingType}>
+            <Select value={pricingType || 'all'} onValueChange={(v) => setPricingType(v === 'all' ? '' : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Buy Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="auction">Auction</SelectItem>
                 <SelectItem value="fixed">Buy Now</SelectItem>
               </SelectContent>
             </Select>
 
-            <Select value={stateFilter} onValueChange={setStateFilter}>
+            <Select value={stateFilter || 'all'} onValueChange={(v) => setStateFilter(v === 'all' ? '' : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="State" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All States</SelectItem>
+                <SelectItem value="all">All States</SelectItem>
                 {AUSTRALIAN_STATES.map(state => (
                   <SelectItem key={state.value} value={state.value}>{state.value}</SelectItem>
                 ))}
