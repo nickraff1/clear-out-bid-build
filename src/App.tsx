@@ -57,8 +57,8 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <OnboardingWizard />
         <BrowserRouter>
+          <OnboardingWizard />
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Index />} />

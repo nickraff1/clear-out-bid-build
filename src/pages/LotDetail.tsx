@@ -160,38 +160,35 @@ export default function LotDetail() {
 
     setBidLoading(true);
     try {
-      // Insert bid
-      const { error: bidError } = await supabase.from('bids').insert({
-        lot_id: lot.id,
-        user_id: user.id,
-        org_id: primaryOrg.id,
-        amount
+      // Use auction engine edge function for server-side validation
+      const { data, error } = await supabase.functions.invoke('auction-engine/place-bid', {
+        body: {
+          lot_id: lot.id,
+          amount,
+          org_id: primaryOrg.id
+        }
       });
 
-      if (bidError) throw bidError;
-
-      // Update lot current bid
-      await supabase.from('lots').update({
-        current_bid: amount,
-        bid_count: (lot.bid_count ?? 0) + 1
-      }).eq('id', lot.id);
-
-      // Create bid event
-      await supabase.from('bid_events').insert({
-        bid_id: crypto.randomUUID(), // Would come from the insert
-        lot_id: lot.id,
-        user_id: user.id,
-        org_id: primaryOrg.id,
-        amount,
-        event_type: 'bid_placed'
-      });
+      if (error) throw error;
+      
+      if (data?.error) {
+        setBidError(data.error);
+        return;
+      }
 
       setBidSuccess(true);
       setBidAmount('');
+      
+      // Show soft close extension message if applicable
+      if (data?.soft_close_extended) {
+        setBidError(''); // Clear any error
+        // The success message will show that bid was placed
+      }
+      
       fetchLot();
       fetchBids();
     } catch (error: any) {
-      setBidError(error.message);
+      setBidError(error.message || 'Failed to place bid');
     } finally {
       setBidLoading(false);
     }
