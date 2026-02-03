@@ -41,6 +41,7 @@ export default function AppLayout() {
     { to: '/app/seller/lots', label: 'All Lots', icon: Package },
     { to: '/app/seller/orders', label: 'Sales', icon: FileText },
     { to: '/app/seller/pickups', label: 'Pickups', icon: Truck },
+    { to: '/app/seller/payments', label: 'Payments', icon: Tag },
   ];
 
   const adminNav = [

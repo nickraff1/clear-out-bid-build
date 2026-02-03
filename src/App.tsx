@@ -37,9 +37,12 @@ import BuyerBids from "./pages/app/buyer/BuyerBids";
 import BuyerOrders from "./pages/app/buyer/BuyerOrders";
 import BuyerWatchlist from "./pages/app/buyer/BuyerWatchlist";
 import BuyerAlerts from "./pages/app/buyer/BuyerAlerts";
+import Checkout from "./pages/app/buyer/Checkout";
 
 // Common App Pages
 import AppSettings from "./pages/app/AppSettings";
+import AddRole from "./pages/app/AddRole";
+import PaymentSettings from "./pages/app/seller/PaymentSettings";
 
 // Legacy Dashboard (keep for now)
 import Dashboard from "./pages/Dashboard";
@@ -141,9 +144,22 @@ const App = () => (
                   <BuyerAlerts />
                 </RoleGuard>
               } />
+              <Route path="/app/buyer/checkout/:orderId" element={
+                <RoleGuard allowedRoles={['buyer', 'admin']}>
+                  <Checkout />
+                </RoleGuard>
+              } />
+
+              {/* Seller Payment Settings */}
+              <Route path="/app/seller/payments" element={
+                <RoleGuard allowedRoles={['seller', 'admin']}>
+                  <PaymentSettings />
+                </RoleGuard>
+              } />
 
               {/* Common Routes */}
               <Route path="/app/settings" element={<AppSettings />} />
+              <Route path="/app/add-role" element={<AddRole />} />
             </Route>
 
             {/* Legacy Dashboard Routes */}
