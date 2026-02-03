@@ -138,14 +138,11 @@ export function PortalSwitcher({ activePortal, onPortalChange }: PortalSwitcherP
           <div className="flex items-center gap-2">
             <div className={cn(
               "h-8 w-8 rounded-md flex items-center justify-center",
-              activePortal === 'seller' ? 'bg-secondary' : 'bg-primary/10'
+              activePortal === 'seller' ? 'bg-primary/10' : 'bg-primary/10'
             )}>
-              <currentPortalInfo.icon className={cn(
-                "h-4 w-4",
-                activePortal === 'seller' ? 'text-secondary-foreground' : 'text-primary'
-              )} />
+              <currentPortalInfo.icon className="h-4 w-4 text-primary" />
             </div>
-            <span className="font-medium text-sm">{currentPortalInfo.label}</span>
+            <span className="font-medium text-sm text-primary">{currentPortalInfo.label}</span>
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
