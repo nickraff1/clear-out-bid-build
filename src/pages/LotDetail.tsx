@@ -161,8 +161,9 @@ export default function LotDetail() {
     setBidLoading(true);
     try {
       // Use auction engine edge function for server-side validation
-      const { data, error } = await supabase.functions.invoke('auction-engine/place-bid', {
+      const { data, error } = await supabase.functions.invoke('auction-engine', {
         body: {
+          action: 'place-bid',
           lot_id: lot.id,
           amount,
           org_id: primaryOrg.id
