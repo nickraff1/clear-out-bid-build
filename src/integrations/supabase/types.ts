@@ -960,7 +960,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      lot_bid_stats: {
+        Row: {
+          bid_count: number | null
+          highest_bid: number | null
+          lot_id: string | null
+          lowest_bid: number | null
+          unique_bidders: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bids_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       has_role: {
