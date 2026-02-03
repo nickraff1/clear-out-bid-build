@@ -201,15 +201,20 @@ export default function LotDetail() {
       return;
     }
 
-    // Create order
+    // Create order with buyer fee (10%)
     try {
+      const basePrice = lot.fixed_price!;
+      const buyerFee = basePrice * 0.10; // 10% buyer fee
+      const totalAmount = basePrice + buyerFee;
+
       const { error } = await supabase.from('orders').insert({
         buyer_id: user.id,
         buyer_org_id: primaryOrg.id,
         lot_id: lot.id,
         event_id: lot.event_id,
-        amount: lot.fixed_price!,
-        status: 'pending_payment'
+        amount: totalAmount, // Total including buyer fee
+        status: 'pending_payment',
+        notes: `Base price: $${basePrice.toFixed(2)}, Buyer fee (10%): $${buyerFee.toFixed(2)}`
       });
 
       if (error) throw error;
@@ -217,7 +222,7 @@ export default function LotDetail() {
       // Update lot status
       await supabase.from('lots').update({ status: 'sold' }).eq('id', lot.id);
 
-      navigate('/dashboard/orders');
+      navigate('/app/buyer/orders');
     } catch (error) {
       console.error('Error creating order:', error);
     }
@@ -425,13 +430,18 @@ export default function LotDetail() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Bid increment: ${getBidIncrement(currentPrice)}
+                    Bid increment: ${getBidIncrement(currentPrice)} • 10% buyer fee applies to winning bid
                   </p>
                 </form>
               ) : !isAuction && lot.status === 'active' ? (
-                <Button variant="hero" size="lg" className="w-full" onClick={handleBuyNow}>
-                  Buy Now - ${(lot.fixed_price ?? 0).toLocaleString()}
-                </Button>
+                <div className="space-y-2">
+                  <Button variant="hero" size="lg" className="w-full" onClick={handleBuyNow}>
+                    Buy Now - ${((lot.fixed_price ?? 0) * 1.10).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Price ${(lot.fixed_price ?? 0).toLocaleString()} + 10% buyer fee
+                  </p>
+                </div>
               ) : null}
 
               <div className="flex gap-2">
