@@ -2,7 +2,7 @@ import { Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck, MessageSquare } from 'lucide-react';
+import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PortalSwitcher } from './PortalSwitcher';
 import { useActivePortal } from '@/hooks/useActivePortal';
@@ -40,6 +40,7 @@ export default function AppLayout() {
     { to: '/app/seller/overview', label: 'Overview', icon: LayoutDashboard },
     { to: '/app/seller/events', label: 'Events', icon: Calendar },
     { to: '/app/seller/lots', label: 'Listings', icon: Package },
+    { to: '/app/seller/bulk-upload', label: 'Bulk upload', icon: Upload },
     { to: '/app/seller/orders', label: 'Sales', icon: FileText },
     { to: '/app/seller/pickups', label: 'Pickups', icon: Truck },
     { to: '/app/messages', label: 'Messages', icon: MessageSquare },
@@ -48,10 +49,12 @@ export default function AppLayout() {
 
   const adminNav = [
     { to: '/app/admin/overview', label: 'Overview', icon: LayoutDashboard },
-    { to: '/app/admin/organizations', label: 'Organizations', icon: Building2 },
-    { to: '/app/admin/moderation', label: 'Moderation', icon: Package },
     { to: '/app/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/app/admin/users', label: 'Users', icon: Users },
+    { to: '/app/admin/listings', label: 'Listings', icon: Package },
+    { to: '/app/admin/orders', label: 'Orders', icon: ShoppingCart },
+    { to: '/app/admin/reports', label: 'Reports', icon: Flag },
+    { to: '/app/admin/fees', label: 'Fees', icon: DollarSign },
   ];
 
   const commonNav = [

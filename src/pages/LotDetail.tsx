@@ -28,6 +28,7 @@ import type { Lot, LotMedia, ClearanceEvent, Category, ComplianceTag, Bid, Organ
 import { LOT_CONDITIONS, getMinNextBid, getBidIncrement } from '@/lib/constants';
 import { formatDistanceToNow, isPast, parseISO, format } from 'date-fns';
 import { MessageSellerDialog } from '@/components/messaging/MessageSellerDialog';
+import { ReportLotDialog } from '@/components/lots/ReportLotDialog';
 
 type LotWithDetails = Lot & {
   media: LotMedia[];
