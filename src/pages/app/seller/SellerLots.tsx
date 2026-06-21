@@ -177,6 +177,7 @@ export default function SellerLots() {
                 <TableHead>Type</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -221,6 +222,38 @@ export default function SellerLots() {
                     <Badge variant={getStatusColor(lot.status)}>
                       {lot.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {lot.status === 'draft' && (
+                          <DropdownMenuItem onClick={() => setLotStatus(lot.id, 'active')}>
+                            <Eye className="h-4 w-4 mr-2" /> Publish
+                          </DropdownMenuItem>
+                        )}
+                        {lot.status === 'active' && (
+                          <DropdownMenuItem onClick={() => setLotStatus(lot.id, 'draft')}>
+                            <EyeOff className="h-4 w-4 mr-2" /> Unpublish
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem asChild>
+                          <Link to={`/app/seller/lots/${lot.id}/edit`}>
+                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => deleteLot(lot.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
