@@ -55,6 +55,7 @@ import AdminListings from "./pages/app/admin/AdminListings";
 import AdminOrders from "./pages/app/admin/AdminOrders";
 import AdminReports from "./pages/app/admin/AdminReports";
 import AdminPayouts from "./pages/app/admin/AdminPayouts";
+import AdminLaunch from "./pages/app/admin/AdminLaunch";
 import SellerPayouts from "./pages/app/seller/SellerPayouts";
 
 // Seller bulk
@@ -249,6 +250,9 @@ const App = () => (
               } />
               <Route path="/app/admin/payouts" element={
                 <RoleGuard allowedRoles={['admin']}><AdminPayouts /></RoleGuard>
+              } />
+              <Route path="/app/admin/launch" element={
+                <RoleGuard allowedRoles={['admin']}><AdminLaunch /></RoleGuard>
               } />
 
               {/* Seller bulk upload */}
