@@ -133,23 +133,22 @@ export default function BuyerBids() {
 
       {/* Bids Table */}
       {filteredBids.length === 0 ? (
-        <div className="text-center py-16 dashboard-card">
-          <Gavel className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">
-            {bids.length === 0 ? 'No bids yet' : 'No matching bids'}
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            {bids.length === 0 
-              ? 'Start bidding on auction lots in the marketplace.'
-              : 'Try adjusting your search or filter criteria.'
-            }
-          </p>
-          {bids.length === 0 && (
-            <Button asChild>
-              <Link to="/marketplace">Browse Marketplace</Link>
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icon={Gavel}
+          title={bids.length === 0 ? 'No bids yet' : 'No matching bids'}
+          description={
+            bids.length === 0
+              ? 'Place a bid on an auction listing to track it here.'
+              : 'Try adjusting your search or filter to see more results.'
+          }
+          action={
+            bids.length === 0 ? (
+              <Button asChild>
+                <Link to="/marketplace">Browse marketplace</Link>
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <div className="dashboard-card p-0 overflow-hidden">
           <Table>

@@ -139,23 +139,22 @@ export default function BuyerOrders() {
 
       {/* Orders Table */}
       {filteredOrders.length === 0 ? (
-        <div className="text-center py-16 dashboard-card">
-          <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">
-            {orders.length === 0 ? 'No orders yet' : 'No matching orders'}
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            {orders.length === 0 
-              ? 'Your purchases will appear here.'
-              : 'Try adjusting your search or filter criteria.'
-            }
-          </p>
-          {orders.length === 0 && (
-            <Button asChild>
-              <Link to="/marketplace">Browse Marketplace</Link>
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icon={ShoppingCart}
+          title={orders.length === 0 ? 'No orders yet' : 'No matching orders'}
+          description={
+            orders.length === 0
+              ? 'When you win an auction or buy now, your order will show up here.'
+              : 'Try adjusting your search or filter to see more results.'
+          }
+          action={
+            orders.length === 0 ? (
+              <Button asChild>
+                <Link to="/marketplace">Browse marketplace</Link>
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <div className="dashboard-card p-0 overflow-hidden">
           <Table>

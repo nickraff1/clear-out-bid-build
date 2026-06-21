@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { LotCard } from '@/components/lots/LotCard';
 import { Heart, Loader2, Trash2 } from 'lucide-react';
+import { EmptyState } from '@/components/app/EmptyState';
 import type { Watchlist, Lot, LotMedia, ClearanceEvent, Category } from '@/types/database';
 
 type WatchlistItem = Watchlist & {
@@ -73,18 +74,16 @@ export default function BuyerWatchlist() {
       </div>
 
       {items.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-            <Heart className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">Your watchlist is empty</h2>
-          <p className="text-muted-foreground mb-4">
-            Browse the marketplace and add items you're interested in.
-          </p>
-          <Button asChild>
-            <Link to="/marketplace">Browse Marketplace</Link>
-          </Button>
-        </div>
+        <EmptyState
+          icon={Heart}
+          title="Your watchlist is empty"
+          description="Tap the heart on any listing to save it here for later."
+          action={
+            <Button asChild>
+              <Link to="/marketplace">Browse marketplace</Link>
+            </Button>
+          }
+        />
       ) : (
         <div className="marketplace-grid">
           {items.map(item => (
