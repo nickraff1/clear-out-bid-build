@@ -240,17 +240,17 @@ export default function BuyerAlerts() {
 
       {/* Alerts List */}
       {alerts.length === 0 ? (
-        <div className="text-center py-16 dashboard-card">
-          <Bell className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No alerts set up</h3>
-          <p className="text-muted-foreground mb-4">
-            Create an alert to get notified when new lots match your criteria
-          </p>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Alert
-          </Button>
-        </div>
+        <EmptyState
+          icon={Bell}
+          title="No alerts set up"
+          description="Create an alert and we'll email you when new listings match your criteria."
+          action={
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create alert
+            </Button>
+          }
+        />
       ) : (
         <div className="grid gap-4">
           {alerts.map(alert => {

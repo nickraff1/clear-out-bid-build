@@ -105,17 +105,6 @@ export default function BuyerOverview() {
     }
   };
 
-  const getOrderStatusColor = (status: string) => {
-    const colors: Record<string, 'muted' | 'success' | 'info' | 'destructive' | 'warning'> = {
-      pending_payment: 'warning',
-      paid: 'success',
-      ready_for_pickup: 'info',
-      collected: 'success',
-      cancelled: 'destructive',
-    };
-    return colors[status] ?? 'muted';
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
