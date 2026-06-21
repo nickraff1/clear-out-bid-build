@@ -6,6 +6,7 @@ import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell,
 import { cn } from '@/lib/utils';
 import { PortalSwitcher } from './PortalSwitcher';
 import { useActivePortal } from '@/hooks/useActivePortal';
+import { NotificationsBell } from './NotificationsBell';
 
 export default function AppLayout() {
   const { user, isLoading, isAdmin, isSeller, isBuyer, profile } = useAuth();
@@ -53,6 +54,7 @@ export default function AppLayout() {
     { to: '/app/admin/launch', label: 'Launch readiness', icon: Rocket },
     { to: '/app/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/app/admin/users', label: 'Users', icon: Users },
+    { to: '/app/admin/sellers', label: 'Sellers', icon: Building2 },
     { to: '/app/admin/listings', label: 'Listings', icon: Package },
     { to: '/app/admin/orders', label: 'Orders', icon: ShoppingCart },
     { to: '/app/admin/payouts', label: 'Payouts', icon: DollarSign },
@@ -61,6 +63,7 @@ export default function AppLayout() {
   ];
 
   const commonNav = [
+    { to: '/app/notifications', label: 'Notifications', icon: Bell },
     { to: '/app/settings', label: 'Settings', icon: Settings },
   ];
 
@@ -192,6 +195,9 @@ export default function AppLayout() {
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto pb-20 md:pb-0">
+          <div className="sticky top-0 z-30 flex justify-end items-center gap-2 px-4 py-2 border-b border-border bg-background/95 backdrop-blur">
+            <NotificationsBell />
+          </div>
           <Outlet />
         </main>
       </div>
