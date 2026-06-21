@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { DollarSign, FileText, Loader2 } from 'lucide-react';
+import { ArrowUpRight, DollarSign, FileText, Loader2 } from 'lucide-react';
 import { EmptyState } from '@/components/app/EmptyState';
 import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
 import type { Order, Lot, ClearanceEvent, Profile } from '@/types/database';
@@ -117,6 +117,7 @@ export default function SellerOrders() {
                 <TableHead>Amount</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -146,6 +147,13 @@ export default function SellerOrders() {
                     <Badge variant={getStatusColor(order.status)}>
                       {formatStatus(order.status)}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link to={`/app/orders/${order.id}`}>
+                        Open <ArrowUpRight className="h-4 w-4 ml-1" />
+                      </Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
