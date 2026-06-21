@@ -279,6 +279,40 @@ export default function OrderDetail() {
         </Alert>
       )}
 
+      {/* Next step guidance */}
+      {paid && !completed && (() => {
+        let msg = '';
+        if (isBuyer) {
+          if (order.pickup_status === 'awaiting_arrangement' && !order.proposed_pickup_at) {
+            msg = 'Next: propose a pickup time below, or message the seller to coordinate.';
+          } else if (order.pickup_status === 'pickup_proposed' && order.proposed_pickup_by === user?.id) {
+            msg = 'Waiting for the seller to accept your proposed pickup time.';
+          } else if (order.pickup_status === 'pickup_proposed') {
+            msg = 'Next: accept the seller’s proposed pickup time, or suggest another.';
+          } else if (order.status === 'ready_for_pickup') {
+            msg = 'Your item is ready. Bring the pickup code below to collect it.';
+          } else if (order.pickup_status === 'collected_pending_seller_confirmation') {
+            msg = 'Marked collected — waiting for the seller to confirm with your pickup code.';
+          } else {
+            msg = 'Next: arrange pickup with the seller using the controls below.';
+          }
+        } else {
+          if (order.status !== 'ready_for_pickup' && order.pickup_status !== 'collected_pending_seller_confirmation') {
+            msg = 'Next: confirm a pickup time, then mark the item ready for pickup.';
+          } else if (order.status === 'ready_for_pickup') {
+            msg = 'Buyer can collect. Enter their 6-digit code to confirm pickup.';
+          } else {
+            msg = 'Buyer marked collected — confirm with their pickup code to complete the order.';
+          }
+        }
+        return (
+          <Alert className="border-primary/30 bg-primary/5">
+            <Clock className="h-4 w-4" />
+            <AlertDescription>{msg}</AlertDescription>
+          </Alert>
+        );
+      })()}
+
       <div className="grid md:grid-cols-3 gap-6">
         {/* Left column */}
         <div className="md:col-span-2 space-y-6">
