@@ -82,6 +82,35 @@ export default function CreateLot() {
     }
   };
 
+  // Auto-create a default "Ongoing listings" event if seller has none
+  const ensureDefaultEvent = async (): Promise<string | null> => {
+    if (formData.event_id) return formData.event_id;
+    if (events.length > 0) return events[0].id;
+    if (!primaryOrg || !user) return null;
+    const now = new Date();
+    const end = new Date(); end.setMonth(end.getMonth() + 3);
+    const { data, error } = await supabase
+      .from('clearance_events')
+      .insert({
+        org_id: primaryOrg.id,
+        created_by: user.id,
+        title: 'Ongoing listings',
+        site_address: primaryOrg.address ?? 'TBC',
+        suburb: primaryOrg.suburb ?? 'TBC',
+        state: primaryOrg.state ?? 'NSW',
+        postcode: primaryOrg.postcode ?? '',
+        pickup_start: now.toISOString(),
+        pickup_end: end.toISOString(),
+        status: 'active',
+      })
+      .select('id').single();
+    if (error) {
+      console.error('ensureDefaultEvent', error);
+      return null;
+    }
+    return data.id;
+  };
+
   const updateFormData = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
