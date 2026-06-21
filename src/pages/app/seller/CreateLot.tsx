@@ -19,6 +19,9 @@ import {
 import { ArrowLeft, Camera, Check, Gavel, Loader2, Tag, Trash2, X } from 'lucide-react';
 import { DEFAULT_CATEGORIES, LOT_CONDITIONS } from '@/lib/constants';
 import type { ClearanceEvent, ComplianceTag } from '@/types/database';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Link } from 'react-router-dom';
+import { ShieldCheck } from 'lucide-react';
 
 const COMPLIANCE_TAGS = [
   'Fire Rated',
@@ -41,6 +44,16 @@ export default function CreateLot() {
   const [error, setError] = useState('');
   const [events, setEvents] = useState<ClearanceEvent[]>([]);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
+
+  const [attestations, setAttestations] = useState({
+    ownership: false,
+    notStolen: false,
+    notHazardous: false,
+    noAsbestos: false,
+    accurateDescription: false,
+    accuratePickup: false,
+  });
+  const allAttested = Object.values(attestations).every(Boolean);
 
   const [formData, setFormData] = useState({
     event_id: searchParams.get('eventId') || '',
@@ -179,7 +192,12 @@ export default function CreateLot() {
         return false;
       }
     }
-    
+
+    if (formData.publish && !allAttested) {
+      setError('Please confirm all safety and accuracy statements before publishing.');
+      return false;
+    }
+
     return true;
   };
 
