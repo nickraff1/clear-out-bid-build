@@ -44,6 +44,20 @@ import AppSettings from "./pages/app/AppSettings";
 import AddRole from "./pages/app/AddRole";
 import PaymentSettings from "./pages/app/seller/PaymentSettings";
 
+// Admin
+import AdminFees from "./pages/app/admin/AdminFees";
+
+// SEO Landing Pages
+import {
+  SellSurplusSydney,
+  BuyCheapMaterialsSydney,
+  ConstructionWasteMarketplaceSydney,
+  StoneOffcutsSydney,
+  TimberOffcutsSydney,
+  TileOffcutsSydney,
+  MetalOffcutsSydney,
+} from "./pages/seo/pages";
+
 // Legacy Dashboard (keep for now)
 import Dashboard from "./pages/Dashboard";
 import DashboardOverview from "./pages/dashboard/Overview";
@@ -72,6 +86,15 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* SEO Landing Pages */}
+            <Route path="/sell-surplus-building-materials-sydney" element={<SellSurplusSydney />} />
+            <Route path="/buy-cheap-building-materials-sydney" element={<BuyCheapMaterialsSydney />} />
+            <Route path="/construction-waste-marketplace-sydney" element={<ConstructionWasteMarketplaceSydney />} />
+            <Route path="/stone-offcuts-sydney" element={<StoneOffcutsSydney />} />
+            <Route path="/timber-offcuts-sydney" element={<TimberOffcutsSydney />} />
+            <Route path="/tile-offcuts-sydney" element={<TileOffcutsSydney />} />
+            <Route path="/metal-offcuts-sydney" element={<MetalOffcutsSydney />} />
             
             {/* App Portal Routes */}
             <Route path="/app" element={<AppRedirect />} />
@@ -154,6 +177,13 @@ const App = () => (
               <Route path="/app/seller/payments" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <PaymentSettings />
+                </RoleGuard>
+              } />
+
+              {/* Admin */}
+              <Route path="/app/admin/fees" element={
+                <RoleGuard allowedRoles={['admin']}>
+                  <AdminFees />
                 </RoleGuard>
               } />
 

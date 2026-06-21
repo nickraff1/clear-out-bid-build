@@ -55,6 +55,30 @@ export type Database = {
           },
         ]
       }
+      analytics_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          id: string
+          props: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          id?: string
+          props?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          id?: string
+          props?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       bid_events: {
         Row: {
           amount: number
@@ -158,12 +182,125 @@ export type Database = {
           },
         ]
       }
+      bulk_import_rows: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          import_id: string
+          lot_id: string | null
+          payload: Json
+          row_index: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          import_id: string
+          lot_id?: string | null
+          payload: Json
+          row_index: number
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          import_id?: string
+          lot_id?: string | null
+          payload?: Json
+          row_index?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_rows_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_import_rows_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_imports: {
+        Row: {
+          created_at: string
+          created_by: string
+          event_id: string | null
+          file_name: string | null
+          id: string
+          rows_error: number
+          rows_ok: number
+          rows_total: number
+          seller_org_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          event_id?: string | null
+          file_name?: string | null
+          id?: string
+          rows_error?: number
+          rows_ok?: number
+          rows_total?: number
+          seller_org_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          event_id?: string | null
+          file_name?: string | null
+          id?: string
+          rows_error?: number
+          rows_ok?: number
+          rows_total?: number
+          seller_org_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_imports_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "clearance_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_imports_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "clearance_events_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_imports_seller_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
           description: string | null
           icon: string | null
           id: string
+          kg_per_unit: number | null
           name: string
           parent_id: string | null
           slug: string
@@ -174,6 +311,7 @@ export type Database = {
           description?: string | null
           icon?: string | null
           id?: string
+          kg_per_unit?: number | null
           name: string
           parent_id?: string | null
           slug: string
@@ -184,6 +322,7 @@ export type Database = {
           description?: string | null
           icon?: string | null
           id?: string
+          kg_per_unit?: number | null
           name?: string
           parent_id?: string | null
           slug?: string
@@ -298,6 +437,75 @@ export type Database = {
         }
         Relationships: []
       }
+      conversations: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          id: string
+          last_message_at: string
+          lot_id: string | null
+          seller_org_id: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          lot_id?: string | null
+          seller_org_id: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          lot_id?: string | null
+          seller_org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_seller_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fee_settings: {
+        Row: {
+          buyer_fee_pct: number
+          id: string
+          seller_fee_pct: number
+          singleton: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          buyer_fee_pct?: number
+          id?: string
+          seller_fee_pct?: number
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          buyer_fee_pct?: number
+          id?: string
+          seller_fee_pct?: number
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       lot_compliance_tags: {
         Row: {
           lot_id: string
@@ -366,10 +574,55 @@ export type Database = {
           },
         ]
       }
+      lot_reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          lot_id: string
+          reason: string
+          reporter_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          lot_id: string
+          reason: string
+          reporter_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          lot_id?: string
+          reason?: string
+          reporter_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lot_reports_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lots: {
         Row: {
           auction_end: string | null
           bid_count: number | null
+          buy_now_price: number | null
           category_id: string | null
           condition: Database["public"]["Enums"]["lot_condition"]
           created_at: string
@@ -378,18 +631,26 @@ export type Database = {
           event_id: string
           fixed_price: number | null
           id: string
+          is_featured: boolean | null
+          min_bid_increment: number | null
           pricing_type: Database["public"]["Enums"]["pricing_type"]
+          prohibited_materials_confirmed: boolean | null
           quantity: number
+          reserve_met: boolean | null
           reserve_price: number | null
+          retail_estimate: number | null
           start_price: number | null
           status: Database["public"]["Enums"]["lot_status"]
           title: string
           unit: string | null
           updated_at: string
+          view_count: number | null
+          winning_bidder_id: string | null
         }
         Insert: {
           auction_end?: string | null
           bid_count?: number | null
+          buy_now_price?: number | null
           category_id?: string | null
           condition?: Database["public"]["Enums"]["lot_condition"]
           created_at?: string
@@ -398,18 +659,26 @@ export type Database = {
           event_id: string
           fixed_price?: number | null
           id?: string
+          is_featured?: boolean | null
+          min_bid_increment?: number | null
           pricing_type?: Database["public"]["Enums"]["pricing_type"]
+          prohibited_materials_confirmed?: boolean | null
           quantity?: number
+          reserve_met?: boolean | null
           reserve_price?: number | null
+          retail_estimate?: number | null
           start_price?: number | null
           status?: Database["public"]["Enums"]["lot_status"]
           title: string
           unit?: string | null
           updated_at?: string
+          view_count?: number | null
+          winning_bidder_id?: string | null
         }
         Update: {
           auction_end?: string | null
           bid_count?: number | null
+          buy_now_price?: number | null
           category_id?: string | null
           condition?: Database["public"]["Enums"]["lot_condition"]
           created_at?: string
@@ -418,14 +687,21 @@ export type Database = {
           event_id?: string
           fixed_price?: number | null
           id?: string
+          is_featured?: boolean | null
+          min_bid_increment?: number | null
           pricing_type?: Database["public"]["Enums"]["pricing_type"]
+          prohibited_materials_confirmed?: boolean | null
           quantity?: number
+          reserve_met?: boolean | null
           reserve_price?: number | null
+          retail_estimate?: number | null
           start_price?: number | null
           status?: Database["public"]["Enums"]["lot_status"]
           title?: string
           unit?: string | null
           updated_at?: string
+          view_count?: number | null
+          winning_bidder_id?: string | null
         }
         Relationships: [
           {
@@ -447,6 +723,41 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "clearance_events_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -623,59 +934,78 @@ export type Database = {
         Row: {
           abn: string | null
           address: string | null
+          bio: string | null
           created_at: string
           email: string | null
           id: string
           is_approved: boolean | null
           is_disabled: boolean | null
+          is_founding: boolean | null
+          is_verified: boolean | null
           logo_url: string | null
           name: string
           org_type: Database["public"]["Enums"]["org_type"]
           phone: string | null
           postcode: string | null
+          rating_avg: number | null
+          rating_count: number | null
           state: string | null
           suburb: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
           abn?: string | null
           address?: string | null
+          bio?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_approved?: boolean | null
           is_disabled?: boolean | null
+          is_founding?: boolean | null
+          is_verified?: boolean | null
           logo_url?: string | null
           name: string
           org_type: Database["public"]["Enums"]["org_type"]
           phone?: string | null
           postcode?: string | null
+          rating_avg?: number | null
+          rating_count?: number | null
           state?: string | null
           suburb?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
           abn?: string | null
           address?: string | null
+          bio?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_approved?: boolean | null
           is_disabled?: boolean | null
+          is_founding?: boolean | null
+          is_verified?: boolean | null
           logo_url?: string | null
           name?: string
           org_type?: Database["public"]["Enums"]["org_type"]
           phone?: string | null
           postcode?: string | null
+          rating_avg?: number | null
+          rating_count?: number | null
           state?: string | null
           suburb?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
       payments: {
         Row: {
           amount_charged: number
+          application_fee_amount: number | null
           base_amount: number
           buyer_fee: number
           created_at: string
@@ -688,10 +1018,13 @@ export type Database = {
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id: string | null
           stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+          stripe_transfer_id: string | null
           updated_at: string
         }
         Insert: {
           amount_charged: number
+          application_fee_amount?: number | null
           base_amount: number
           buyer_fee?: number
           created_at?: string
@@ -704,10 +1037,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          stripe_transfer_id?: string | null
           updated_at?: string
         }
         Update: {
           amount_charged?: number
+          application_fee_amount?: number | null
           base_amount?: number
           buyer_fee?: number
           created_at?: string
@@ -720,6 +1056,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          stripe_transfer_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -822,6 +1160,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          bio: string | null
           created_at: string
           email: string
           full_name: string | null
@@ -831,6 +1170,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -840,6 +1180,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
@@ -848,6 +1189,99 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          order_id: string
+          rating: number
+          reviewee_id: string
+          reviewee_org_id: string | null
+          reviewer_id: string
+          reviewer_role: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          order_id: string
+          rating: number
+          reviewee_id: string
+          reviewee_org_id?: string | null
+          reviewer_id: string
+          reviewer_role: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          order_id?: string
+          rating?: number
+          reviewee_id?: string
+          reviewee_org_id?: string | null
+          reviewer_id?: string
+          reviewer_role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewee_org_id_fkey"
+            columns: ["reviewee_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_search_alerts: {
+        Row: {
+          id: string
+          lot_id: string
+          read_at: string | null
+          saved_search_id: string
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          lot_id: string
+          read_at?: string | null
+          saved_search_id: string
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          lot_id?: string
+          read_at?: string | null
+          saved_search_id?: string
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_search_alerts_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_search_alerts_saved_search_id_fkey"
+            columns: ["saved_search_id"]
+            isOneToOne: false
+            referencedRelation: "saved_searches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_searches: {
         Row: {
@@ -884,8 +1318,42 @@ export type Database = {
           },
         ]
       }
+      seller_badges: {
+        Row: {
+          badge: string
+          granted_at: string
+          granted_by: string | null
+          id: string
+          org_id: string
+        }
+        Insert: {
+          badge: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          org_id: string
+        }
+        Update: {
+          badge?: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_badges_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seller_stripe_accounts: {
         Row: {
+          account_status: string | null
+          charges_enabled: boolean | null
           created_at: string
           details_submitted: boolean | null
           id: string
@@ -896,6 +1364,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_status?: string | null
+          charges_enabled?: boolean | null
           created_at?: string
           details_submitted?: boolean | null
           id?: string
@@ -906,6 +1376,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_status?: string | null
+          charges_enabled?: boolean | null
           created_at?: string
           details_submitted?: boolean | null
           id?: string
@@ -1080,6 +1552,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_conversation_participant: {
+        Args: { _conv_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_org_member: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
@@ -1094,7 +1570,14 @@ export type Database = {
         | "buyer_staff"
       event_status: "draft" | "active" | "completed" | "cancelled"
       lot_condition: "unused" | "like_new" | "good" | "fair"
-      lot_status: "draft" | "active" | "sold" | "unsold" | "cancelled"
+      lot_status:
+        | "draft"
+        | "active"
+        | "sold"
+        | "unsold"
+        | "cancelled"
+        | "reserved"
+        | "expired"
       order_status:
         | "pending_payment"
         | "paid"
@@ -1246,7 +1729,15 @@ export const Constants = {
       ],
       event_status: ["draft", "active", "completed", "cancelled"],
       lot_condition: ["unused", "like_new", "good", "fair"],
-      lot_status: ["draft", "active", "sold", "unsold", "cancelled"],
+      lot_status: [
+        "draft",
+        "active",
+        "sold",
+        "unsold",
+        "cancelled",
+        "reserved",
+        "expired",
+      ],
       order_status: [
         "pending_payment",
         "paid",
