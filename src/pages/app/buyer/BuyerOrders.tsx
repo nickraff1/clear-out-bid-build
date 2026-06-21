@@ -7,24 +7,11 @@ import { EmptyState } from '@/components/app/EmptyState';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { ArrowUpRight, CreditCard, Filter, Loader2, MapPin, Search, ShoppingCart } from 'lucide-react';
+import { ArrowRight, CreditCard, Filter, Loader2, Search, ShoppingCart } from 'lucide-react';
 import type { Order, Lot, ClearanceEvent } from '@/types/database';
-import { format, parseISO } from 'date-fns';
-import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
+import { formatDistanceToNow, parseISO } from 'date-fns';
 import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
 
 type OrderWithDetails = Order & {
@@ -82,7 +69,8 @@ export default function BuyerOrders() {
   const formatStatus = orderStatusLabel;
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.lot?.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const title = order.lot?.title ?? '';
+    const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -149,75 +137,62 @@ export default function BuyerOrders() {
           }
         />
       ) : (
-        <div className="dashboard-card p-0 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>Pickup Location</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map(order => (
-                <TableRow key={order.id}>
-                  <TableCell>
-                    <Link 
-                      to={`/lot/${order.lot_id}`}
-                      className="font-medium hover:text-primary transition-colors"
-                    >
-                      {order.lot?.title}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      <MapPin className="h-3 w-3" />
-                      {order.event?.suburb}, {order.event?.state}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    ${order.amount.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {format(parseISO(order.created_at), 'MMM d, yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusBadge(order.status)}>
-                      {formatStatus(order.status)}
+        <div className="space-y-3">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Buying ({filteredOrders.length})
+          </p>
+          {filteredOrders.map(order => {
+            const total = Number(order.amount ?? 0);
+            const base = Math.round((total / 1.10) * 100) / 100;
+            const fee = Math.round((total - base) * 100) / 100;
+            const target =
+              order.status === 'pending_payment'
+                ? `/app/buyer/checkout/${order.id}`
+                : `/app/orders/${order.id}`;
+            return (
+              <div
+                key={order.id}
+                className="dashboard-card p-4 flex flex-col md:flex-row md:items-center gap-4"
+              >
+                <div className="md:w-48">
+                  <p className="font-semibold">
+                    {order.lot?.title ?? 'Order'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Buying · {formatDistanceToNow(parseISO(order.created_at), { addSuffix: true })}
+                  </p>
+                </div>
+
+                <div className="flex-1 text-sm">
+                  <p className="text-muted-foreground">
+                    Item ${base.toFixed(0)} · Fee ${fee.toFixed(0)}
+                  </p>
+                  <p className="font-semibold">Total ${total.toFixed(0)}</p>
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant={getStatusBadge(order.status)}>
+                    {formatStatus(order.status)}
+                  </Badge>
+                  {order.pickup_status && order.pickup_status !== 'completed' && (
+                    <Badge variant="muted">
+                      {order.pickup_status.replace(/_/g, ' ')}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 justify-end">
-                      {order.status === 'pending_payment' && (
-                        <Button size="sm" asChild>
-                          <Link to={`/app/buyer/checkout/${order.id}`}>
-                            <CreditCard className="h-4 w-4 mr-1" />Pay
-                          </Link>
-                        </Button>
-                      )}
-                      {order.status === 'collected' && !order.has_review && order.lot?.event?.created_by && (
-                        <LeaveReviewDialog
-                          orderId={order.id}
-                          revieweeId={order.lot.event.created_by}
-                          revieweeOrgId={order.lot.event.org_id}
-                          reviewerRole="buyer"
-                          onReviewed={fetchOrders}
-                        />
-                      )}
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/app/orders/${order.id}`}>
-                          View <ArrowUpRight className="h-4 w-4 ml-1" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  )}
+                </div>
+
+                <Button asChild size="sm" className="md:w-auto">
+                  <Link to={target}>
+                    {order.status === 'pending_payment' ? (
+                      <><CreditCard className="h-4 w-4 mr-1" /> Pay now</>
+                    ) : (
+                      <>Manage <ArrowRight className="h-4 w-4 ml-1" /></>
+                    )}
+                  </Link>
+                </Button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
