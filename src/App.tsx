@@ -16,6 +16,13 @@ import Signup from "./pages/auth/Signup";
 import ResetPassword from "./pages/auth/ResetPassword";
 import NotFound from "./pages/NotFound";
 
+// Legal / policy pages
+import Terms from "./pages/legal/Terms";
+import Privacy from "./pages/legal/Privacy";
+import ProhibitedMaterials from "./pages/legal/ProhibitedMaterials";
+import PickupSafety from "./pages/legal/PickupSafety";
+import RefundsAndDisputes from "./pages/legal/RefundsAndDisputes";
+
 // App Portal
 import AppLayout from "./components/app/AppLayout";
 import AppRedirect from "./components/app/AppRedirect";
@@ -109,6 +116,13 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* Legal / Policy */}
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/prohibited-materials" element={<ProhibitedMaterials />} />
+            <Route path="/pickup-safety" element={<PickupSafety />} />
+            <Route path="/refunds-and-disputes" element={<RefundsAndDisputes />} />
 
             {/* SEO Landing Pages */}
             <Route path="/sell-surplus-building-materials-sydney" element={<SellSurplusSydney />} />

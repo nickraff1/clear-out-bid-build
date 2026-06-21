@@ -19,6 +19,9 @@ import {
 import { ArrowLeft, Camera, Check, Gavel, Loader2, Tag, Trash2, X } from 'lucide-react';
 import { DEFAULT_CATEGORIES, LOT_CONDITIONS } from '@/lib/constants';
 import type { ClearanceEvent, ComplianceTag } from '@/types/database';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Link } from 'react-router-dom';
+import { ShieldCheck } from 'lucide-react';
 
 const COMPLIANCE_TAGS = [
   'Fire Rated',
@@ -41,6 +44,16 @@ export default function CreateLot() {
   const [error, setError] = useState('');
   const [events, setEvents] = useState<ClearanceEvent[]>([]);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
+
+  const [attestations, setAttestations] = useState({
+    ownership: false,
+    notStolen: false,
+    notHazardous: false,
+    noAsbestos: false,
+    accurateDescription: false,
+    accuratePickup: false,
+  });
+  const allAttested = Object.values(attestations).every(Boolean);
 
   const [formData, setFormData] = useState({
     event_id: searchParams.get('eventId') || '',
@@ -140,7 +153,7 @@ export default function CreateLot() {
     });
   };
 
-  const validate = (): boolean => {
+  const validate = (publishing: boolean): boolean => {
     setError('');
     
     if (!formData.category) {
@@ -179,12 +192,17 @@ export default function CreateLot() {
         return false;
       }
     }
-    
+
+    if (publishing && !allAttested) {
+      setError('Please confirm all safety and accuracy statements before publishing.');
+      return false;
+    }
+
     return true;
   };
 
-  const handleSubmit = async () => {
-    if (!validate() || !user) return;
+  const handleSubmit = async (publishing: boolean) => {
+    if (!validate(publishing) || !user) return;
     
     setLoading(true);
     setError('');
@@ -208,7 +226,7 @@ export default function CreateLot() {
         unit: formData.unit,
         condition: formData.condition,
         pricing_type: formData.pricing_type,
-        status: formData.publish ? 'active' : 'draft',
+        status: publishing ? 'active' : 'draft',
       };
 
       if (formData.pricing_type === 'fixed') {
@@ -577,26 +595,59 @@ export default function CreateLot() {
           <p className="text-sm text-destructive">{error}</p>
         )}
 
+        {/* Safety & accuracy attestation */}
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Before you publish
+            </CardTitle>
+            <CardDescription>
+              Confirm all of the following. Listings that breach these rules are removed and may
+              result in account suspension. See our{' '}
+              <Link to="/prohibited-materials" className="text-primary hover:underline">
+                prohibited materials
+              </Link>{' '}
+              policy.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {([
+              ['ownership', 'I own this item or have permission to sell it.'],
+              ['notStolen', 'This item is not stolen.'],
+              ['notHazardous', 'This item is not hazardous, contaminated, or unsafe.'],
+              ['noAsbestos', 'This item does not contain asbestos or suspected asbestos.'],
+              ['accurateDescription', 'The title, description, photos, dimensions, and condition are accurate.'],
+              ['accuratePickup', 'The pickup address, access notes, and contact details are accurate.'],
+            ] as const).map(([key, label]) => (
+              <label key={key} className="flex items-start gap-3 cursor-pointer">
+                <Checkbox
+                  checked={attestations[key]}
+                  onCheckedChange={(v) =>
+                    setAttestations((a) => ({ ...a, [key]: v === true }))
+                  }
+                  className="mt-0.5"
+                />
+                <span className="text-sm leading-snug">{label}</span>
+              </label>
+            ))}
+          </CardContent>
+        </Card>
+
         {/* Actions */}
         <div className="flex gap-3">
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => {
-              updateFormData('publish', false);
-              handleSubmit();
-            }}
+            onClick={() => handleSubmit(false)}
             disabled={loading}
           >
             Save as Draft
           </Button>
           <Button
             className="flex-1"
-            onClick={() => {
-              updateFormData('publish', true);
-              handleSubmit();
-            }}
-            disabled={loading}
+            onClick={() => handleSubmit(true)}
+            disabled={loading || !allAttested}
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />

@@ -21,6 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { PickupSafetyReminder } from '@/components/safety/SafetyNotice';
 
 const REPORT_REASONS = [
   'Pickup issue',
@@ -294,6 +295,8 @@ export default function OrderDetail() {
           {/* Pickup details */}
           <div className="dashboard-card p-4 space-y-3">
             <h2 className="font-semibold flex items-center gap-2"><Truck className="h-4 w-4" /> Pickup</h2>
+
+            <PickupSafetyReminder />
 
             {paid ? (
               <>

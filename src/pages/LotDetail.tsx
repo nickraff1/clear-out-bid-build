@@ -29,6 +29,7 @@ import { LOT_CONDITIONS, getMinNextBid, getBidIncrement } from '@/lib/constants'
 import { formatDistanceToNow, isPast, parseISO, format } from 'date-fns';
 import { MessageSellerDialog } from '@/components/messaging/MessageSellerDialog';
 import { ReportLotDialog } from '@/components/lots/ReportLotDialog';
+import { ListingSafetyNotice } from '@/components/safety/SafetyNotice';
 
 type LotWithDetails = Lot & {
   media: LotMedia[];
@@ -604,6 +605,7 @@ export default function LotDetail() {
                     <p className="text-muted-foreground">{lot.event.access_notes}</p>
                   )}
                 </div>
+                <ListingSafetyNotice />
               </div>
             )}
 
