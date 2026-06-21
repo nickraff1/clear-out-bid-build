@@ -101,15 +101,17 @@ export default function SellerEvents() {
 
   if (!primaryOrg) {
     return (
-      <div className="p-6 text-center py-16">
-        <Calendar className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">No Organization</h2>
-        <p className="text-muted-foreground mb-4">
-          You need to create or join an organization to manage events.
-        </p>
-        <Button asChild>
-          <Link to="/app/settings">Set Up Organization</Link>
-        </Button>
+      <div className="p-6">
+        <EmptyState
+          icon={Calendar}
+          title="No business profile yet"
+          description="Create or join a seller business to manage clearance events."
+          action={
+            <Button asChild>
+              <Link to="/app/settings">Set up business</Link>
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -158,26 +160,25 @@ export default function SellerEvents() {
 
       {/* Events List */}
       {filteredEvents.length === 0 ? (
-        <div className="text-center py-16">
-          <Calendar className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h2 className="text-xl font-semibold mb-2">
-            {events.length === 0 ? 'No events yet' : 'No matching events'}
-          </h2>
-          <p className="text-muted-foreground mb-4">
-            {events.length === 0 
-              ? 'Create your first clearance event to start selling surplus materials.'
-              : 'Try adjusting your search or filter criteria.'
-            }
-          </p>
-          {events.length === 0 && (
-            <Button asChild>
-              <Link to="/app/seller/events/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Event
-              </Link>
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icon={Calendar}
+          title={events.length === 0 ? 'No events yet' : 'No matching events'}
+          description={
+            events.length === 0
+              ? 'Group multiple listings under a single clearance event with one pickup window.'
+              : 'Try adjusting your search or filter to see more results.'
+          }
+          action={
+            events.length === 0 ? (
+              <Button asChild>
+                <Link to="/app/seller/events/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create event
+                </Link>
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <div className="space-y-4">
           {filteredEvents.map(event => {

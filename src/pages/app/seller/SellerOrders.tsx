@@ -13,6 +13,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DollarSign, FileText, Loader2 } from 'lucide-react';
+import { EmptyState } from '@/components/app/EmptyState';
+import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
 import type { Order, Lot, ClearanceEvent, Profile } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 
@@ -61,20 +63,8 @@ export default function SellerOrders() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, 'success' | 'info' | 'warning' | 'muted' | 'destructive'> = {
-      pending_payment: 'warning',
-      paid: 'success',
-      ready_for_pickup: 'info',
-      collected: 'success',
-      cancelled: 'destructive',
-    };
-    return colors[status] ?? 'muted';
-  };
-
-  const formatStatus = (status: string) => {
-    return status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  };
+  const getStatusColor = orderStatusTone;
+  const formatStatus = orderStatusLabel;
 
   const totalRevenue = orders
     .filter(o => ['paid', 'ready_for_pickup', 'collected'].includes(o.status))
@@ -111,13 +101,11 @@ export default function SellerOrders() {
 
       {/* Orders Table */}
       {orders.length === 0 ? (
-        <div className="text-center py-16 dashboard-card">
-          <FileText className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No sales yet</h3>
-          <p className="text-muted-foreground mb-4">
-            Orders will appear here when buyers purchase your lots
-          </p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="No sales yet"
+          description="Orders will appear here when buyers purchase your listings."
+        />
       ) : (
         <div className="dashboard-card p-0 overflow-hidden">
           <Table>

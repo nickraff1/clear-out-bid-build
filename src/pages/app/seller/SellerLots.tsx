@@ -153,23 +153,22 @@ export default function SellerLots() {
 
       {/* Lots Table */}
       {filteredLots.length === 0 ? (
-        <div className="text-center py-16 dashboard-card">
-          <Package className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">
-            {lots.length === 0 ? 'No lots yet' : 'No matching lots'}
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            {lots.length === 0 
-              ? 'Create an event and add lots to start selling.'
-              : 'Try adjusting your search or filter criteria.'
-            }
-          </p>
-          {lots.length === 0 && (
-            <Button asChild>
-              <Link to="/app/seller/events/new">Create Event</Link>
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icon={Package}
+          title={lots.length === 0 ? 'No listings yet' : 'No matching listings'}
+          description={
+            lots.length === 0
+              ? 'Add your first listing to start selling surplus materials.'
+              : 'Try adjusting your search or filter to see more results.'
+          }
+          action={
+            lots.length === 0 ? (
+              <Button asChild>
+                <Link to="/app/seller/lots/new">Create listing</Link>
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <div className="dashboard-card p-0 overflow-hidden">
           <Table>
