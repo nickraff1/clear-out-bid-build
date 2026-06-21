@@ -44,7 +44,8 @@ export default function AppLayout() {
     { to: '/app/seller/orders', label: 'Sales', icon: FileText },
     { to: '/app/seller/pickups', label: 'Pickups', icon: Truck },
     { to: '/app/messages', label: 'Messages', icon: MessageSquare },
-    { to: '/app/seller/payments', label: 'Payments', icon: Tag },
+    { to: '/app/seller/payouts', label: 'Payouts', icon: DollarSign },
+    { to: '/app/seller/payments', label: 'Payment setup', icon: Tag },
   ];
 
   const adminNav = [
@@ -53,8 +54,9 @@ export default function AppLayout() {
     { to: '/app/admin/users', label: 'Users', icon: Users },
     { to: '/app/admin/listings', label: 'Listings', icon: Package },
     { to: '/app/admin/orders', label: 'Orders', icon: ShoppingCart },
+    { to: '/app/admin/payouts', label: 'Payouts', icon: DollarSign },
     { to: '/app/admin/reports', label: 'Reports', icon: Flag },
-    { to: '/app/admin/fees', label: 'Fees', icon: DollarSign },
+    { to: '/app/admin/fees', label: 'Fees', icon: Tag },
   ];
 
   const commonNav = [

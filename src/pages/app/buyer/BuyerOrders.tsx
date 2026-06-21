@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowUpRight, Filter, Loader2, MapPin, Search, ShoppingCart } from 'lucide-react';
+import { ArrowUpRight, CreditCard, Filter, Loader2, MapPin, Search, ShoppingCart } from 'lucide-react';
 import type { Order, Lot, ClearanceEvent } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
@@ -199,6 +199,13 @@ export default function BuyerOrders() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 justify-end">
+                      {order.status === 'pending_payment' && (
+                        <Button size="sm" asChild>
+                          <Link to={`/app/buyer/checkout/${order.id}`}>
+                            <CreditCard className="h-4 w-4 mr-1" />Pay
+                          </Link>
+                        </Button>
+                      )}
                       {order.status === 'collected' && !order.has_review && order.lot?.event?.created_by && (
                         <LeaveReviewDialog
                           orderId={order.id}

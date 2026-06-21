@@ -39,6 +39,8 @@ import BuyerOrders from "./pages/app/buyer/BuyerOrders";
 import BuyerWatchlist from "./pages/app/buyer/BuyerWatchlist";
 import BuyerAlerts from "./pages/app/buyer/BuyerAlerts";
 import Checkout from "./pages/app/buyer/Checkout";
+import CheckoutReturn from "./pages/app/buyer/CheckoutReturn";
+import CheckoutCancel from "./pages/app/buyer/CheckoutCancel";
 
 // Common App Pages
 import AppSettings from "./pages/app/AppSettings";
@@ -52,6 +54,8 @@ import AdminUsers from "./pages/app/admin/AdminUsers";
 import AdminListings from "./pages/app/admin/AdminListings";
 import AdminOrders from "./pages/app/admin/AdminOrders";
 import AdminReports from "./pages/app/admin/AdminReports";
+import AdminPayouts from "./pages/app/admin/AdminPayouts";
+import SellerPayouts from "./pages/app/seller/SellerPayouts";
 
 // Seller bulk
 import BulkUpload from "./pages/app/seller/BulkUpload";
@@ -190,11 +194,26 @@ const App = () => (
                   <Checkout />
                 </RoleGuard>
               } />
+              <Route path="/app/buyer/checkout/return" element={
+                <RoleGuard allowedRoles={['buyer', 'admin']}>
+                  <CheckoutReturn />
+                </RoleGuard>
+              } />
+              <Route path="/app/buyer/checkout/cancel" element={
+                <RoleGuard allowedRoles={['buyer', 'admin']}>
+                  <CheckoutCancel />
+                </RoleGuard>
+              } />
 
               {/* Seller Payment Settings */}
               <Route path="/app/seller/payments" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <PaymentSettings />
+                </RoleGuard>
+              } />
+              <Route path="/app/seller/payouts" element={
+                <RoleGuard allowedRoles={['seller', 'admin']}>
+                  <SellerPayouts />
                 </RoleGuard>
               } />
 
@@ -224,6 +243,9 @@ const App = () => (
               } />
               <Route path="/app/admin/orders" element={
                 <RoleGuard allowedRoles={['admin']}><AdminOrders /></RoleGuard>
+              } />
+              <Route path="/app/admin/payouts" element={
+                <RoleGuard allowedRoles={['admin']}><AdminPayouts /></RoleGuard>
               } />
 
               {/* Seller bulk upload */}

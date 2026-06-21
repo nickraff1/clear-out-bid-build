@@ -1004,15 +1004,21 @@ export type Database = {
       }
       payments: {
         Row: {
+          admin_notes: string | null
           amount_charged: number
           application_fee_amount: number | null
           base_amount: number
           buyer_fee: number
           created_at: string
+          environment: string
           error_message: string | null
           id: string
+          manual_payout_paid_at: string | null
+          manual_payout_reference: string | null
+          manual_payout_status: Database["public"]["Enums"]["manual_payout_status"]
           order_id: string
           payment_method: string | null
+          payment_mode: Database["public"]["Enums"]["payment_mode"]
           seller_fee: number
           seller_payout: number
           status: Database["public"]["Enums"]["payment_status"]
@@ -1023,15 +1029,21 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_notes?: string | null
           amount_charged: number
           application_fee_amount?: number | null
           base_amount: number
           buyer_fee?: number
           created_at?: string
+          environment?: string
           error_message?: string | null
           id?: string
+          manual_payout_paid_at?: string | null
+          manual_payout_reference?: string | null
+          manual_payout_status?: Database["public"]["Enums"]["manual_payout_status"]
           order_id: string
           payment_method?: string | null
+          payment_mode?: Database["public"]["Enums"]["payment_mode"]
           seller_fee?: number
           seller_payout?: number
           status?: Database["public"]["Enums"]["payment_status"]
@@ -1042,15 +1054,21 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_notes?: string | null
           amount_charged?: number
           application_fee_amount?: number | null
           base_amount?: number
           buyer_fee?: number
           created_at?: string
+          environment?: string
           error_message?: string | null
           id?: string
+          manual_payout_paid_at?: string | null
+          manual_payout_reference?: string | null
+          manual_payout_status?: Database["public"]["Enums"]["manual_payout_status"]
           order_id?: string
           payment_method?: string | null
+          payment_mode?: Database["public"]["Enums"]["payment_mode"]
           seller_fee?: number
           seller_payout?: number
           status?: Database["public"]["Enums"]["payment_status"]
@@ -1578,6 +1596,11 @@ export type Database = {
         | "cancelled"
         | "reserved"
         | "expired"
+      manual_payout_status:
+        | "manual_payout_pending"
+        | "manual_payout_paid"
+        | "manual_payout_failed"
+        | "manual_payout_on_hold"
       order_status:
         | "pending_payment"
         | "paid"
@@ -1586,6 +1609,7 @@ export type Database = {
         | "cancelled"
         | "disputed"
       org_type: "seller" | "buyer" | "fabricator"
+      payment_mode: "manual_payout_mode" | "stripe_connect_mode"
       payment_status:
         | "pending"
         | "processing"
@@ -1738,6 +1762,12 @@ export const Constants = {
         "reserved",
         "expired",
       ],
+      manual_payout_status: [
+        "manual_payout_pending",
+        "manual_payout_paid",
+        "manual_payout_failed",
+        "manual_payout_on_hold",
+      ],
       order_status: [
         "pending_payment",
         "paid",
@@ -1747,6 +1777,7 @@ export const Constants = {
         "disputed",
       ],
       org_type: ["seller", "buyer", "fabricator"],
+      payment_mode: ["manual_payout_mode", "stripe_connect_mode"],
       payment_status: [
         "pending",
         "processing",

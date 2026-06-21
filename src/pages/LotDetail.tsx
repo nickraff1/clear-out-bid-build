@@ -231,28 +231,27 @@ export default function LotDetail() {
       return;
     }
 
-    // Create order with buyer fee (10%)
+    // Create order with 5% buyer fee, then go to Stripe checkout
     try {
       const basePrice = lot.fixed_price!;
-      const buyerFee = basePrice * 0.10; // 10% buyer fee
-      const totalAmount = basePrice + buyerFee;
+      const buyerFee = Math.round(basePrice * 0.05 * 100) / 100;
+      const totalAmount = Math.round((basePrice + buyerFee) * 100) / 100;
 
-      const { error } = await supabase.from('orders').insert({
+      const { data: created, error } = await supabase.from('orders').insert({
         buyer_id: user.id,
         buyer_org_id: primaryOrg.id,
         lot_id: lot.id,
         event_id: lot.event_id,
-        amount: totalAmount, // Total including buyer fee
+        amount: totalAmount,
         status: 'pending_payment',
-        notes: `Base price: $${basePrice.toFixed(2)}, Buyer fee (10%): $${buyerFee.toFixed(2)}`
-      });
+        notes: `Base price: $${basePrice.toFixed(2)}, Buyer fee (5%): $${buyerFee.toFixed(2)}`
+      }).select('id').single();
 
       if (error) throw error;
 
-      // Update lot status
       await supabase.from('lots').update({ status: 'sold' }).eq('id', lot.id);
 
-      navigate('/app/buyer/orders');
+      navigate(`/app/buyer/checkout/${created!.id}`);
     } catch (error) {
       console.error('Error creating order:', error);
     }
@@ -468,21 +467,21 @@ export default function LotDetail() {
                       {bidLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Place Bid'}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {isOwnLot
-                      ? 'You cannot bid on your own listing.'
-                      : `Bid increment: $${getBidIncrement(currentPrice)} • 10% buyer fee applies to winning bid`}
-                  </p>
+                   <p className="text-xs text-muted-foreground">
+                     {isOwnLot
+                       ? 'You cannot bid on your own listing.'
+                       : `Bid increment: $${getBidIncrement(currentPrice)} • 5% buyer fee applies to winning bid`}
+                   </p>
                 </form>
               ) : !isAuction && lot.status === 'active' ? (
-                <div className="space-y-2">
-                  <Button variant="hero" size="lg" className="w-full" onClick={handleBuyNow} disabled={isOwnLot}>
-                    Buy Now - ${((lot.fixed_price ?? 0) * 1.10).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </Button>
-                  <p className="text-xs text-muted-foreground text-center">
-                    {isOwnLot ? 'This is your own listing.' : `Price $${(lot.fixed_price ?? 0).toLocaleString()} + 10% buyer fee`}
-                  </p>
-                </div>
+                 <div className="space-y-2">
+                   <Button variant="hero" size="lg" className="w-full" onClick={handleBuyNow} disabled={isOwnLot}>
+                     Buy Now - ${((lot.fixed_price ?? 0) * 1.05).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                   </Button>
+                   <p className="text-xs text-muted-foreground text-center">
+                     {isOwnLot ? 'This is your own listing.' : `Price $${(lot.fixed_price ?? 0).toLocaleString()} + 5% buyer fee`}
+                   </p>
+                 </div>
               ) : null}
 
               {/* Message Seller */}
