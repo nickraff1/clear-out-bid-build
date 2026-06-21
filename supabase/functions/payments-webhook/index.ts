@@ -119,6 +119,49 @@ async function handlePaymentFailed(pi: any, env: StripeEnv) {
   }).eq("stripe_payment_intent_id", pi.id);
 }
 
+// Cancel the pending order tied to a session/payment-intent, but ONLY if it is
+// still pending_payment and no successful payment exists. This is the defensive
+// check that prevents accidentally releasing a lot that has already been paid.
+async function cancelPendingOrderForSession(args: { sessionId?: string; paymentIntentId?: string }, env: StripeEnv) {
+  const sb = getSupabase();
+  const { sessionId, paymentIntentId } = args;
+
+  // Locate the payment row (we stamp it on checkout creation).
+  let paymentQuery = sb.from("payments").select("id, order_id, status").limit(1);
+  if (sessionId) paymentQuery = paymentQuery.eq("stripe_session_id", sessionId);
+  else if (paymentIntentId) paymentQuery = paymentQuery.eq("stripe_payment_intent_id", paymentIntentId);
+  else return;
+  const { data: payment } = await paymentQuery.maybeSingle();
+  if (!payment) return;
+
+  // Mark the payment cancelled (don't clobber a succeeded one).
+  if (payment.status !== "succeeded") {
+    await sb.from("payments").update({
+      status: "cancelled",
+      environment: env,
+      updated_at: new Date().toISOString(),
+    }).eq("id", payment.id);
+  }
+
+  const orderId = payment.order_id as string | undefined;
+  if (!orderId) return;
+
+  // Defensive: only cancel the order if it is still pending_payment AND no
+  // succeeded payment exists for it. The order_cancel trigger will release
+  // the lot back to active automatically.
+  const { data: succeeded } = await sb.from("payments")
+    .select("id").eq("order_id", orderId).eq("status", "succeeded").limit(1).maybeSingle();
+  if (succeeded) {
+    console.log(`[webhook] order ${orderId} already has succeeded payment; not cancelling`);
+    return;
+  }
+
+  await sb.from("orders").update({
+    status: "cancelled",
+    updated_at: new Date().toISOString(),
+  }).eq("id", orderId).eq("status", "pending_payment");
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
@@ -139,6 +182,14 @@ Deno.serve(async (req) => {
         break;
       case "payment_intent.payment_failed":
         await handlePaymentFailed(event.data.object, env);
+        await cancelPendingOrderForSession({ paymentIntentId: event.data.object?.id }, env);
+        break;
+      case "checkout.session.expired":
+      case "checkout.session.async_payment_failed":
+        await cancelPendingOrderForSession({ sessionId: event.data.object?.id }, env);
+        break;
+      case "payment_intent.canceled":
+        await cancelPendingOrderForSession({ paymentIntentId: event.data.object?.id }, env);
         break;
       default:
         console.log("Unhandled event:", event.type);
