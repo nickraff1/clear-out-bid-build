@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import type { Bid, Order, Lot, ClearanceEvent } from '@/types/database';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { EmptyState } from '@/components/app/EmptyState';
+import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
 
 type BidWithLot = Bid & {
   lot: Lot & { event: ClearanceEvent };
@@ -171,13 +173,17 @@ export default function BuyerOverview() {
           </div>
 
           {recentBids.length === 0 ? (
-            <div className="text-center py-8">
-              <Gavel className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-muted-foreground mb-4">No bids yet</p>
-              <Button asChild size="sm">
-                <Link to="/marketplace">Browse Marketplace</Link>
-              </Button>
-            </div>
+            <EmptyState
+              icon={Gavel}
+              compact
+              title="No bids yet"
+              description="Find an auction listing and place your first bid."
+              action={
+                <Button asChild size="sm">
+                  <Link to="/marketplace">Browse marketplace</Link>
+                </Button>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {recentBids.slice(0, 4).map(bid => {
@@ -227,13 +233,17 @@ export default function BuyerOverview() {
           </div>
 
           {recentOrders.length === 0 ? (
-            <div className="text-center py-8">
-              <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-muted-foreground mb-4">No orders yet</p>
-              <Button asChild size="sm">
-                <Link to="/marketplace">Start Shopping</Link>
-              </Button>
-            </div>
+            <EmptyState
+              icon={ShoppingCart}
+              compact
+              title="No orders yet"
+              description="Your purchases will show up here once you buy or win an auction."
+              action={
+                <Button asChild size="sm">
+                  <Link to="/marketplace">Browse marketplace</Link>
+                </Button>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {recentOrders.map(order => (
@@ -247,8 +257,8 @@ export default function BuyerOverview() {
                       ${order.amount.toLocaleString()}
                     </p>
                   </div>
-                  <Badge variant={getOrderStatusColor(order.status)}>
-                    {order.status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                  <Badge variant={orderStatusTone(order.status)}>
+                    {orderStatusLabel(order.status)}
                   </Badge>
                 </div>
               ))}
