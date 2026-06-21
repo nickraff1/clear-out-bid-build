@@ -190,9 +190,17 @@ export default function CreateLot() {
     setError('');
 
     try {
+      // Ensure we have an event (auto-create default if seller has none)
+      const eventId = await ensureDefaultEvent();
+      if (!eventId) {
+        setError('Could not create or find a clearance event. Please try again.');
+        setLoading(false);
+        return;
+      }
+
       // Create lot
       const lotData: any = {
-        event_id: formData.event_id,
+        event_id: eventId,
         category_id: null, // Will need to map category slug to ID
         title: formData.title,
         description: formData.description || null,
