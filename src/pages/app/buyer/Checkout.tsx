@@ -1,319 +1,137 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { 
-  Loader2, 
-  ArrowLeft, 
-  CreditCard, 
-  AlertCircle,
-  Package,
-  MapPin,
-  Calendar,
-  Check,
-  Clock
-} from 'lucide-react';
-import type { Lot, ClearanceEvent } from '@/types/database';
-
-interface CheckoutData {
-  lot: Lot & { event: ClearanceEvent };
-  order?: {
-    id: string;
-    amount: number;
-    status: string;
-  };
-}
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
+import { supabase } from "@/integrations/supabase/client";
+import { getStripe, getStripeEnvironment } from "@/lib/stripe";
+import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ArrowLeft, AlertCircle, Loader2, Package, MapPin } from "lucide-react";
 
 export default function Checkout() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { user, organizations } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [data, setData] = useState<CheckoutData | null>(null);
-
-  // Fee calculations
-  const BUYER_FEE_PERCENT = 0.10; // 10%
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchOrderData = async () => {
-      if (!orderId) {
-        setIsLoading(false);
-        return;
+    if (!orderId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, amount, status, lot:lots(title, quantity, unit), event:clearance_events(site_address, suburb, state, postcode, pickup_start)")
+        .eq("id", orderId)
+        .maybeSingle();
+      if (error || !data) {
+        setError("Order not found");
+      } else {
+        setOrder(data);
       }
+      setLoading(false);
+    })();
+  }, [orderId]);
 
-      try {
-        const { data: order, error } = await supabase
-          .from('orders')
-          .select(`
-            *,
-            lot:lots(
-              *,
-              event:clearance_events(*)
-            )
-          `)
-          .eq('id', orderId)
-          .single();
-
-        if (error) throw error;
-
-        if (order && order.lot) {
-          setData({
-            lot: order.lot as Lot & { event: ClearanceEvent },
-            order: {
-              id: order.id,
-              amount: order.amount,
-              status: order.status
-            }
-          });
-        }
-      } catch (error: any) {
-        console.error('Error fetching order:', error);
-        toast({
-          title: 'Error loading order',
-          description: error.message,
-          variant: 'destructive'
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrderData();
-  }, [orderId, toast]);
-
-  const handlePayment = async () => {
-    if (!data?.order) return;
-
-    // Payment integration not yet configured
-    // This button is disabled until Stripe is connected
-    toast({
-      title: 'Payment Not Available',
-      description: 'Payment processing is not yet configured. Please contact support.',
-      variant: 'destructive'
+  const fetchClientSecret = useCallback(async (): Promise<string> => {
+    const returnUrl = `${window.location.origin}/app/buyer/checkout/return?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`;
+    const { data, error } = await supabase.functions.invoke("create-checkout", {
+      body: { order_id: orderId, return_url: returnUrl, environment: getStripeEnvironment() },
     });
-  };
+    if (error || !data?.clientSecret) {
+      throw new Error(error?.message || data?.error || "Failed to start checkout");
+    }
+    return data.clientSecret;
+  }, [orderId]);
 
-  // Check if payment system is ready (Stripe configured)
-  const isPaymentSystemReady = false; // Will be true once Stripe is integrated
-
-  if (isLoading) {
-    return (
-      <div className="container max-w-2xl mx-auto py-12 px-4">
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </div>
-    );
+  if (loading) {
+    return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
-  if (!data) {
+  if (error || !order) {
     return (
       <div className="container max-w-2xl mx-auto py-12 px-4">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Order not found</AlertTitle>
-          <AlertDescription>
-            We couldn't find this order. It may have been cancelled or doesn't exist.
-          </AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button asChild className="mt-4">
-          <Link to="/app/buyer/orders">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Orders
-          </Link>
-        </Button>
+        <Button asChild className="mt-4"><Link to="/app/buyer/orders"><ArrowLeft className="h-4 w-4 mr-2" />Back to orders</Link></Button>
       </div>
     );
   }
 
-  const { lot, order } = data;
-  const basePrice = order?.amount ?? 0;
-  const buyerFee = basePrice * BUYER_FEE_PERCENT;
-  const totalAmount = basePrice + buyerFee;
-
-  // If already paid, show confirmation
-  if (order?.status === 'paid') {
+  if (order.status !== "pending_payment") {
     return (
-      <div className="container max-w-2xl mx-auto py-12 px-4">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <Check className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle className="text-2xl">Payment Complete</CardTitle>
-            <CardDescription>
-              Your payment has been processed successfully.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted/50 rounded-lg p-4">
-              <h4 className="font-medium mb-2">{lot.title}</h4>
-              <p className="text-sm text-muted-foreground">
-                Order #{order.id.slice(0, 8)}
-              </p>
-            </div>
-            <Alert>
-              <Calendar className="h-4 w-4" />
-              <AlertTitle>Next Steps</AlertTitle>
-              <AlertDescription>
-                Check your email for pickup instructions. You can also view the pickup details in your orders.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-          <CardFooter>
-            <Button asChild className="w-full">
-              <Link to="/app/buyer/orders">View My Orders</Link>
-            </Button>
-          </CardFooter>
-        </Card>
+      <div className="container max-w-2xl mx-auto py-12 px-4 space-y-4">
+        <Alert>
+          <AlertTitle>Order status: {order.status}</AlertTitle>
+          <AlertDescription>This order is no longer awaiting payment.</AlertDescription>
+        </Alert>
+        <Button asChild><Link to="/app/buyer/orders">View orders</Link></Button>
       </div>
     );
   }
+
+  const total = Number(order.amount);
+  const basePrice = Math.round((total / 1.05) * 100) / 100;
+  const buyerFee = Math.round((total - basePrice) * 100) / 100;
 
   return (
-    <div className="container max-w-2xl mx-auto py-12 px-4">
-      <Button 
-        variant="ghost" 
-        onClick={() => navigate(-1)}
-        className="mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back
-      </Button>
+    <div>
+      <PaymentTestModeBanner />
+      <div className="container max-w-5xl mx-auto py-8 px-4">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />Back
+        </Button>
 
-      <div className="grid gap-6">
-        {/* Order Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Order Summary</CardTitle>
-            <CardDescription>Review your purchase before payment</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Item Details */}
-            <div className="flex gap-4">
-              <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                <Package className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium truncate">{lot.title}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {lot.quantity} {lot.unit}
-                </p>
-                <Badge variant="secondary" className="mt-1">
-                  {lot.condition.replace('_', ' ')}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Event/Pickup Info */}
-            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-              <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+        <div className="grid lg:grid-cols-2 gap-6">
+          <Card className="h-fit">
+            <CardHeader><CardTitle>Order summary</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-3">
+                <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  <Package className="h-7 w-7 text-muted-foreground" />
+                </div>
                 <div>
-                  <p className="text-sm font-medium">{lot.event?.site_address}</p>
+                  <p className="font-medium">{order.lot?.title}</p>
                   <p className="text-sm text-muted-foreground">
-                    {lot.event?.suburb}, {lot.event?.state} {lot.event?.postcode}
+                    {order.lot?.quantity} {order.lot?.unit}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Pickup: {lot.event?.pickup_start ? new Date(lot.event.pickup_start).toLocaleDateString() : 'TBD'}
-                </p>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Price Breakdown */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Item Price</span>
-                <span>${basePrice.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Buyer Fee (10%)</span>
-                <span>${buyerFee.toFixed(2)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-medium text-lg">
-                <span>Total</span>
-                <span>${totalAmount.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Payment Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Payment
-            </CardTitle>
-            <CardDescription>
-              Secure payment processing
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Alert className="mb-4">
-              <Clock className="h-4 w-4" />
-              <AlertTitle>Payment Integration Coming Soon</AlertTitle>
-              <AlertDescription>
-                Card payments will be available shortly. For now, click below to confirm your order and arrange payment at pickup.
-              </AlertDescription>
-            </Alert>
-
-            {/* Placeholder for Stripe Elements */}
-            <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center text-muted-foreground">
-              <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Card payment form will appear here</p>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              className="w-full" 
-              size="lg"
-              onClick={handlePayment}
-              disabled={!isPaymentSystemReady || isProcessing}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : !isPaymentSystemReady ? (
-                <>
-                  Payment System Not Configured
-                </>
-              ) : (
-                <>
-                  Pay ${totalAmount.toFixed(2)}
-                </>
+              {order.event && (
+                <div className="text-sm bg-muted/40 rounded-lg p-3 flex items-start gap-2">
+                  <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div>
+                    <p>{order.event.site_address}</p>
+                    <p className="text-muted-foreground">
+                      {order.event.suburb}, {order.event.state} {order.event.postcode}
+                    </p>
+                  </div>
+                </div>
               )}
-            </Button>
-          </CardFooter>
-        </Card>
+              <Separator />
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Item price</span><span>${basePrice.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Buyer fee (5%)</span><span>${buyerFee.toFixed(2)}</span></div>
+                <Separator className="my-2" />
+                <div className="flex justify-between font-semibold text-base"><span>Total</span><span>${total.toFixed(2)} AUD</span></div>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Trust Indicators */}
-        <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Check className="h-4 w-4 text-primary" />
-            Secure checkout
-          </div>
-          <div className="flex items-center gap-1">
-            <Check className="h-4 w-4 text-primary" />
-            Buyer protection
-          </div>
+          <Card>
+            <CardHeader><CardTitle>Payment</CardTitle></CardHeader>
+            <CardContent>
+              <div id="checkout" className="min-h-[500px]">
+                <EmbeddedCheckoutProvider stripe={getStripe()} options={{ fetchClientSecret }}>
+                  <EmbeddedCheckout />
+                </EmbeddedCheckoutProvider>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
