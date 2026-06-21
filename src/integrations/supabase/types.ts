@@ -125,6 +125,13 @@ export type Database = {
             foreignKeyName: "bid_events_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "bid_events_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "lots"
             referencedColumns: ["id"]
           },
@@ -159,6 +166,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "bids_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
           {
             foreignKeyName: "bids_lot_id_fkey"
             columns: ["lot_id"]
@@ -220,6 +234,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "bulk_imports"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_import_rows_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
           },
           {
             foreignKeyName: "bulk_import_rows_lot_id_fkey"
@@ -470,6 +491,13 @@ export type Database = {
             foreignKeyName: "conversations_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "conversations_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "lots"
             referencedColumns: ["id"]
           },
@@ -527,6 +555,13 @@ export type Database = {
             foreignKeyName: "lot_compliance_tags_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "lot_compliance_tags_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "lots"
             referencedColumns: ["id"]
           },
@@ -568,6 +603,13 @@ export type Database = {
           url?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lot_media_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
           {
             foreignKeyName: "lot_media_lot_id_fkey"
             columns: ["lot_id"]
@@ -618,6 +660,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lot_reports_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
           {
             foreignKeyName: "lot_reports_lot_id_fkey"
             columns: ["lot_id"]
@@ -784,9 +833,18 @@ export type Database = {
         Row: {
           created_at: string
           data: Json | null
+          email_sent_at: string | null
+          email_should_send: boolean
           id: string
+          link_url: string | null
           message: string | null
+          priority: string
           read: boolean | null
+          read_at: string | null
+          related_conversation_id: string | null
+          related_lot_id: string | null
+          related_order_id: string | null
+          related_report_id: string | null
           title: string
           type: string
           user_id: string
@@ -794,9 +852,18 @@ export type Database = {
         Insert: {
           created_at?: string
           data?: Json | null
+          email_sent_at?: string | null
+          email_should_send?: boolean
           id?: string
+          link_url?: string | null
           message?: string | null
+          priority?: string
           read?: boolean | null
+          read_at?: string | null
+          related_conversation_id?: string | null
+          related_lot_id?: string | null
+          related_order_id?: string | null
+          related_report_id?: string | null
           title: string
           type: string
           user_id: string
@@ -804,14 +871,65 @@ export type Database = {
         Update: {
           created_at?: string
           data?: Json | null
+          email_sent_at?: string | null
+          email_should_send?: boolean
           id?: string
+          link_url?: string | null
           message?: string | null
+          priority?: string
           read?: boolean | null
+          read_at?: string | null
+          related_conversation_id?: string | null
+          related_lot_id?: string | null
+          related_order_id?: string | null
+          related_report_id?: string | null
           title?: string
           type?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_related_conversation_id_fkey"
+            columns: ["related_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_lot_id_fkey"
+            columns: ["related_lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "notifications_related_lot_id_fkey"
+            columns: ["related_lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "notifications_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_report_id_fkey"
+            columns: ["related_report_id"]
+            isOneToOne: false
+            referencedRelation: "lot_reports"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_user_id_fkey"
             columns: ["user_id"]
@@ -916,6 +1034,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clearance_events_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
           },
           {
             foreignKeyName: "orders_lot_id_fkey"
@@ -1125,6 +1250,13 @@ export type Database = {
             foreignKeyName: "payments_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -1162,6 +1294,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickup_confirmations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
           },
           {
             foreignKeyName: "pickup_confirmations_order_id_fkey"
@@ -1289,6 +1428,13 @@ export type Database = {
             foreignKeyName: "reviews_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -1327,6 +1473,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "saved_search_alerts_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
           {
             foreignKeyName: "saved_search_alerts_lot_id_fkey"
             columns: ["lot_id"]
@@ -1499,6 +1652,13 @@ export type Database = {
             foreignKeyName: "watchlist_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "watchlist_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "lots"
             referencedColumns: ["id"]
           },
@@ -1513,6 +1673,30 @@ export type Database = {
       }
     }
     Views: {
+      admin_stuck_orders: {
+        Row: {
+          agreed_pickup_at: string | null
+          amount: number | null
+          created_at: string | null
+          has_conversation: boolean | null
+          has_open_issue: boolean | null
+          lot_id: string | null
+          lot_status: Database["public"]["Enums"]["lot_status"] | null
+          lot_title: string | null
+          manual_payout_status:
+            | Database["public"]["Enums"]["manual_payout_status"]
+            | null
+          order_id: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          pickup_code: string | null
+          pickup_status: string | null
+          proposed_pickup_at: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          stuck_reason: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
       clearance_events_public: {
         Row: {
           created_at: string | null
@@ -1592,6 +1776,13 @@ export type Database = {
             foreignKeyName: "bids_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "bids_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "lots"
             referencedColumns: ["id"]
           },
@@ -1603,6 +1794,10 @@ export type Database = {
         Args: { _note: string; _order_id: string }
         Returns: undefined
       }
+      admin_cancel_order: {
+        Args: { _note?: string; _order_id: string }
+        Returns: undefined
+      }
       admin_force_complete_order: {
         Args: { _note?: string; _order_id: string }
         Returns: undefined
@@ -1610,6 +1805,31 @@ export type Database = {
       admin_regenerate_pickup_code: {
         Args: { _note?: string; _order_id: string }
         Returns: string
+      }
+      admin_resolve_report: {
+        Args: { _note?: string; _report_id: string; _status: string }
+        Returns: undefined
+      }
+      admin_set_org_disabled: {
+        Args: { _disabled: boolean; _org_id: string }
+        Returns: undefined
+      }
+      admin_set_org_founding: {
+        Args: { _founding: boolean; _org_id: string }
+        Returns: undefined
+      }
+      admin_set_org_verified: {
+        Args: { _org_id: string; _verified: boolean }
+        Returns: undefined
+      }
+      admin_set_payout_status: {
+        Args: {
+          _note?: string
+          _payment_id: string
+          _reference?: string
+          _status: string
+        }
+        Returns: undefined
       }
       close_all_expired_auctions: {
         Args: never
@@ -1640,6 +1860,50 @@ export type Database = {
       is_org_member: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
+      }
+      mark_all_notifications_read: { Args: never; Returns: number }
+      notify_admins: {
+        Args: {
+          _link_url?: string
+          _lot_id?: string
+          _message: string
+          _order_id?: string
+          _priority?: string
+          _report_id?: string
+          _title: string
+          _type: string
+        }
+        Returns: undefined
+      }
+      notify_org: {
+        Args: {
+          _conversation_id?: string
+          _link_url?: string
+          _lot_id?: string
+          _message: string
+          _order_id?: string
+          _org_id: string
+          _priority?: string
+          _title: string
+          _type: string
+        }
+        Returns: undefined
+      }
+      notify_user: {
+        Args: {
+          _conversation_id?: string
+          _email?: boolean
+          _link_url?: string
+          _lot_id?: string
+          _message: string
+          _order_id?: string
+          _priority?: string
+          _report_id?: string
+          _title: string
+          _type: string
+          _user_id: string
+        }
+        Returns: string
       }
       release_expired_reservations: { Args: never; Returns: number }
       release_lot_reservation: { Args: { _lot_id: string }; Returns: undefined }
