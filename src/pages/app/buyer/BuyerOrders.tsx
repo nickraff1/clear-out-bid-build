@@ -53,7 +53,7 @@ export default function BuyerOrders() {
         .order('created_at', { ascending: false });
 
       if (data) {
-        const ordersData = data as OrderWithDetails[];
+        const ordersData = data as unknown as OrderWithDetails[];
         // Check existing reviews
         const orderIds = ordersData.map(o => o.id);
         if (orderIds.length > 0) {
