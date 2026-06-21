@@ -595,6 +595,45 @@ export default function CreateLot() {
           <p className="text-sm text-destructive">{error}</p>
         )}
 
+        {/* Safety & accuracy attestation */}
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Before you publish
+            </CardTitle>
+            <CardDescription>
+              Confirm all of the following. Listings that breach these rules are removed and may
+              result in account suspension. See our{' '}
+              <Link to="/prohibited-materials" className="text-primary hover:underline">
+                prohibited materials
+              </Link>{' '}
+              policy.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {([
+              ['ownership', 'I own this item or have permission to sell it.'],
+              ['notStolen', 'This item is not stolen.'],
+              ['notHazardous', 'This item is not hazardous, contaminated, or unsafe.'],
+              ['noAsbestos', 'This item does not contain asbestos or suspected asbestos.'],
+              ['accurateDescription', 'The title, description, photos, dimensions, and condition are accurate.'],
+              ['accuratePickup', 'The pickup address, access notes, and contact details are accurate.'],
+            ] as const).map(([key, label]) => (
+              <label key={key} className="flex items-start gap-3 cursor-pointer">
+                <Checkbox
+                  checked={attestations[key]}
+                  onCheckedChange={(v) =>
+                    setAttestations((a) => ({ ...a, [key]: v === true }))
+                  }
+                  className="mt-0.5"
+                />
+                <span className="text-sm leading-snug">{label}</span>
+              </label>
+            ))}
+          </CardContent>
+        </Card>
+
         {/* Actions */}
         <div className="flex gap-3">
           <Button
