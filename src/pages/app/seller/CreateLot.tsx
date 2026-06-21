@@ -284,17 +284,20 @@ export default function CreateLot() {
       </div>
 
       <div className="space-y-6">
-        {/* Event Selection */}
+        {/* Event Selection (optional - skipped when seller has no events) */}
+        {events.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Event</CardTitle>
+            <CardTitle className="text-lg">Clearance event (optional)</CardTitle>
+            <CardDescription>Group this listing under an existing material drop, or leave blank to list it on its own.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select value={formData.event_id} onValueChange={(v) => updateFormData('event_id', v)}>
+            <Select value={formData.event_id || 'none'} onValueChange={(v) => updateFormData('event_id', v === 'none' ? '' : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select an event" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">No event — list on its own</SelectItem>
                 {events.map(event => (
                   <SelectItem key={event.id} value={event.id}>
                     {event.title} ({event.suburb})
@@ -304,6 +307,7 @@ export default function CreateLot() {
             </Select>
           </CardContent>
         </Card>
+        )}
 
         {/* Photos */}
         <Card>
