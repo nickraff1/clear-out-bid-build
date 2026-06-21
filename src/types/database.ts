@@ -5,8 +5,16 @@ export type OrgType = 'seller' | 'buyer' | 'fabricator';
 export type PricingType = 'fixed' | 'auction';
 export type LotCondition = 'unused' | 'like_new' | 'good' | 'fair';
 export type OrderStatus = 'pending_payment' | 'paid' | 'ready_for_pickup' | 'collected' | 'cancelled' | 'disputed';
+export type PickupStatus =
+  | 'awaiting_arrangement'
+  | 'pickup_proposed'
+  | 'pickup_confirmed'
+  | 'ready_for_pickup'
+  | 'collected_pending_seller_confirmation'
+  | 'completed'
+  | 'issue_reported';
 export type EventStatus = 'draft' | 'active' | 'completed' | 'cancelled';
-export type LotStatus = 'draft' | 'active' | 'sold' | 'unsold' | 'cancelled';
+export type LotStatus = 'draft' | 'active' | 'reserved' | 'sold' | 'unsold' | 'cancelled';
 
 export interface Organization {
   id: string;
@@ -153,6 +161,14 @@ export interface Order {
   notes?: string;
   created_at: string;
   updated_at: string;
+  pickup_code?: string;
+  pickup_status?: PickupStatus;
+  proposed_pickup_at?: string;
+  proposed_pickup_by?: string;
+  agreed_pickup_at?: string;
+  buyer_collected_at?: string;
+  seller_confirmed_at?: string;
+  admin_notes?: string;
   lot?: Lot;
   event?: ClearanceEvent;
   buyer?: Profile;
