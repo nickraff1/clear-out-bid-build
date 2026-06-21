@@ -40,7 +40,7 @@ export default function AdminReports() {
 
   const suspendListing = async (lotId: string) => {
     if (!window.confirm('Suspend this listing? It will be removed from the public marketplace.')) return;
-    const { error } = await supabase.from('lots').update({ status: 'paused' }).eq('id', lotId);
+    const { error } = await supabase.from('lots').update({ status: 'cancelled' }).eq('id', lotId);
     if (error) return toast({ title: 'Failed', description: error.message, variant: 'destructive' });
     toast({ title: 'Listing suspended' });
     load();
@@ -97,7 +97,7 @@ export default function AdminReports() {
                     {r.status === 'open' && <Button size="sm" variant="outline" onClick={() => setStatus(r.id, 'investigating', true)}>Investigate</Button>}
                     {r.status !== 'resolved' && r.status !== 'dismissed' && <Button size="sm" variant="outline" onClick={() => setStatus(r.id, 'resolved', true)}>Resolve</Button>}
                     {r.status !== 'dismissed' && r.status !== 'resolved' && <Button size="sm" variant="ghost" onClick={() => setStatus(r.id, 'dismissed', true)}>Dismiss</Button>}
-                    {r.lot?.id && r.lot.status !== 'paused' && <Button size="sm" variant="destructive" onClick={() => suspendListing(r.lot.id)}>Suspend listing</Button>}
+                    {r.lot?.id && r.lot.status !== 'cancelled' && <Button size="sm" variant="destructive" onClick={() => suspendListing(r.lot.id)}>Suspend listing</Button>}
                   </div>
                 </TableCell>
               </TableRow>
