@@ -110,7 +110,7 @@ export default function OrderDetail() {
 
   async function update(fields: Record<string, any>, successMsg: string) {
     setBusy(true);
-    const { error } = await supabase.from('orders').update(fields).eq('id', order.id);
+    const { error } = await supabase.from('orders').update(fields as any).eq('id', order.id);
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success(successMsg);
