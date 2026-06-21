@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { PickupSafetyReminder } from '@/components/safety/SafetyNotice';
+import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
 
 const REPORT_REASONS = [
   'Pickup issue',
@@ -53,6 +54,7 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
 
   // pickup proposal
   const [proposedAt, setProposedAt] = useState('');
@@ -75,7 +77,7 @@ export default function OrderDetail() {
         *,
         lot:lots(id, title, fixed_price, status, media:lot_media(url, is_primary)),
         event:clearance_events(
-          id, org_id, title, site_address, suburb, state, postcode,
+          id, org_id, created_by, title, site_address, suburb, state, postcode,
           pickup_start, pickup_end, access_notes, contact_name, contact_phone,
           organization:organizations(id, name)
         ),
@@ -84,6 +86,15 @@ export default function OrderDetail() {
       .eq('id', orderId)
       .maybeSingle();
     setOrder(data);
+    if (data && user) {
+      const { data: rev } = await supabase
+        .from('reviews')
+        .select('id')
+        .eq('order_id', data.id)
+        .eq('reviewer_id', user.id)
+        .maybeSingle();
+      setHasReviewed(!!rev);
+    }
     setLoading(false);
   }
 
@@ -98,13 +109,14 @@ export default function OrderDetail() {
   }
 
   const paid = ['paid', 'ready_for_pickup', 'collected'].includes(order.status);
-  const completed = order.status === 'collected' && order.pickup_status === 'completed';
+  const completed = order.status === 'collected';
 
-  // pricing breakdown (assumes 5% buyer fee bundled into amount)
+  // Pricing breakdown: amount already includes 10% buyer service fee.
+  // Seller commission is 10% of the base item price.
   const total = Number(order.amount);
-  const basePrice = Math.round((total / 1.05) * 100) / 100;
+  const basePrice = Math.round((total / 1.10) * 100) / 100;
   const buyerFee = Math.round((total - basePrice) * 100) / 100;
-  const sellerFee = Math.round(basePrice * 0.05 * 100) / 100;
+  const sellerFee = Math.round(basePrice * 0.10 * 100) / 100;
   const sellerPayout = Math.round((basePrice - sellerFee) * 100) / 100;
 
   const primaryImage = order.lot?.media?.find((m: any) => m.is_primary)?.url ?? order.lot?.media?.[0]?.url;
@@ -416,7 +428,19 @@ export default function OrderDetail() {
               {completed && (
                 <Alert className="border-success/30 bg-success/10">
                   <CheckCircle2 className="h-4 w-4 text-success" />
-                  <AlertDescription>This order is complete. You can now leave a review from your orders list.</AlertDescription>
+                  <AlertDescription className="flex items-center justify-between gap-3 flex-wrap">
+                    <span>This order is complete.</span>
+                    {!hasReviewed && (
+                      <LeaveReviewDialog
+                        orderId={order.id}
+                        revieweeId={isBuyer ? (order.event?.created_by ?? '') : order.buyer_id}
+                        revieweeOrgId={isBuyer ? order.event?.org_id : null}
+                        reviewerRole={isBuyer ? 'buyer' : 'seller'}
+                        triggerLabel={isBuyer ? 'Review seller' : 'Review buyer'}
+                        onReviewed={() => setHasReviewed(true)}
+                      />
+                    )}
+                  </AlertDescription>
                 </Alert>
               )}
             </div>
@@ -456,14 +480,14 @@ export default function OrderDetail() {
             {isBuyer ? (
               <>
                 <Row label="Item price" value={`$${basePrice.toFixed(2)}`} />
-                <Row label="Buyer fee (5%)" value={`$${buyerFee.toFixed(2)}`} />
+                <Row label="Buyer service fee (10%)" value={`$${buyerFee.toFixed(2)}`} />
                 <Separator />
                 <Row label="Total paid" value={`$${total.toFixed(2)}`} bold />
               </>
             ) : (
               <>
                 <Row label="Sold amount" value={`$${basePrice.toFixed(2)}`} />
-                <Row label="Offcutt fee (5%)" value={`-$${sellerFee.toFixed(2)}`} />
+                <Row label="Offcutt commission (10%)" value={`-$${sellerFee.toFixed(2)}`} />
                 <Separator />
                 <Row label="Net payout" value={`$${sellerPayout.toFixed(2)}`} bold />
                 <Row label="Payout status" value="Manual — pending" />
