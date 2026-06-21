@@ -109,7 +109,7 @@ export default function BulkUpload() {
         eventId = ev!.id;
       }
 
-      const { data: importRec, error: impErr } = await supabase.from('bulk_imports').insert({
+      const { data: importRec, error: impErr } = await (supabase.from('bulk_imports') as any).insert({
         seller_org_id: primaryOrg.id,
         created_by: user.id,
         filename,
@@ -135,7 +135,7 @@ export default function BulkUpload() {
       const { error: lotErr } = await supabase.from('lots').insert(payload);
       if (lotErr) throw lotErr;
 
-      await supabase.from('bulk_imports').update({
+      await (supabase.from('bulk_imports') as any).update({
         status: 'completed', success_rows: valid.length,
       }).eq('id', importRec!.id);
 
