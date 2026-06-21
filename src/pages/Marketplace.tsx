@@ -90,7 +90,7 @@ export default function Marketplace() {
         console.error('Error fetching lots:', error);
       } else {
         // Filter by search term client-side for now
-        let filtered = (data as LotWithDetails[]) ?? [];
+        let filtered = (data as unknown as LotWithDetails[]) ?? [];
         if (search) {
           const searchLower = search.toLowerCase();
           filtered = filtered.filter(lot => 

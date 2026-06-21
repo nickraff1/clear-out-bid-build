@@ -94,7 +94,7 @@ export default function LotDetail() {
         const lotWithTags = {
           ...data,
           compliance_tags: tagData?.map(t => t.compliance_tags as ComplianceTag) ?? []
-        } as LotWithDetails;
+        } as unknown as LotWithDetails;
         
         setLot(lotWithTags);
       }
