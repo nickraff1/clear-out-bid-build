@@ -153,7 +153,7 @@ export default function CreateLot() {
     });
   };
 
-  const validate = (): boolean => {
+  const validate = (publishing: boolean): boolean => {
     setError('');
     
     if (!formData.category) {
@@ -193,7 +193,7 @@ export default function CreateLot() {
       }
     }
 
-    if (formData.publish && !allAttested) {
+    if (publishing && !allAttested) {
       setError('Please confirm all safety and accuracy statements before publishing.');
       return false;
     }
@@ -201,8 +201,8 @@ export default function CreateLot() {
     return true;
   };
 
-  const handleSubmit = async () => {
-    if (!validate() || !user) return;
+  const handleSubmit = async (publishing: boolean) => {
+    if (!validate(publishing) || !user) return;
     
     setLoading(true);
     setError('');
@@ -226,7 +226,7 @@ export default function CreateLot() {
         unit: formData.unit,
         condition: formData.condition,
         pricing_type: formData.pricing_type,
-        status: formData.publish ? 'active' : 'draft',
+        status: publishing ? 'active' : 'draft',
       };
 
       if (formData.pricing_type === 'fixed') {
@@ -600,21 +600,15 @@ export default function CreateLot() {
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => {
-              updateFormData('publish', false);
-              handleSubmit();
-            }}
+            onClick={() => handleSubmit(false)}
             disabled={loading}
           >
             Save as Draft
           </Button>
           <Button
             className="flex-1"
-            onClick={() => {
-              updateFormData('publish', true);
-              handleSubmit();
-            }}
-            disabled={loading}
+            onClick={() => handleSubmit(true)}
+            disabled={loading || !allAttested}
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
