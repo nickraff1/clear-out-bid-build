@@ -4,23 +4,26 @@ import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import { 
-  ArrowLeft, 
-  Clock, 
-  MapPin, 
-  Gavel, 
-  Heart, 
-  Share2, 
-  AlertCircle, 
+import {
+  ArrowLeft,
+  Clock,
+  MapPin,
+  Gavel,
+  Heart,
+  Share2,
+  AlertCircle,
   Loader2,
   CheckCircle2,
   Tag,
   Calendar,
-  User,
+  Package,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck,
+  Star,
+  Flag,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +33,7 @@ import { formatDistanceToNow, isPast, parseISO, format } from 'date-fns';
 import { MessageSellerDialog } from '@/components/messaging/MessageSellerDialog';
 import { ReportLotDialog } from '@/components/lots/ReportLotDialog';
 import { ListingSafetyNotice } from '@/components/safety/SafetyNotice';
+import { CountdownTimer } from '@/components/lots/CountdownTimer';
 
 type LotWithDetails = Lot & {
   media: LotMedia[];
@@ -299,24 +303,48 @@ export default function LotDetail() {
   const images = lot.media?.length > 0 ? lot.media.sort((a, b) => (a.is_primary ? -1 : b.is_primary ? 1 : a.sort_order - b.sort_order)) : [];
   const isOwnLot = !!primaryOrg && !!lot.event?.org_id && primaryOrg.id === lot.event.org_id;
   const reserveMet = !!lot.reserve_price && (lot.current_bid ?? 0) >= lot.reserve_price;
+  const bidIncrement = getBidIncrement(currentPrice);
+  const statusLabel = lot.status.charAt(0).toUpperCase() + lot.status.slice(1).replace(/_/g, ' ');
+
+  // Stable anonymous alias per bidder per lot
+  const bidderAlias = (bidderId: string, isYou: boolean) => {
+    if (isYou) return 'You';
+    const ids = Array.from(new Set(bids.map(b => b.user_id)));
+    const idx = ids.indexOf(bidderId);
+    return `Bidder #${(idx >= 0 ? idx : 0) + 1}`;
+  };
 
   return (
     <Layout>
       <div className="container py-6 md:py-8">
-        {/* Breadcrumb */}
-        <nav className="mb-6">
-          <Button variant="ghost" size="sm" asChild className="gap-1 pl-0">
-            <Link to="/marketplace">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Marketplace
-            </Link>
-          </Button>
-        </nav>
+        <Link to="/marketplace" className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1">
+          <ArrowLeft className="h-4 w-4" /> Back to marketplace
+        </Link>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Images */}
+        {(lot.status === 'sold' || lot.status === 'reserved' || lot.status === 'cancelled') && (
+          <div className="mt-4 p-4 rounded-lg border border-border bg-muted/40 text-sm flex items-center gap-3">
+            <Package className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <div className="text-base font-semibold">
+                {lot.status === 'sold'
+                  ? 'This item has been sold'
+                  : lot.status === 'reserved'
+                    ? 'This item is reserved'
+                    : 'This item is no longer available'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {lot.status === 'reserved'
+                  ? "Another buyer is in checkout. Check back if their payment doesn't complete."
+                  : 'It is no longer available to buy or bid on.'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid lg:grid-cols-[1.4fr_1fr] gap-8 mt-4">
+          {/* PHOTOS + DESCRIPTION */}
           <div>
-            <div className="relative aspect-[4/3] bg-muted rounded-lg overflow-hidden mb-4">
+            <div className="relative aspect-[4/3] bg-secondary rounded-xl overflow-hidden">
               {images.length > 0 ? (
                 <>
                   <img
@@ -342,21 +370,20 @@ export default function LotDetail() {
                   )}
                 </>
               ) : (
-                <div className="flex items-center justify-center h-full">
-                  <Tag className="h-16 w-16 text-muted-foreground/40" />
+                <div className="w-full h-full grid place-items-center text-muted-foreground text-3xl font-semibold">
+                  {lot.category?.name ?? 'Surplus'}
                 </div>
               )}
             </div>
 
-            {/* Thumbnails */}
             {images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
+              <div className="grid grid-cols-5 gap-2 mt-3">
                 {images.map((img, idx) => (
                   <button
                     key={img.id}
                     onClick={() => setCurrentImageIndex(idx)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 transition-colors ${
-                      idx === currentImageIndex ? 'border-primary' : 'border-transparent'
+                    className={`aspect-square rounded-md overflow-hidden border transition-colors ${
+                      idx === currentImageIndex ? 'border-primary' : 'border-border hover:border-muted-foreground/40'
                     }`}
                   >
                     <img src={img.url} alt="" className="w-full h-full object-cover" />
@@ -364,211 +391,26 @@ export default function LotDetail() {
                 ))}
               </div>
             )}
-          </div>
 
-          {/* Details */}
-          <div>
-            {/* Badges */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              <Badge variant={isAuction ? 'auction' : 'fixed'}>
-                {isAuction ? (
-                  <>
-                    <Gavel className="h-3 w-3 mr-1" />
-                    Auction
-                  </>
-                ) : (
-                  'Buy Now'
-                )}
-              </Badge>
-              {condition && (
-                <Badge variant="success">{condition.label}</Badge>
-              )}
-              {lot.category && (
-                <Badge variant="muted">{lot.category.name}</Badge>
-              )}
-            </div>
-
-            {/* Title */}
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-              {lot.title}
-            </h1>
-
-            {/* Location & Event */}
-            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-              {lot.event?.suburb && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {lot.event.suburb}, {lot.event.state}
-                </span>
-              )}
-              {lot.event?.organization && (
-                <span className="flex items-center gap-1">
-                  <User className="h-4 w-4" />
-                  {lot.event.organization.name}
-                </span>
-              )}
-            </div>
-
-            {/* Price */}
-            <div className="bg-muted/50 rounded-lg p-4 mb-6">
-              <div className="flex items-end justify-between mb-2">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">
-                    {isAuction ? (lot.current_bid ? 'Current Bid' : 'Starting Bid') : 'Price'}
-                  </p>
-                  <p className="text-3xl font-bold text-foreground">
-                    ${currentPrice.toLocaleString()}
-                  </p>
-                </div>
-                {isAuction && lot.bid_count > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {lot.bid_count} bid{lot.bid_count !== 1 ? 's' : ''}
-                  </p>
-                )}
+            {/* Description + stats */}
+            <div className="mt-6 space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Description</h3>
+                <p className="whitespace-pre-line text-foreground/90 text-sm leading-relaxed">
+                  {lot.description || 'No description provided.'}
+                </p>
               </div>
 
-              {/* Auction Timer */}
-              {isAuction && lot.auction_end && !auctionEnded && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <span>Ends {formatDistanceToNow(parseISO(lot.auction_end), { addSuffix: true })}</span>
-                </div>
-              )}
-              
-              {auctionEnded && (
-                <p className="text-sm text-muted-foreground">Auction has ended</p>
-              )}
-            </div>
-
-            {/* Sold / reserved banner */}
-            {(lot.status === 'sold' || lot.status === 'reserved') && (
-              <Alert className="mb-6 border-warning/30 bg-warning/10">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {lot.status === 'sold'
-                    ? 'This item has been sold and is no longer available.'
-                    : 'This item is reserved while another buyer completes checkout. Check back shortly if their payment is not completed.'}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Actions */}
-            <div className="space-y-4 mb-6">
-              {isAuction && !auctionEnded && lot.status === 'active' && !isOwnLot ? (
-                <form onSubmit={handleBid} className="space-y-3">
-                  {lot.reserve_price && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <Badge variant={reserveMet ? 'success' : 'warning'}>
-                        {reserveMet ? 'Reserve met' : 'Reserve not met'}
-                      </Badge>
-                    </div>
-                  )}
-                  {bidError && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{bidError}</AlertDescription>
-                    </Alert>
-                  )}
-                  {bidSuccess && (
-                    <Alert className="border-success/20 bg-success/10">
-                      <CheckCircle2 className="h-4 w-4 text-success" />
-                      <AlertDescription className="text-success">Bid placed successfully!</AlertDescription>
-                    </Alert>
-                  )}
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      placeholder={`Min $${minNextBid.toLocaleString()}`}
-                      value={bidAmount}
-                      onChange={(e) => setBidAmount(e.target.value)}
-                      min={minNextBid}
-                      step={getBidIncrement(currentPrice)}
-                      className="flex-1"
-                      disabled={bidLoading || isOwnLot}
-                    />
-                    <Button type="submit" variant="hero" disabled={bidLoading || isOwnLot}>
-                      {bidLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Place Bid'}
-                    </Button>
-                  </div>
-                   <p className="text-xs text-muted-foreground">
-                     {isOwnLot
-                       ? 'You cannot bid on your own listing.'
-                       : `Bid increment: $${getBidIncrement(currentPrice)} • 5% buyer fee applies to winning bid`}
-                   </p>
-                </form>
-               ) : !isAuction && lot.status === 'active' ? (
-                 <div className="space-y-2">
-                   <Button variant="hero" size="lg" className="w-full" onClick={handleBuyNow} disabled={isOwnLot}>
-                     Buy Now - ${((lot.fixed_price ?? 0) * 1.05).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                   </Button>
-                   <p className="text-xs text-muted-foreground text-center">
-                     {isOwnLot ? 'This is your own listing.' : `Price $${(lot.fixed_price ?? 0).toLocaleString()} + 5% buyer fee`}
-                   </p>
-                 </div>
-              ) : null}
-
-              {/* Message Seller */}
-              {!isOwnLot && lot.event?.org_id && (
-                <MessageSellerDialog
-                  lotId={lot.id}
-                  lotTitle={lot.title}
-                  sellerOrgId={lot.event.org_id}
-                />
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={toggleWatchlist}
-                >
-                  <Heart className={`h-4 w-4 ${isWatched ? 'fill-primary text-primary' : ''}`} />
-                  {isWatched ? 'Watching' : 'Watch'}
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </div>
-              {!isOwnLot && (
-                <div className="flex justify-end">
-                  <ReportLotDialog lotId={lot.id} />
-                </div>
-              )}
-            </div>
-
-            <Separator className="my-6" />
-
-            {/* Details */}
-            <div className="space-y-4">
-              <h2 className="font-semibold text-lg">Details</h2>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Quantity</p>
-                  <p className="font-medium">{lot.quantity} {lot.unit}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Condition</p>
-                  <p className="font-medium">{condition?.label}</p>
-                </div>
-                {lot.category && (
-                  <div>
-                    <p className="text-muted-foreground">Category</p>
-                    <p className="font-medium">{lot.category.name}</p>
-                  </div>
-                )}
-              </div>
-
-              {lot.description && (
-                <div>
-                  <p className="text-muted-foreground text-sm mb-1">Description</p>
-                  <p className="text-sm whitespace-pre-wrap">{lot.description}</p>
-                </div>
-              )}
+              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <Stat label="Condition" value={condition?.label ?? '—'} />
+                <Stat label="Quantity" value={`${lot.quantity} ${lot.unit}`} />
+                <Stat label="Category" value={lot.category?.name ?? '—'} />
+                <Stat label="Status" value={statusLabel} />
+              </dl>
 
               {lot.compliance_tags && lot.compliance_tags.length > 0 && (
                 <div>
-                  <p className="text-muted-foreground text-sm mb-2">Compliance Tags</p>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Compliance</p>
                   <div className="flex flex-wrap gap-2">
                     {lot.compliance_tags.map(tag => (
                       <Badge key={tag.id} variant="outline">{tag.name}</Badge>
@@ -576,66 +418,272 @@ export default function LotDetail() {
                   </div>
                 </div>
               )}
+
+              {/* Pickup */}
+              {lot.event && (
+                <div className="pt-2">
+                  <h3 className="text-xl font-semibold mb-3">Pickup</h3>
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">{lot.event.suburb}, {lot.event.state} {lot.event.postcode}</p>
+                        <p className="text-xs text-muted-foreground">Exact address shared after payment is confirmed.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Pickup window</p>
+                        <p className="text-muted-foreground">
+                          {format(parseISO(lot.event.pickup_start), 'PPP')} – {format(parseISO(lot.event.pickup_end), 'PPP')}
+                        </p>
+                      </div>
+                    </div>
+                    {lot.event.access_notes && (
+                      <p className="text-muted-foreground">{lot.event.access_notes}</p>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <ListingSafetyNotice />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SIDEBAR */}
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4" />
+                {lot.event?.suburb}, {lot.event?.state} · Pickup only
+              </div>
+              <h1 className="text-3xl font-bold mt-2 leading-tight">{lot.title}</h1>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <Badge variant={isAuction ? 'auction' : 'fixed'}>
+                  {isAuction ? <><Gavel className="h-3 w-3 mr-1" />Auction</> : 'Buy now'}
+                </Badge>
+                {condition && <Badge variant="success">{condition.label}</Badge>}
+                {lot.category && <Badge variant="muted">{lot.category.name}</Badge>}
+              </div>
             </div>
 
-            <Separator className="my-6" />
+            {/* Price + action card */}
+            <Card>
+              <CardContent className="p-5 space-y-4">
+                {isAuction ? (
+                  <>
+                    <div>
+                      <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                        {lot.current_bid ? 'Current bid' : 'Starting at'}
+                      </div>
+                      <div className="text-4xl font-bold text-primary tabular-nums">
+                        ${currentPrice.toLocaleString()}
+                      </div>
+                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground mt-1">
+                        {lot.reserve_price ? (
+                          <span className={reserveMet ? 'text-success' : ''}>
+                            {reserveMet ? 'Reserve met' : 'Reserve not yet met'}
+                          </span>
+                        ) : (
+                          <span className="text-success">No reserve</span>
+                        )}
+                        <span>· {lot.bid_count ?? 0} bid{(lot.bid_count ?? 0) === 1 ? '' : 's'}</span>
+                        <span>· Increment ${bidIncrement.toLocaleString()}</span>
+                      </div>
+                    </div>
 
-            {/* Pickup Info */}
-            {lot.event && (
-              <div className="space-y-4">
-                <h2 className="font-semibold text-lg">Pickup Information</h2>
-                <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                    {!auctionEnded ? (
+                      <div className="text-sm flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span>Ends in</span>
+                        <CountdownTimer endsAt={lot.auction_end} />
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Auction ended {lot.auction_end && formatDistanceToNow(parseISO(lot.auction_end), { addSuffix: true })}
+                      </div>
+                    )}
+
+                    {!auctionEnded && lot.status === 'active' && !isOwnLot ? (
+                      <form onSubmit={handleBid} className="space-y-2">
+                        {bidError && (
+                          <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>{bidError}</AlertDescription>
+                          </Alert>
+                        )}
+                        {bidSuccess && (
+                          <Alert className="border-success/20 bg-success/10">
+                            <CheckCircle2 className="h-4 w-4 text-success" />
+                            <AlertDescription className="text-success">Bid placed.</AlertDescription>
+                          </Alert>
+                        )}
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            placeholder={`Min $${minNextBid.toLocaleString()}`}
+                            value={bidAmount}
+                            onChange={(e) => setBidAmount(e.target.value)}
+                            min={minNextBid}
+                            step={bidIncrement}
+                            className="flex-1"
+                            disabled={bidLoading}
+                          />
+                          <Button type="submit" size="lg" disabled={bidLoading}>
+                            {bidLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1.5" />Place bid</>}
+                          </Button>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          By bidding you commit to buy if you win. Bids in the final 5 minutes may extend the auction (anti-snipe). 10% buyer fee added at checkout.
+                        </p>
+                      </form>
+                    ) : (
+                      <Button className="w-full" size="lg" disabled>
+                        {isOwnLot ? "You're the seller" : auctionEnded ? 'Auction ended' : `Not available — ${statusLabel}`}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <>
                     <div>
-                      <p className="font-medium">{lot.event.site_address}</p>
-                      <p className="text-muted-foreground">{lot.event.suburb}, {lot.event.state} {lot.event.postcode}</p>
+                      <div className="text-xs uppercase tracking-wider text-muted-foreground">Buy now</div>
+                      <div className="text-4xl font-bold text-primary tabular-nums">
+                        ${(lot.fixed_price ?? 0).toLocaleString()}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">+ 10% buyer fee at checkout</p>
                     </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">Pickup Window</p>
-                      <p className="text-muted-foreground">
-                        {format(parseISO(lot.event.pickup_start), 'PPP')} - {format(parseISO(lot.event.pickup_end), 'PPP')}
-                      </p>
-                    </div>
-                  </div>
-                  {lot.event.access_notes && (
-                    <p className="text-muted-foreground">{lot.event.access_notes}</p>
+                    <Button
+                      size="lg"
+                      className="w-full"
+                      onClick={handleBuyNow}
+                      disabled={isOwnLot || lot.status !== 'active'}
+                    >
+                      {lot.status === 'active' ? `Buy now · $${((lot.fixed_price ?? 0) * 1.1).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Not available — ${statusLabel}`}
+                    </Button>
+                  </>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={toggleWatchlist}>
+                    <Heart className={`h-4 w-4 mr-2 ${isWatched ? 'fill-primary text-primary' : ''}`} />
+                    {isWatched ? 'Saved' : 'Save'}
+                  </Button>
+                  {!isOwnLot && lot.event?.org_id ? (
+                    <MessageSellerDialog
+                      lotId={lot.id}
+                      lotTitle={lot.title}
+                      sellerOrgId={lot.event.org_id}
+                    />
+                  ) : (
+                    <Button variant="outline" size="icon" className="w-full">
+                      <Share2 className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
-                <ListingSafetyNotice />
-              </div>
+
+                <p className="text-xs text-muted-foreground flex items-start gap-2 pt-2 border-t border-border">
+                  <Package className="h-4 w-4 mt-0.5 shrink-0" />
+                  Exact pickup address is shared after payment is confirmed.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Seller card */}
+            {lot.event?.organization && (
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-lg font-semibold">{lot.event.organization.name}</div>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                        {(lot.event.organization as any).is_verified && (
+                          <span className="flex items-center gap-1 text-success">
+                            <ShieldCheck className="h-4 w-4" />Verified
+                          </span>
+                        )}
+                        {(lot.event.organization as any).is_founding && (
+                          <span className="flex items-center gap-1">
+                            <Star className="h-4 w-4 text-primary" />Founding seller
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {(lot.event.organization as any).rating_count > 0 && (
+                      <div className="text-right text-sm">
+                        <div className="font-semibold">★ {Number((lot.event.organization as any).rating_avg ?? 0).toFixed(1)}</div>
+                        <div className="text-xs text-muted-foreground">{(lot.event.organization as any).rating_count} reviews</div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Bid History */}
-            {isAuction && bids.length > 0 && (
-              <>
-                <Separator className="my-6" />
-                <div>
-                  <h2 className="font-semibold text-lg mb-4">Bid History</h2>
-                  <div className="space-y-2">
-                    {bids.slice(0, 5).map((bid, idx) => (
-                      <div
-                        key={bid.id}
-                        className={`flex justify-between items-center text-sm p-2 rounded ${idx === 0 ? 'bg-primary/10' : ''}`}
-                      >
-                        <span className="text-muted-foreground">
-                          {bid.profile?.full_name ?? 'Anonymous'}
-                        </span>
-                        <span className={`font-medium ${idx === 0 ? 'text-primary' : ''}`}>
-                          ${bid.amount.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+            {/* Bid history */}
+            {isAuction && (
+              <Card>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Gavel className="h-4 w-4" /> Bid history
+                    </h3>
+                    <span className="text-xs text-muted-foreground">
+                      {bids.length} bid{bids.length === 1 ? '' : 's'}
+                    </span>
                   </div>
-                </div>
-              </>
+                  {bids.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No bids yet — be the first.</p>
+                  ) : (
+                    <ul className="divide-y divide-border">
+                      {bids.map((b, idx) => {
+                        const isYou = !!user && b.user_id === user.id;
+                        return (
+                          <li key={b.id} className="flex items-center justify-between py-2 text-sm">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={isYou ? 'font-medium text-primary' : 'text-foreground/80'}>
+                                {bidderAlias(b.user_id, isYou)}
+                              </span>
+                              {idx === 0 && !auctionEnded && (
+                                <Badge variant="outline" className="text-[10px] border-success text-success">Winning</Badge>
+                              )}
+                              {idx === 0 && auctionEnded && (
+                                <Badge variant="outline" className="text-[10px] border-success text-success">Won</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(parseISO(b.created_at), { addSuffix: true })}
+                              </span>
+                              <span className="font-semibold tabular-nums">${b.amount.toLocaleString()}</span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {!isOwnLot && (
+              <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
+                <span><ReportLotDialog lotId={lot.id} /></span>
+              </Button>
             )}
           </div>
         </div>
       </div>
     </Layout>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-sm font-medium">{value}</div>
+    </div>
   );
 }
