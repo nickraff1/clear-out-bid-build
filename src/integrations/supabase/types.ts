@@ -1621,6 +1621,8 @@ export type Database = {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
+      release_expired_reservations: { Args: never; Returns: number }
+      release_lot_reservation: { Args: { _lot_id: string }; Returns: undefined }
     }
     Enums: {
       app_role:
