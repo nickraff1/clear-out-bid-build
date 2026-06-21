@@ -116,9 +116,12 @@ export default function SellerLots() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">All Lots</h1>
-          <p className="text-muted-foreground">Manage lots across all your events</p>
+          <h1 className="text-2xl font-bold">My Listings</h1>
+          <p className="text-muted-foreground">Manage all the items you're selling</p>
         </div>
+        <Button asChild>
+          <Link to="/app/seller/lots/new">+ New Listing</Link>
+        </Button>
       </div>
 
       {/* Filters */}
