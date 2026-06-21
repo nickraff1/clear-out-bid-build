@@ -267,7 +267,7 @@ export default function BuyerOverview() {
           </div>
           <div>
             <p className="font-medium">Marketplace</p>
-            <p className="text-sm text-muted-foreground">Browse lots</p>
+            <p className="text-sm text-muted-foreground">Browse listings</p>
           </div>
         </Link>
 
@@ -279,7 +279,7 @@ export default function BuyerOverview() {
             <Gavel className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="font-medium">My Bids</p>
+            <p className="font-medium">My bids</p>
             <p className="text-sm text-muted-foreground">{stats.activeBids} active</p>
           </div>
         </Link>
