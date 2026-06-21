@@ -1,97 +1,76 @@
-## Audit: Spec vs current Offcutt implementation
+## Goal
+Make the post-purchase journey usable end-to-end: once a buyer creates/pays for an order, it is clearly visible in the buyer portal, opens into a guided order page, and can be traced/admin-managed from the admin portal. Use the Offcut Sydney project as the UX reference while preserving the existing Offcutt backend model where possible.
 
-Legend: ✅ implemented · 🟡 partial / deviation · ❌ missing
+## What I found
+- Orders are being created and paid orders exist in the database.
+- The likely visibility gap is in the buyer portal queries and navigation:
+  - Buyer order pages currently filter by `buyer_id` only, even though the backend access model also supports `buyer_org_id`.
+  - Checkout return sends buyers to the generic orders list instead of the specific order detail page.
+  - Buyer overview recent orders are not strong “manage/arrange pickup” entry points.
+- The order detail page has core pickup actions, but lacks the clearer Offcut Sydney-style post-purchase guidance: “what happens next”, pickup code emphasis, payment summary, and step-by-step status context.
+- Admin can list orders, but tracing is mostly a flat table; it needs clearer search/status/payment/pickup diagnostics and direct drill-in for beta support.
 
-### 1) Role-based app shell
-- ✅ `/app` redirect by role (`AppRedirect.tsx`)
-- ✅ Portals `/app/buyer/*`, `/app/seller/*`, `/app/admin/*`
-- ✅ RBAC via `RoleGuard.tsx` + `localStorage` fallback for fresh onboarding
+## Implementation plan
 
-### 2) Seller portal
-- ✅ Overview, events list, event detail, lots manager, lot create/edit
-- 🟡 **Event creation is a single form, not a 3-step wizard** (`CreateEvent.tsx`). Site-constraint fields (forklift, dock, pickup hours) are folded into a single `access_notes` text field — no structured constraints.
-- ✅ Lot create: category, title, qty/unit, condition, photos, compliance tags, fixed/auction pricing, draft/live
-- ✅ Lots belong to seller org (enforced by RLS + `is_org_member`)
-- 🟡 Event detail shows lots + add-lot deep link, but the **consolidated pickup schedule lives on a separate `/app/seller/pickups` page**, not embedded in the event page
+### 1) Fix buyer order visibility
+- Update buyer order fetches to include orders where the user is either:
+  - the direct `buyer_id`, or
+  - a member of the `buyer_org_id` through the existing backend/RLS access model.
+- Apply this consistently to:
+  - Buyer Orders page
+  - Buyer Overview recent orders/stats
+  - Any buyer order summaries that currently only use `buyer_id`
+- Keep RLS intact; do not make orders public.
 
-### 3) Buyer portal
-- ✅ Overview, bids, orders, watchlist, alerts pages all exist
-- 🟡 **`BuyerOrders` filters by `buyer_id` only, not `buyer_org_id`** (`BuyerOrders.tsx:54`). Spec explicitly requires org-scoped visibility so org staff see org orders. Same issue likely on `BuyerOverview`/`BuyerBids` — needs re-check.
-- ✅ Watchlist + saved searches + alerts tables exist
-- 🟡 Email delivery for saved-search alerts: table + UI present, but no scheduled job sending emails was found
+### 2) Improve post-checkout routing
+- Change checkout success/return UX so a successful payment leads buyers directly to:
+  - `/app/orders/:orderId`
+- Keep secondary CTAs:
+  - “View all orders”
+  - “Keep browsing”
+- If webhook confirmation is still pending, show a processing state with a retry/check-again path and a direct link to the pending order detail when possible.
 
-### 4) Auction engine
-- ✅ Server-side bid validation, min-increment, end-time, self-bid block (`prevent_seller_self_bid` trigger)
-- ✅ Auto-create order at close (`close_expired_auction` SECURITY DEFINER + `close-expired-auctions` cron)
-- ✅ Immutable `bid_events` audit log
-- 🟡 **Soft-close extension on last-minute bid: not found** in `auction-engine` or DB triggers — needs confirmation
-- 🟡 **Per-user bid rate limit: not found**
+### 3) Polish buyer post-purchase UI using Offcut Sydney as reference
+- Rework the existing order detail page layout, not the backend flow:
+  - Order header with item title, order number/short ID, buyer/seller context, status chips
+  - Listing summary with image, seller/org, pickup suburb/address visibility rules
+  - Clear “Next step” panel based on current status:
+    - pending payment → pay now
+    - paid / awaiting arrangement → propose pickup time or message seller
+    - pickup proposed → accept/suggest another time
+    - ready for pickup → show pickup code and collection instructions
+    - collected → review/report completion state
+  - Prominent pickup code section for buyers, seller confirmation instructions for sellers
+  - Payment summary sidebar using existing order/payment fields
+  - Issue reporting and messaging remain available from the order page
 
-### 5) Pickup scheduling & proof
-- 🟡 Spec calls for a slot picker bound to event window. Current model uses a **free-form pickup-time proposal** between buyer and seller (`proposed_pickup_at`, `agreed_pickup_at`) plus a `pickup_code` handshake. `pickup_slots` table exists but isn't used by the buyer flow.
-- ✅ Seller has consolidated pickup schedule (`SellerPickups.tsx`)
-- 🟡 **Proof-of-pickup photo upload: `pickup_confirmations` table exists but no UI uploads to it.** Completion is done via pickup-code entry instead.
+### 4) Make buyer orders page action-oriented
+- Replace the passive table feel with clearer rows/cards inspired by Offcut Sydney:
+  - item title
+  - status + pickup status
+  - payment/pickup next action
+  - “Manage order” CTA
+  - “Pay now” CTA for pending payment
+- Preserve filters/search and existing design tokens.
 
-### 6) Onboarding
-- ✅ `OnboardingWizard.tsx` runs on first login, picks role, creates org
-- 🟡 **3-step checklist with deep-links to first action: not present.** Wizard ends at role/org creation, no post-onboarding "list your first item / place your first bid" checklist.
+### 5) Improve seller/admin traceability
+- Seller orders/pickups:
+  - Ensure seller rows link directly to the shared order detail page.
+  - Show pickup status and next action wording consistently.
+- Admin orders:
+  - Keep the existing admin controls, but make order tracing clearer with: order short ID, buyer, seller, payment status, pickup status, missing-code/stuck indicators, direct “Open” action.
+  - Add clearer empty/loading/error states so beta testers know whether no records exist vs. filters hiding records.
 
-### 7) Design consistency
-- ✅ Orange/black/white tokens, dashboard cards, status chips, mobile-first lot create
-- ✅ Recent polish pass standardized empty states and status wording
+### 6) Add lightweight backend traceability if needed
+- If current tables are insufficient during implementation, add a small `order_status_history` table and trigger so status changes are traceable in admin/order detail.
+- This would include proper grants and RLS:
+  - buyers can view history for their own org’s orders
+  - sellers can view history for their own event/org orders
+  - admins can view all
+- I will only add this if needed for the “can’t be traced” admin requirement; otherwise I’ll reuse existing `orders`, `payments`, and `notifications` data.
 
----
-
-### Post-order workflow audit
-
-**Database (`orders` table)**
-- ✅ buyer_id, buyer_org_id, lot_id, event_id, amount, status, pickup_status, pickup_code, admin_notes, proposed/agreed/collected timestamps
-- ❌ `order_number` (human-readable)
-- ❌ `seller_org_id` (derived via `lot → event → org_id` join; spec wants it denormalized)
-- ❌ Separate `platform_fee` / `total_amount` columns (fee is encoded in `amount` and free-text `notes`)
-- ❌ `order_items` table (single-lot orders only — fine for current model, but spec calls for it)
-- ❌ `order_status_history` table — status transitions are not logged
-- ❌ `payment_status` enum column (payment state lives in `payments` table instead)
-- 🟡 Status enum: has `pending_payment / paid / ready_for_pickup / collected / cancelled / disputed`. Missing `PICKUP_SCHEDULED`. Pickup state is tracked separately in `pickup_status`.
-
-**Order creation**
-- ✅ Buy Now: creates order, reserves lot, redirects to checkout/order page
-- ✅ Auction close: `close_expired_auction` creates order for winner with `pending_payment` + notification
-
-**Buyer Orders page**
-- 🟡 Live and shows orders (7 paid orders confirmed in DB for the active test buyer) — **so the reported "orders not appearing" bug is NOT reproducing**. Likely fixed in an earlier pass.
-- 🟡 But query is `buyer_id = user.id`, **not `buyer_org_id IN user's orgs`** — org staff of the same buyer org won't see each other's orders. This is the only real gap vs the spec on this page.
-
-**Order detail (`/app/orders/:id`)**
-- ✅ Single shared page for buyer + seller, gated by role
-- ✅ Pickup proposal/accept, pickup-code reveal, seller confirm
-- ✅ Cancel order (admin), force-complete (admin), regenerate code (admin)
-- ❌ Buyer proof-of-pickup photo upload
-- 🟡 "Choose pickup slot" uses free-form datetime, not slot picker
-
-**Seller**
-- ✅ Event detail lists lots; seller orders + pickups pages exist
-- 🟡 Per-event order list is not embedded in the event detail page
-
-**Admin**
-- ✅ AdminOrders with manual status actions, payout controls, notes
-
-**RBAC / RLS**
-- ✅ Orders RLS scopes buyers to own user + buyers org members; sellers to event-org members; admins all
-- ✅ `protect_order_critical_fields` trigger locks amount/buyer/lot/pickup_code; restricts seller/buyer status transitions
-
----
-
-### Net gaps if you later want spec-perfect
-
-1. Buyer orders/bids/overview queries → use `buyer_org_id IN (user's orgs)` instead of `buyer_id`.
-2. Add `order_status_history` table + trigger logging every status change.
-3. Add `order_number`, denormalized `seller_org_id`, `platform_fee`, `total_amount`, `payment_status` columns (or accept current model).
-4. Implement real `pickup_slots` selection flow + `pickup_confirmations` photo upload UI.
-5. Add soft-close auction extension (e.g. last-60s bid pushes `auction_end` by 2 min) and bid rate-limit.
-6. Convert event creation to 3-step wizard and add structured site-constraint fields (forklift/dock/hours).
-7. Embed per-event order/pickup schedule inside seller event detail.
-8. Onboarding: add post-role 3-step checklist with deep links to first listing / first bid.
-9. Saved-search email delivery job.
-
-**No code changes made — this is audit-only.** Tell me which of the gaps above (if any) you want me to fix and I'll plan that work next.
+### 7) Validate end-to-end
+- Verify the current paid test orders appear in buyer portal queries.
+- Check checkout return behavior routes to the specific order.
+- Verify buyer, seller, and admin can all open the same order detail route according to their role.
+- Check no new RLS errors, dead buttons, or confusing empty states are introduced.
