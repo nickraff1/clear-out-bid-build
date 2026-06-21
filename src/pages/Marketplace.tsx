@@ -338,10 +338,33 @@ export default function Marketplace() {
               </SelectContent>
             </Select>
 
+            <Select value={conditionFilter || 'all'} onValueChange={(v) => setConditionFilter(v === 'all' ? '' : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Condition" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any Condition</SelectItem>
+                {LOT_CONDITIONS.map(c => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input placeholder="Suburb" value={suburbFilter} onChange={(e) => setSuburbFilter(e.target.value)} />
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="number" placeholder="Min $" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} />
+              <Input type="number" placeholder="Max $" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} />
+            </div>
+
             <Button variant="ghost" size="sm" onClick={clearFilters}>
               <X className="h-4 w-4 mr-1" />
               Clear All
             </Button>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+            {error}
           </div>
         )}
 
