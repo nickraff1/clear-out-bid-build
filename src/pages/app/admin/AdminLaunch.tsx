@@ -46,12 +46,12 @@ export default function AdminLaunch() {
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
     const [
-      activeLots, sellerRoles, buyerRoles,
+      activeLots, sellerOrgs, buyerProfiles,
       pendingPayouts, unresolvedReports, stuckOrders, paidOrders, latestPayment,
     ] = await Promise.all([
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active"),
-      supabase.from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "seller"),
-      supabase.from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "buyer"),
+      supabase.from("organizations").select("id", { count: "exact", head: true }),
+      supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("payments").select("id", { count: "exact", head: true }).eq("status", "succeeded").eq("manual_payout_status", "manual_payout_pending"),
       supabase.from("lot_reports").select("id", { count: "exact", head: true }).neq("status", "resolved"),
       supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending_payment").lt("created_at", thirtyMinAgo),
@@ -61,8 +61,8 @@ export default function AdminLaunch() {
 
     setStats({
       activeListings: activeLots.count ?? 0,
-      sellers: sellerRoles.count ?? 0,
-      buyers: buyerRoles.count ?? 0,
+      sellers: sellerOrgs.count ?? 0,
+      buyers: buyerProfiles.count ?? 0,
       pendingPayouts: pendingPayouts.count ?? 0,
       unresolvedReports: unresolvedReports.count ?? 0,
       stuckOrders: stuckOrders.count ?? 0,
