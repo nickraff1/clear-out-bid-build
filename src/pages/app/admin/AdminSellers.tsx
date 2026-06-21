@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Loader2, MoreVertical, Award, BadgeCheck, Ban, ShieldCheck, Search } from 'lucide-react';
+import { Loader2, MoreVertical, Award, BadgeCheck, Ban, ShieldCheck, Search, Building2 } from 'lucide-react';
+import { EmptyState } from '@/components/app/EmptyState';
 import { toast } from 'sonner';
 
 export default function AdminSellers() {
@@ -67,6 +68,13 @@ export default function AdminSellers() {
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input className="pl-8" placeholder="Search organisation" value={q} onChange={e=>setQ(e.target.value)} />
       </div>
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={Building2}
+          title={orgs.length === 0 ? 'No seller organisations yet' : 'No matching organisations'}
+          description={orgs.length === 0 ? 'Sellers will appear here when they create a business profile.' : 'Try a different search term.'}
+        />
+      ) : (
       <div className="border rounded-md overflow-hidden">
         <Table>
           <TableHeader><TableRow>
@@ -116,6 +124,7 @@ export default function AdminSellers() {
           </TableBody>
         </Table>
       </div>
+      )}
     </div>
   );
 }

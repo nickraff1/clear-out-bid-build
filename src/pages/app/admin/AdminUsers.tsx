@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Users } from 'lucide-react';
+import { EmptyState } from '@/components/app/EmptyState';
 import { format, parseISO } from 'date-fns';
 
 type Row = {
@@ -54,6 +55,13 @@ export default function AdminUsers() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input placeholder="Search by name or email" value={q} onChange={e => setQ(e.target.value)} className="pl-9" />
       </div>
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title={rows.length === 0 ? 'No users yet' : 'No matching users'}
+          description={rows.length === 0 ? 'Registered users will appear here.' : 'Try a different search term.'}
+        />
+      ) : (
       <div className="border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
@@ -81,6 +89,7 @@ export default function AdminUsers() {
           </TableBody>
         </Table>
       </div>
+      )}
     </div>
   );
 }
