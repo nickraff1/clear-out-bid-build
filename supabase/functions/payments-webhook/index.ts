@@ -29,12 +29,85 @@ async function handleSessionCompleted(session: any, env: StripeEnv) {
     updated_at: new Date().toISOString(),
   }).eq("stripe_session_id", session.id);
 
-  // Move order from pending_payment to paid
-  await sb.from("orders").update({
+  // Move order from pending_payment to paid, generate pickup code
+  // Use postgres RPC to get a pickup code
+  const { data: codeRow } = await sb.rpc("generate_pickup_code");
+  const pickupCode = (codeRow as unknown as string) ?? Math.random().toString(36).slice(2, 8).toUpperCase();
+
+  const { data: updatedOrder } = await sb.from("orders").update({
     status: "paid",
     payment_reference: session.payment_intent ?? session.id,
+    pickup_code: pickupCode,
+    pickup_status: "awaiting_arrangement",
     updated_at: new Date().toISOString(),
-  }).eq("id", orderId).eq("status", "pending_payment");
+  }).eq("id", orderId).eq("status", "pending_payment").select("*, lot:lots(id, title, event_id), event:clearance_events(org_id, created_by)").maybeSingle();
+
+  if (!updatedOrder) return;
+
+  // Mark the lot as sold
+  await sb.from("lots").update({
+    status: "sold",
+    reserved_until: null,
+  }).eq("id", (updatedOrder as any).lot_id);
+
+  // Find or create conversation between buyer and seller org for this lot
+  const buyerId = (updatedOrder as any).buyer_id as string;
+  const lotId = (updatedOrder as any).lot_id as string;
+  const sellerOrgId = (updatedOrder as any).event?.org_id as string | undefined;
+  let conversationId: string | null = null;
+
+  if (sellerOrgId) {
+    const { data: existing } = await sb
+      .from("conversations")
+      .select("id")
+      .eq("buyer_id", buyerId)
+      .eq("seller_org_id", sellerOrgId)
+      .eq("lot_id", lotId)
+      .maybeSingle();
+
+    if (existing) {
+      conversationId = (existing as any).id;
+      await sb.from("conversations").update({ order_id: orderId }).eq("id", conversationId);
+    } else {
+      const { data: created } = await sb
+        .from("conversations")
+        .insert({ buyer_id: buyerId, seller_org_id: sellerOrgId, lot_id: lotId, order_id: orderId })
+        .select("id").single();
+      conversationId = (created as any)?.id ?? null;
+    }
+
+    if (conversationId) {
+      await sb.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: buyerId,
+        is_system: true,
+        body: `✅ Order confirmed. Please arrange pickup through this chat. The exact pickup address is now available to the buyer on the order page.`,
+      });
+    }
+  }
+
+  // Notifications
+  const sellerCreator = (updatedOrder as any).event?.created_by as string | undefined;
+  const lotTitle = (updatedOrder as any).lot?.title ?? "your lot";
+  const notifications: any[] = [
+    {
+      user_id: buyerId,
+      type: "order_paid",
+      title: "Payment received",
+      message: `Your payment for "${lotTitle}" was successful. The seller has been notified — arrange pickup from your order page.`,
+      data: { order_id: orderId },
+    },
+  ];
+  if (sellerCreator) {
+    notifications.push({
+      user_id: sellerCreator,
+      type: "order_sold",
+      title: "Item sold",
+      message: `"${lotTitle}" has been paid for. Arrange pickup with the buyer and mark it ready when prepared.`,
+      data: { order_id: orderId },
+    });
+  }
+  await sb.from("notifications").insert(notifications);
 }
 
 async function handlePaymentFailed(pi: any, env: StripeEnv) {

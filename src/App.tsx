@@ -64,6 +64,9 @@ import BulkUpload from "./pages/app/seller/BulkUpload";
 import MessagesInbox from "./pages/app/messages/MessagesInbox";
 import MessageThread from "./pages/app/messages/MessageThread";
 
+// Orders
+import OrderDetail from "./pages/app/orders/OrderDetail";
+
 // SEO Landing Pages
 import {
   SellSurplusSydney,
@@ -260,6 +263,9 @@ const App = () => (
               {/* Messages (buyer + seller) */}
               <Route path="/app/messages" element={<MessagesInbox />} />
               <Route path="/app/messages/:id" element={<MessageThread />} />
+
+              {/* Order detail (buyer + seller) */}
+              <Route path="/app/orders/:orderId" element={<OrderDetail />} />
             </Route>
 
             {/* Legacy Dashboard Routes */}

@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Check, Loader2, Truck } from 'lucide-react';
+import { Loader2, Truck } from 'lucide-react';
 import type { Order, Lot, ClearanceEvent, Profile } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 
@@ -60,11 +60,6 @@ export default function SellerPickups() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const markCollected = async (orderId: string) => {
-    await supabase.from('orders').update({ status: 'collected' }).eq('id', orderId);
-    fetchOrders();
   };
 
   const getStatusColor = (status: string) => {
@@ -143,12 +138,9 @@ export default function SellerPickups() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {order.status !== 'collected' && (
-                      <Button size="sm" onClick={() => markCollected(order.id)}>
-                        <Check className="h-4 w-4 mr-1" />
-                        Collected
-                      </Button>
-                    )}
+                    <Button size="sm" variant="outline" asChild>
+                      <Link to={`/app/orders/${order.id}`}>Manage</Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

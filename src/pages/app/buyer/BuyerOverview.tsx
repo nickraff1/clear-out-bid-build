@@ -78,7 +78,7 @@ export default function BuyerOverview() {
         .limit(5);
 
       if (ordersData) {
-        setRecentOrders(ordersData as Order[]);
+        setRecentOrders(ordersData as unknown as Order[]);
         
         const pendingPickups = ordersData.filter(o => 
           o.status === 'ready_for_pickup' || o.status === 'paid'

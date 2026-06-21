@@ -15,7 +15,7 @@ export default function AdminOrders() {
   useEffect(() => {
     supabase
       .from('orders')
-      .select('id, amount, status, created_at, lot:lots(title), buyer:profiles!orders_buyer_id_fkey(email, full_name)')
+      .select('id, amount, status, pickup_status, created_at, lot:lots(title), buyer:profiles!orders_buyer_id_fkey(email, full_name)')
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data }) => { setRows(data ?? []); setLoading(false); });
@@ -37,7 +37,9 @@ export default function AdminOrders() {
               <TableHead>Buyer</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Pickup</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -47,7 +49,11 @@ export default function AdminOrders() {
                 <TableCell>{o.buyer?.full_name ?? o.buyer?.email ?? '—'}</TableCell>
                 <TableCell>${Number(o.amount).toLocaleString()}</TableCell>
                 <TableCell><Badge variant="muted">{o.status}</Badge></TableCell>
+                <TableCell><Badge variant="muted">{o.pickup_status ?? '—'}</Badge></TableCell>
                 <TableCell className="text-muted-foreground">{format(parseISO(o.created_at), 'MMM d, yyyy')}</TableCell>
+                <TableCell>
+                  <Link to={`/app/orders/${o.id}`} className="text-primary hover:underline text-sm">Manage</Link>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

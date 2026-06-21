@@ -91,7 +91,7 @@ export default function DashboardOverview() {
         .limit(5);
 
       if (data) {
-        setRecentOrders(data as Order[]);
+        setRecentOrders(data as unknown as Order[]);
       }
     } finally {
       setLoading(false);

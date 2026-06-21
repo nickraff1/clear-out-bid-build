@@ -444,6 +444,7 @@ export type Database = {
           id: string
           last_message_at: string
           lot_id: string | null
+          order_id: string | null
           seller_org_id: string
         }
         Insert: {
@@ -452,6 +453,7 @@ export type Database = {
           id?: string
           last_message_at?: string
           lot_id?: string | null
+          order_id?: string | null
           seller_org_id: string
         }
         Update: {
@@ -460,6 +462,7 @@ export type Database = {
           id?: string
           last_message_at?: string
           lot_id?: string | null
+          order_id?: string | null
           seller_org_id?: string
         }
         Relationships: [
@@ -580,8 +583,10 @@ export type Database = {
           details: string | null
           id: string
           lot_id: string
+          order_id: string | null
           reason: string
           reporter_id: string
+          reporter_role: string | null
           resolved_at: string | null
           resolved_by: string | null
           status: string
@@ -591,8 +596,10 @@ export type Database = {
           details?: string | null
           id?: string
           lot_id: string
+          order_id?: string | null
           reason: string
           reporter_id: string
+          reporter_role?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
@@ -602,8 +609,10 @@ export type Database = {
           details?: string | null
           id?: string
           lot_id?: string
+          order_id?: string | null
           reason?: string
           reporter_id?: string
+          reporter_role?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
@@ -638,6 +647,8 @@ export type Database = {
           quantity: number
           reserve_met: boolean | null
           reserve_price: number | null
+          reserved_order_id: string | null
+          reserved_until: string | null
           retail_estimate: number | null
           start_price: number | null
           status: Database["public"]["Enums"]["lot_status"]
@@ -666,6 +677,8 @@ export type Database = {
           quantity?: number
           reserve_met?: boolean | null
           reserve_price?: number | null
+          reserved_order_id?: string | null
+          reserved_until?: string | null
           retail_estimate?: number | null
           start_price?: number | null
           status?: Database["public"]["Enums"]["lot_status"]
@@ -694,6 +707,8 @@ export type Database = {
           quantity?: number
           reserve_met?: boolean | null
           reserve_price?: number | null
+          reserved_order_id?: string | null
+          reserved_until?: string | null
           retail_estimate?: number | null
           start_price?: number | null
           status?: Database["public"]["Enums"]["lot_status"]
@@ -733,6 +748,7 @@ export type Database = {
           conversation_id: string
           created_at: string
           id: string
+          is_system: boolean
           read_at: string | null
           sender_id: string
         }
@@ -741,6 +757,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           id?: string
+          is_system?: boolean
           read_at?: string | null
           sender_id: string
         }
@@ -749,6 +766,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           id?: string
+          is_system?: boolean
           read_at?: string | null
           sender_id?: string
         }
@@ -805,7 +823,10 @@ export type Database = {
       }
       orders: {
         Row: {
+          admin_notes: string | null
+          agreed_pickup_at: string | null
           amount: number
+          buyer_collected_at: string | null
           buyer_id: string
           buyer_org_id: string
           created_at: string
@@ -814,12 +835,20 @@ export type Database = {
           lot_id: string
           notes: string | null
           payment_reference: string | null
+          pickup_code: string | null
           pickup_slot_id: string | null
+          pickup_status: string
+          proposed_pickup_at: string | null
+          proposed_pickup_by: string | null
+          seller_confirmed_at: string | null
           status: Database["public"]["Enums"]["order_status"]
           updated_at: string
         }
         Insert: {
+          admin_notes?: string | null
+          agreed_pickup_at?: string | null
           amount: number
+          buyer_collected_at?: string | null
           buyer_id: string
           buyer_org_id: string
           created_at?: string
@@ -828,12 +857,20 @@ export type Database = {
           lot_id: string
           notes?: string | null
           payment_reference?: string | null
+          pickup_code?: string | null
           pickup_slot_id?: string | null
+          pickup_status?: string
+          proposed_pickup_at?: string | null
+          proposed_pickup_by?: string | null
+          seller_confirmed_at?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           updated_at?: string
         }
         Update: {
+          admin_notes?: string | null
+          agreed_pickup_at?: string | null
           amount?: number
+          buyer_collected_at?: string | null
           buyer_id?: string
           buyer_org_id?: string
           created_at?: string
@@ -842,7 +879,12 @@ export type Database = {
           lot_id?: string
           notes?: string | null
           payment_reference?: string | null
+          pickup_code?: string | null
           pickup_slot_id?: string | null
+          pickup_status?: string
+          proposed_pickup_at?: string | null
+          proposed_pickup_by?: string | null
+          seller_confirmed_at?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           updated_at?: string
         }
@@ -1557,6 +1599,7 @@ export type Database = {
       }
     }
     Functions: {
+      generate_pickup_code: { Args: never; Returns: string }
       get_event_org_id: { Args: { _event_id: string }; Returns: string }
       has_order_for_event: {
         Args: { _event_id: string; _user_id: string }
