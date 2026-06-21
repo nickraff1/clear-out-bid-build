@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/app/EmptyState';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -24,6 +25,7 @@ import { ArrowUpRight, CreditCard, Filter, Loader2, MapPin, Search, ShoppingCart
 import type { Order, Lot, ClearanceEvent } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
+import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
 
 type OrderWithDetails = Order & {
   lot: Lot & { event?: { org_id: string; created_by: string } };
@@ -72,21 +74,8 @@ export default function BuyerOrders() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'success' | 'warning' | 'info' | 'muted' | 'destructive'> = {
-      pending_payment: 'warning',
-      paid: 'success',
-      ready_for_pickup: 'info',
-      collected: 'success',
-      cancelled: 'destructive',
-      disputed: 'warning',
-    };
-    return variants[status] ?? 'muted';
-  };
-
-  const formatStatus = (status: string) => {
-    return status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  };
+  const getStatusBadge = orderStatusTone;
+  const formatStatus = orderStatusLabel;
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.lot?.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -139,23 +128,22 @@ export default function BuyerOrders() {
 
       {/* Orders Table */}
       {filteredOrders.length === 0 ? (
-        <div className="text-center py-16 dashboard-card">
-          <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">
-            {orders.length === 0 ? 'No orders yet' : 'No matching orders'}
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            {orders.length === 0 
-              ? 'Your purchases will appear here.'
-              : 'Try adjusting your search or filter criteria.'
-            }
-          </p>
-          {orders.length === 0 && (
-            <Button asChild>
-              <Link to="/marketplace">Browse Marketplace</Link>
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icon={ShoppingCart}
+          title={orders.length === 0 ? 'No orders yet' : 'No matching orders'}
+          description={
+            orders.length === 0
+              ? 'When you win an auction or buy now, your order will show up here.'
+              : 'Try adjusting your search or filter to see more results.'
+          }
+          action={
+            orders.length === 0 ? (
+              <Button asChild>
+                <Link to="/marketplace">Browse marketplace</Link>
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <div className="dashboard-card p-0 overflow-hidden">
           <Table>

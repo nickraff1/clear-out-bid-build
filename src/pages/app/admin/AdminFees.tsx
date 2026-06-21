@@ -11,8 +11,8 @@ import { Loader2 } from "lucide-react";
 
 export default function AdminFees() {
   const { user } = useAuth();
-  const [buyer, setBuyer] = useState("5");
-  const [seller, setSeller] = useState("5");
+  const [buyer, setBuyer] = useState("10");
+  const [seller, setSeller] = useState("10");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 

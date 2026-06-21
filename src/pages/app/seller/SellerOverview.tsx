@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { EmptyState } from '@/components/app/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -205,13 +206,17 @@ export default function SellerOverview() {
           </div>
 
           {recentEvents.length === 0 ? (
-            <div className="text-center py-8">
-              <Calendar className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-muted-foreground mb-4">No events yet</p>
-              <Button asChild size="sm">
-                <Link to="/app/seller/events/new">Create First Event</Link>
-              </Button>
-            </div>
+            <EmptyState
+              icon={Calendar}
+              compact
+              title="No events yet"
+              description="Group your listings under a clearance event with one pickup window."
+              action={
+                <Button asChild size="sm">
+                  <Link to="/app/seller/events/new">Create event</Link>
+                </Button>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {recentEvents.slice(0, 4).map(event => (
@@ -250,10 +255,12 @@ export default function SellerOverview() {
           </div>
 
           {upcomingPickups.length === 0 ? (
-            <div className="text-center py-8">
-              <Truck className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-muted-foreground">No pickups scheduled</p>
-            </div>
+            <EmptyState
+              icon={Truck}
+              compact
+              title="No pickups scheduled"
+              description="Pickups appear here as soon as a buyer pays for a listing."
+            />
           ) : (
             <div className="space-y-3">
               {upcomingPickups.slice(0, 4).map(order => (

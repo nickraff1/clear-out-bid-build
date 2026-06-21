@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, DollarSign, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { EmptyState } from "@/components/app/EmptyState";
 import { format, parseISO } from "date-fns";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -78,15 +79,23 @@ export default function SellerPayouts() {
             <TableHead>Lot</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Sold</TableHead>
-            <TableHead>Offcutt fee (5%)</TableHead>
+            <TableHead>Offcutt commission (10%)</TableHead>
             <TableHead>Net payout</TableHead>
             <TableHead>Payout status</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {paidRows.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-10">
-                <AlertCircle className="h-6 w-6 mx-auto mb-2 opacity-50" />No paid orders yet
-              </TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={6} className="p-0">
+                  <EmptyState
+                    icon={AlertCircle}
+                    compact
+                    framed={false}
+                    title="No paid orders yet"
+                    description="Once a buyer pays, you'll see the gross, fees and your net payout here."
+                  />
+                </TableCell>
+              </TableRow>
             )}
             {paidRows.map(r => {
               const p = Array.isArray(r.payment) ? r.payment[0] : r.payment;

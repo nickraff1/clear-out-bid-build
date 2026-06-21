@@ -176,10 +176,10 @@ export default function AdminOrders() {
                   <div className="text-xs text-muted-foreground">paid ${Number(o.amount).toFixed(2)}</div>
                 </TableCell>
                 <TableCell>${Number(p?.seller_payout ?? 0).toFixed(2)}</TableCell>
-                <TableCell><Badge variant="muted">{o.status}</Badge></TableCell>
+                <TableCell><Badge variant="muted">{o.status.split('_').map((w:string)=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}</Badge></TableCell>
                 <TableCell><Badge variant={p?.status === 'succeeded' ? 'success' : 'muted'}>{p?.status ?? '—'}</Badge></TableCell>
-                <TableCell><Badge variant="muted">{o.pickup_status ?? '—'}</Badge></TableCell>
-                <TableCell><Badge variant={p?.manual_payout_status === 'manual_payout_paid' ? 'success' : p?.manual_payout_status === 'manual_payout_on_hold' ? 'destructive' : 'warning'}>{p?.manual_payout_status?.replace('manual_payout_','') ?? '—'}</Badge></TableCell>
+                <TableCell><Badge variant="muted">{(o.pickup_status ?? '—').toString().replace(/_/g,' ')}</Badge></TableCell>
+                <TableCell><Badge variant={p?.manual_payout_status === 'manual_payout_paid' ? 'success' : p?.manual_payout_status === 'manual_payout_on_hold' ? 'destructive' : 'warning'}>{(p?.manual_payout_status?.replace('manual_payout_','') ?? '—').replace(/_/g,' ')}</Badge></TableCell>
                 <TableCell className="font-mono text-xs">
                   {o.pickup_code
                     ? <span>{o.pickup_code}</span>

@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Package } from 'lucide-react';
+import { EmptyState } from '@/components/app/EmptyState';
 import { toast } from '@/hooks/use-toast';
 
 export default function AdminListings() {
@@ -48,6 +49,17 @@ export default function AdminListings() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input placeholder="Search listings" value={q} onChange={e => setQ(e.target.value)} className="pl-9" />
       </div>
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title={rows.length === 0 ? 'No listings yet' : 'No matching listings'}
+          description={
+            rows.length === 0
+              ? 'Listings will appear here as soon as sellers publish them.'
+              : 'Try a different search term.'
+          }
+        />
+      ) : (
       <div className="border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
@@ -67,9 +79,9 @@ export default function AdminListings() {
                   <Link to={`/lot/${r.id}`} className="font-medium hover:text-primary">{r.title}</Link>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{r.event?.organization?.name ?? '—'}</TableCell>
-                <TableCell><Badge variant={r.pricing_type === 'auction' ? 'auction' : 'fixed'}>{r.pricing_type}</Badge></TableCell>
+                <TableCell><Badge variant={r.pricing_type === 'auction' ? 'auction' : 'fixed'}>{r.pricing_type === 'auction' ? 'Auction' : 'Buy now'}</Badge></TableCell>
                 <TableCell>${(r.fixed_price ?? r.current_bid ?? r.start_price ?? 0).toLocaleString()}</TableCell>
-                <TableCell><Badge variant="muted">{r.status}</Badge></TableCell>
+                <TableCell><Badge variant="muted">{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</Badge></TableCell>
                 <TableCell>
                   {r.status !== 'cancelled' ? (
                     <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setStatus(r.id, 'cancelled')}>
@@ -84,6 +96,7 @@ export default function AdminListings() {
           </TableBody>
         </Table>
       </div>
+      )}
     </div>
   );
 }

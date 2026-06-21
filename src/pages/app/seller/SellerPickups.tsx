@@ -13,6 +13,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Loader2, Truck } from 'lucide-react';
+import { EmptyState } from '@/components/app/EmptyState';
+import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
 import type { Order, Lot, ClearanceEvent, Profile } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 
@@ -62,14 +64,7 @@ export default function SellerPickups() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, 'success' | 'info' | 'warning' | 'muted'> = {
-      paid: 'success',
-      ready_for_pickup: 'info',
-      collected: 'muted',
-    };
-    return colors[status] ?? 'muted';
-  };
+  const getStatusColor = orderStatusTone;
 
   if (loading) {
     return (
@@ -89,13 +84,11 @@ export default function SellerPickups() {
 
       {/* Pickups Table */}
       {orders.length === 0 ? (
-        <div className="text-center py-16 dashboard-card">
-          <Truck className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No pickups scheduled</h3>
-          <p className="text-muted-foreground mb-4">
-            Pickups will appear here when buyers purchase your lots
-          </p>
-        </div>
+        <EmptyState
+          icon={Truck}
+          title="No pickups scheduled"
+          description="Pickups appear here as soon as a buyer pays for one of your listings."
+        />
       ) : (
         <div className="dashboard-card p-0 overflow-hidden">
           <Table>
@@ -134,13 +127,7 @@ export default function SellerPickups() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={getStatusColor(order.status)}>
-                      {order.status === 'ready_for_pickup'
-                        ? 'Ready'
-                        : order.status === 'collected'
-                        ? 'Collected'
-                        : order.status === 'paid'
-                        ? 'Paid'
-                        : order.status}
+                      {orderStatusLabel(order.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>

@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
+import { EmptyState } from '@/components/app/EmptyState';
 import { format, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 
@@ -65,6 +66,17 @@ export default function AdminReports() {
           </SelectContent>
         </Select>
       </div>
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={ShieldAlert}
+          title={rows.length === 0 ? 'No reports yet' : 'No matching reports'}
+          description={
+            rows.length === 0
+              ? 'Buyer and seller reports appear here for triage.'
+              : 'Try a different status filter to see more.'
+          }
+        />
+      ) : (
       <div className="border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
@@ -90,7 +102,7 @@ export default function AdminReports() {
                 <TableCell>
                   {r.order_id ? <Link to={`/app/orders/${r.order_id}`} className="text-primary text-sm hover:underline">{r.order_id.slice(0,8)}</Link> : '—'}
                 </TableCell>
-                <TableCell><Badge variant={r.status === 'open' ? 'warning' : r.status === 'investigating' ? 'warning' : r.status === 'resolved' ? 'success' : 'muted'}>{r.status}</Badge></TableCell>
+                <TableCell><Badge variant={r.status === 'open' ? 'warning' : r.status === 'investigating' ? 'warning' : r.status === 'resolved' ? 'success' : 'muted'}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</Badge></TableCell>
                 <TableCell className="text-muted-foreground">{format(parseISO(r.created_at), 'MMM d')}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
@@ -105,6 +117,7 @@ export default function AdminReports() {
           </TableBody>
         </Table>
       </div>
+      )}
     </div>
   );
 }

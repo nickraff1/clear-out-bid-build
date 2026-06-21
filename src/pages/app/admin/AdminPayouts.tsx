@@ -190,7 +190,11 @@ export default function AdminPayouts() {
               </TableRow>
             ))}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={12} className="text-center py-10 text-muted-foreground">No payouts found</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={12} className="text-center py-10 text-muted-foreground">
+                  No payouts match this filter yet.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
