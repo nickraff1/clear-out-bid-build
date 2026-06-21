@@ -438,6 +438,18 @@ export default function LotDetail() {
               )}
             </div>
 
+            {/* Sold / reserved banner */}
+            {(lot.status === 'sold' || lot.status === 'reserved') && (
+              <Alert className="mb-6 border-warning/30 bg-warning/10">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {lot.status === 'sold'
+                    ? 'This item has been sold and is no longer available.'
+                    : 'This item is reserved while another buyer completes checkout. Check back shortly if their payment is not completed.'}
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Actions */}
             <div className="space-y-4 mb-6">
               {isAuction && !auctionEnded ? (
