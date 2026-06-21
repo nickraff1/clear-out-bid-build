@@ -126,9 +126,11 @@ export default function OrderDetail() {
 
   async function proposePickup() {
     if (!proposedAt) { toast.error('Pick a date/time'); return; }
+    const when = new Date(proposedAt);
+    if (when.getTime() < Date.now()) { toast.error('Pickup time must be in the future'); return; }
     await update(
       {
-        proposed_pickup_at: new Date(proposedAt).toISOString(),
+        proposed_pickup_at: when.toISOString(),
         proposed_pickup_by: user!.id,
         pickup_status: 'pickup_proposed',
       },
