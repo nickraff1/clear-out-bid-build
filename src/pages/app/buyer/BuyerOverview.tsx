@@ -146,7 +146,7 @@ export default function BuyerOverview() {
           variant={stats.outbidCount > 0 ? 'warning' : 'default'}
         />
         <StatsCard
-          title="Won Auctions"
+          title="My Orders"
           value={stats.wonAuctions}
           icon={TrendingUp}
           variant="success"

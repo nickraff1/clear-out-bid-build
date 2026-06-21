@@ -134,7 +134,13 @@ export default function SellerPickups() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={getStatusColor(order.status)}>
-                      {order.status === 'ready_for_pickup' ? 'Ready' : order.status}
+                      {order.status === 'ready_for_pickup'
+                        ? 'Ready'
+                        : order.status === 'collected'
+                        ? 'Collected'
+                        : order.status === 'paid'
+                        ? 'Paid'
+                        : order.status}
                     </Badge>
                   </TableCell>
                   <TableCell>
