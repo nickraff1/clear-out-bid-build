@@ -20,7 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Filter, Loader2, Package, Search } from 'lucide-react';
+import { Filter, Loader2, Package, Search, MoreVertical, Eye, EyeOff, Trash2, Pencil } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from '@/hooks/use-toast';
 import type { Lot, ClearanceEvent } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 
@@ -44,10 +48,11 @@ export default function SellerLots() {
   }, [primaryOrg]);
 
   const fetchLots = async () => {
+    setLoading(true);
     try {
       const { data } = await supabase
         .from('lots')
-        .select('*, event:clearance_events(*)')
+        .select('*, event:clearance_events!inner(*)')
         .eq('event.org_id', primaryOrg!.id)
         .order('created_at', { ascending: false });
 
@@ -57,6 +62,27 @@ export default function SellerLots() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setLotStatus = async (lotId: string, status: 'active' | 'draft' | 'cancelled') => {
+    const { error } = await supabase.from('lots').update({ status }).eq('id', lotId);
+    if (error) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Listing updated', description: `Status: ${status}` });
+      fetchLots();
+    }
+  };
+
+  const deleteLot = async (lotId: string) => {
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
+    const { error } = await supabase.from('lots').delete().eq('id', lotId);
+    if (error) {
+      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Listing deleted' });
+      fetchLots();
     }
   };
 
