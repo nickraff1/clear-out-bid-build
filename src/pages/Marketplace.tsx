@@ -15,7 +15,7 @@ import {
 import { Search, SlidersHorizontal, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Lot, LotMedia, ClearanceEvent, Category } from '@/types/database';
-import { DEFAULT_CATEGORIES, AUSTRALIAN_STATES } from '@/lib/constants';
+import { DEFAULT_CATEGORIES, AUSTRALIAN_STATES, LOT_CONDITIONS } from '@/lib/constants';
 
 type LotWithDetails = Lot & {
   media?: LotMedia[];
@@ -34,14 +34,20 @@ export default function Marketplace() {
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') ?? '');
   const [pricingType, setPricingType] = useState(searchParams.get('type') ?? '');
   const [stateFilter, setStateFilter] = useState(searchParams.get('state') ?? '');
+  const [conditionFilter, setConditionFilter] = useState(searchParams.get('condition') ?? '');
+  const [suburbFilter, setSuburbFilter] = useState(searchParams.get('suburb') ?? '');
+  const [minPrice, setMinPrice] = useState(searchParams.get('min') ?? '');
+  const [maxPrice, setMaxPrice] = useState(searchParams.get('max') ?? '');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') ?? 'newest');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLots();
-  }, [categoryFilter, pricingType, stateFilter, sortBy]);
+  }, [categoryFilter, pricingType, stateFilter, conditionFilter, sortBy, minPrice, maxPrice]);
 
   const fetchLots = async () => {
     setLoading(true);
+    setError(null);
     try {
       let query = supabase
         .from('lots')
@@ -69,6 +75,23 @@ export default function Marketplace() {
         query = query.eq('event.state', stateFilter);
       }
 
+      if (suburbFilter.trim()) {
+        query = query.ilike('event.suburb', `%${suburbFilter.trim()}%`);
+      }
+
+      if (conditionFilter) {
+        query = query.eq('condition', conditionFilter as any);
+      }
+
+      const minP = parseFloat(minPrice);
+      const maxP = parseFloat(maxPrice);
+      if (!isNaN(minP)) {
+        query = query.or(`fixed_price.gte.${minP},start_price.gte.${minP}`);
+      }
+      if (!isNaN(maxP)) {
+        query = query.or(`fixed_price.lte.${maxP},start_price.lte.${maxP}`);
+      }
+
       // Sorting
       switch (sortBy) {
         case 'price-low':
@@ -88,18 +111,23 @@ export default function Marketplace() {
 
       if (error) {
         console.error('Error fetching lots:', error);
+        setError('Could not load listings. Please try again.');
       } else {
-        // Filter by search term client-side for now
         let filtered = (data as unknown as LotWithDetails[]) ?? [];
         if (search) {
           const searchLower = search.toLowerCase();
-          filtered = filtered.filter(lot => 
+          filtered = filtered.filter(lot =>
             lot.title.toLowerCase().includes(searchLower) ||
-            lot.description?.toLowerCase().includes(searchLower)
+            lot.description?.toLowerCase().includes(searchLower) ||
+            lot.event?.suburb?.toLowerCase().includes(searchLower) ||
+            lot.category?.name?.toLowerCase().includes(searchLower)
           );
         }
         setLots(filtered);
       }
+    } catch (e) {
+      console.error(e);
+      setError('Something went wrong loading listings.');
     } finally {
       setLoading(false);
     }
@@ -122,11 +150,15 @@ export default function Marketplace() {
     setCategoryFilter('');
     setPricingType('');
     setStateFilter('');
+    setConditionFilter('');
+    setSuburbFilter('');
+    setMinPrice('');
+    setMaxPrice('');
     setSortBy('newest');
     setSearchParams(new URLSearchParams());
   };
 
-  const activeFiltersCount = [categoryFilter, pricingType, stateFilter].filter(Boolean).length;
+  const activeFiltersCount = [categoryFilter, pricingType, stateFilter, conditionFilter, suburbFilter, minPrice, maxPrice].filter(Boolean).length;
 
   return (
     <Layout>
