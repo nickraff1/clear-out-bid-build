@@ -1,82 +1,130 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Users, Package, ShoppingCart, DollarSign, Leaf } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 
-interface Stats {
-  users: number;
-  orgs: number;
-  activeLots: number;
-  orders: number;
-  gmv: number;
-  kgDiverted: number;
-  savings: number;
+type Tone = 'green' | 'amber' | 'red' | 'muted';
+const toneClass: Record<Tone, string> = {
+  green: 'border-success/40',
+  amber: 'border-warning/40',
+  red: 'border-destructive/40',
+  muted: 'border-border',
+};
+
+function Tile({ label, value, tone = 'muted', sub, to }: { label: string; value: string|number; tone?: Tone; sub?: string; to?: string }) {
+  const inner = (
+    <Card className={`border ${toneClass[tone]} hover:border-primary/60 transition`}>
+      <CardContent className="p-4">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="text-2xl font-bold mt-1">{value}</div>
+        {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
+      </CardContent>
+    </Card>
+  );
+  return to ? <Link to={to}>{inner}</Link> : inner;
 }
 
 export default function AdminOverview() {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [k, setK] = useState<any>(null);
 
-  useEffect(() => { load(); }, []);
-
-  const load = async () => {
-    const [u, o, l, ord] = await Promise.all([
-      supabase.from('profiles').select('id', { count: 'exact', head: true }),
-      supabase.from('organizations').select('id', { count: 'exact', head: true }),
-      supabase.from('lots').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('orders').select('amount, status'),
+  useEffect(() => { (async () => {
+    const [lots, orders, payments, reports, stuck, members, badges] = await Promise.all([
+      supabase.from('lots').select('id, status'),
+      supabase.from('orders').select('id, status, pickup_status, pickup_code, created_at, amount, buyer_id'),
+      supabase.from('payments').select('id, status, manual_payout_status, base_amount, buyer_fee, seller_fee, seller_payout'),
+      supabase.from('lot_reports').select('id, status'),
+      (supabase as any).from('admin_stuck_orders').select('order_id, stuck_reason').not('stuck_reason','is',null),
+      supabase.from('org_members').select('user_id, role'),
+      supabase.from('seller_badges').select('id'),
     ]);
+    const L = lots.data ?? []; const O = orders.data ?? []; const P = payments.data ?? [];
+    const R = reports.data ?? []; const S = stuck.data ?? []; const M = members.data ?? [];
 
-    const ordersData = ord.data ?? [];
-    const paidOrders = ordersData.filter(o => ['paid', 'ready_for_pickup', 'collected'].includes(o.status));
-    const gmv = paidOrders.reduce((s, o) => s + Number(o.amount ?? 0), 0);
-    // Rough sustainability estimates: 50kg diverted per order, ~30% savings vs retail
-    const kgDiverted = paidOrders.length * 50;
-    const savings = gmv * 0.30;
+    const expiredAuctionBacklog = L.filter((l:any)=>l.status==='active').length; // placeholder; close-cron now active
+    const sellerUserIds = new Set(M.filter((m:any)=>['owner','admin','member'].includes(m.role)).map((m:any)=>m.user_id));
+    const buyerUserIds = new Set(O.map((o:any)=>o.buyer_id));
 
-    setStats({
-      users: u.count ?? 0,
-      orgs: o.count ?? 0,
-      activeLots: l.count ?? 0,
-      orders: ordersData.length,
-      gmv,
-      kgDiverted,
-      savings,
+    setK({
+      activeLots: L.filter((l:any)=>l.status==='active').length,
+      reservedLots: L.filter((l:any)=>l.status==='reserved').length,
+      soldLots: L.filter((l:any)=>l.status==='sold').length,
+      paidPendingPickup: O.filter((o:any)=>['paid','ready_for_pickup'].includes(o.status)).length,
+      completedOrders: O.filter((o:any)=>o.status==='collected').length,
+      issueOrders: R.filter((r:any)=>r.status==='open' || r.status==='investigating').length,
+      pendingPayouts: P.filter((p:any)=>p.status==='succeeded' && p.manual_payout_status==='manual_payout_pending').length,
+      payoutsOnHold: P.filter((p:any)=>p.manual_payout_status==='manual_payout_on_hold').length,
+      failedPayments: P.filter((p:any)=>['failed','cancelled','expired'].includes(p.status)).length,
+      unresolvedReports: R.filter((r:any)=>r.status==='open' || r.status==='investigating').length,
+      activeSellers: sellerUserIds.size,
+      activeBuyers: buyerUserIds.size,
+      stuckOrders: S.length,
+      ordersMissingPickupCode: O.filter((o:any)=>['paid','ready_for_pickup'].includes(o.status) && !o.pickup_code).length,
+      stuckPendingPayment: O.filter((o:any)=>o.status==='pending_payment' && new Date(o.created_at).getTime() < Date.now() - 30*60*1000).length,
+      foundingBadges: (badges.data ?? []).length,
+      gmv: P.filter((p:any)=>p.status==='succeeded').reduce((s:number,p:any)=>s+Number(p.base_amount||0),0),
+      buyerFees: P.filter((p:any)=>p.status==='succeeded').reduce((s:number,p:any)=>s+Number(p.buyer_fee||0),0),
+      sellerFees: P.filter((p:any)=>p.status==='succeeded').reduce((s:number,p:any)=>s+Number(p.seller_fee||0),0),
+      sellerNetTotal: P.filter((p:any)=>p.status==='succeeded').reduce((s:number,p:any)=>s+Number(p.seller_payout||0),0),
+      payoutsPaid: P.filter((p:any)=>p.manual_payout_status==='manual_payout_paid').reduce((s:number,p:any)=>s+Number(p.seller_payout||0),0),
     });
-  };
+  })(); }, []);
 
-  if (!stats) {
-    return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  }
-
-  const cards = [
-    { label: 'Users', value: stats.users.toLocaleString(), icon: Users },
-    { label: 'Organizations', value: stats.orgs.toLocaleString(), icon: Users },
-    { label: 'Active listings', value: stats.activeLots.toLocaleString(), icon: Package },
-    { label: 'Orders', value: stats.orders.toLocaleString(), icon: ShoppingCart },
-    { label: 'GMV', value: `$${stats.gmv.toLocaleString()}`, icon: DollarSign },
-    { label: 'Est. kg diverted', value: `${stats.kgDiverted.toLocaleString()} kg`, icon: Leaf },
-    { label: 'Est. buyer savings', value: `$${Math.round(stats.savings).toLocaleString()}`, icon: DollarSign },
-  ];
+  if (!k) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Admin overview</h1>
-        <p className="text-muted-foreground">Marketplace health and sustainability metrics</p>
+        <p className="text-muted-foreground">Operational health of the marketplace</p>
       </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {cards.map(c => (
-          <Card key={c.label}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{c.label}</CardTitle>
-              <c.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{c.value}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Needs attention</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <Tile label="Stuck orders" value={k.stuckOrders} tone={k.stuckOrders ? 'red' : 'green'} to="/app/admin/orders" />
+          <Tile label="Pending payouts" value={k.pendingPayouts} tone={k.pendingPayouts ? 'amber' : 'green'} to="/app/admin/payouts" />
+          <Tile label="Payouts on hold" value={k.payoutsOnHold} tone={k.payoutsOnHold ? 'red' : 'green'} to="/app/admin/payouts" />
+          <Tile label="Open reports" value={k.unresolvedReports} tone={k.unresolvedReports ? 'red' : 'green'} to="/app/admin/reports" />
+          <Tile label="Missing pickup code" value={k.ordersMissingPickupCode} tone={k.ordersMissingPickupCode ? 'red' : 'green'} to="/app/admin/orders" />
+          <Tile label="Issue-reported orders" value={k.issueOrders} tone={k.issueOrders ? 'red' : 'green'} to="/app/admin/reports" />
+          <Tile label="Stuck pending payment" value={k.stuckPendingPayment} tone={k.stuckPendingPayment ? 'amber' : 'green'} to="/app/admin/orders" />
+          <Tile label="Failed payments" value={k.failedPayments} tone={k.failedPayments ? 'amber' : 'green'} to="/app/admin/payouts" />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Marketplace activity</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <Tile label="Active listings" value={k.activeLots} to="/app/admin/listings" />
+          <Tile label="Reserved" value={k.reservedLots} to="/app/admin/listings" />
+          <Tile label="Sold" value={k.soldLots} to="/app/admin/listings" />
+          <Tile label="Paid pending pickup" value={k.paidPendingPickup} to="/app/admin/orders" />
+          <Tile label="Completed orders" value={k.completedOrders} to="/app/admin/orders" />
+          <Tile label="Active sellers" value={k.activeSellers} to="/app/admin/sellers" />
+          <Tile label="Active buyers" value={k.activeBuyers} to="/app/admin/users" />
+          <Tile label="Founding badges" value={k.foundingBadges} to="/app/admin/sellers" />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Money</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <Tile label="GMV (gross sales)" value={`$${k.gmv.toFixed(2)}`} />
+          <Tile label="Buyer fees collected" value={`$${k.buyerFees.toFixed(2)}`} />
+          <Tile label="Seller fees collected" value={`$${k.sellerFees.toFixed(2)}`} />
+          <Tile label="Total platform revenue" value={`$${(k.buyerFees + k.sellerFees).toFixed(2)}`} tone="green" />
+          <Tile label="Total seller net" value={`$${k.sellerNetTotal.toFixed(2)}`} />
+          <Tile label="Payouts paid" value={`$${k.payoutsPaid.toFixed(2)}`} tone="green" />
+          <Tile label="Payouts pending" value={`$${(k.sellerNetTotal - k.payoutsPaid).toFixed(2)}`} tone={k.sellerNetTotal - k.payoutsPaid > 0 ? 'amber' : 'green'} to="/app/admin/payouts" />
+        </div>
+      </section>
+
+      <Card className="p-3 bg-muted/30 text-xs text-muted-foreground flex items-center justify-between">
+        <span>Payouts are manual during beta. Pay sellers off-platform, then mark them paid here.</span>
+        <Badge variant="muted">Beta</Badge>
+      </Card>
     </div>
   );
 }
