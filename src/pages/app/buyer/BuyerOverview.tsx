@@ -240,20 +240,27 @@ export default function BuyerOverview() {
           ) : (
             <div className="space-y-3">
               {recentOrders.map(order => (
-                <div
+                <Link
                   key={order.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                  to={
+                    order.status === 'pending_payment'
+                      ? `/app/buyer/checkout/${order.id}`
+                      : `/app/orders/${order.id}`
+                  }
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{(order as any).lot?.title}</p>
                     <p className="text-sm text-muted-foreground">
                       ${order.amount.toLocaleString()}
+                      {order.status === 'pending_payment' && ' · Pay now to secure'}
+                      {(order.status === 'paid' || order.status === 'ready_for_pickup') && ' · Arrange pickup'}
                     </p>
                   </div>
                   <Badge variant={orderStatusTone(order.status)}>
                     {orderStatusLabel(order.status)}
                   </Badge>
-                </div>
+                </Link>
               ))}
             </div>
           )}
