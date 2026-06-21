@@ -56,6 +56,7 @@ import AdminOrders from "./pages/app/admin/AdminOrders";
 import AdminReports from "./pages/app/admin/AdminReports";
 import AdminPayouts from "./pages/app/admin/AdminPayouts";
 import AdminLaunch from "./pages/app/admin/AdminLaunch";
+import AdminSellers from "./pages/app/admin/AdminSellers";
 import SellerPayouts from "./pages/app/seller/SellerPayouts";
 
 // Seller bulk
@@ -67,6 +68,7 @@ import MessageThread from "./pages/app/messages/MessageThread";
 
 // Orders
 import OrderDetail from "./pages/app/orders/OrderDetail";
+import NotificationsPage from "./pages/app/Notifications";
 
 // SEO Landing Pages
 import {
@@ -254,6 +256,12 @@ const App = () => (
               <Route path="/app/admin/launch" element={
                 <RoleGuard allowedRoles={['admin']}><AdminLaunch /></RoleGuard>
               } />
+              <Route path="/app/admin/sellers" element={
+                <RoleGuard allowedRoles={['admin']}><AdminSellers /></RoleGuard>
+              } />
+
+              {/* Notifications (any signed-in user) */}
+              <Route path="/app/notifications" element={<NotificationsPage />} />
 
               {/* Seller bulk upload */}
               <Route path="/app/seller/bulk-upload" element={

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -6,10 +6,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { Loader2, MoreVertical, KeyRound, CheckCircle2, StickyNote } from 'lucide-react';
+import { Loader2, MoreVertical, KeyRound, CheckCircle2, StickyNote, Ban, AlertTriangle, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -22,7 +24,7 @@ export default function AdminOrders() {
     setLoading(true);
     supabase
       .from('orders')
-      .select('id, amount, status, pickup_status, pickup_code, admin_notes, created_at, lot:lots(title), buyer:profiles!orders_buyer_id_fkey(email, full_name)')
+      .select('id, amount, status, pickup_status, pickup_code, admin_notes, created_at, lot:lots(title, event:clearance_events(organization:organizations(name))), buyer:profiles!orders_buyer_id_fkey(email, full_name), payment:payments(status, manual_payout_status, base_amount, buyer_fee, seller_fee, seller_payout)')
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data }) => { setRows(data ?? []); setLoading(false); });
@@ -66,36 +68,118 @@ export default function AdminOrders() {
     reload();
   }
 
+  async function cancelOrder(orderId: string) {
+    const note = window.prompt('Reason for cancelling this order (required):');
+    if (!note) return;
+    if (!window.confirm('Cancel this order? The listing will be released back to active.')) return;
+    setBusyId(orderId);
+    const { error } = await (supabase.rpc as any)('admin_cancel_order', { _order_id: orderId, _note: note });
+    setBusyId(null);
+    if (error) return toast.error(error.message);
+    toast.success('Order cancelled');
+    reload();
+  }
+
+  const [q, setQ] = useState('');
+  const [statusF, setStatusF] = useState('all');
+  const [pickupF, setPickupF] = useState('all');
+  const [paymentF, setPaymentF] = useState('all');
+  const [payoutF, setPayoutF] = useState('all');
+
+  const filtered = useMemo(() => rows.filter((o:any) => {
+    const p = Array.isArray(o.payment) ? o.payment[0] : o.payment;
+    if (statusF !== 'all' && o.status !== statusF) return false;
+    if (pickupF !== 'all' && (o.pickup_status ?? '') !== pickupF) return false;
+    if (paymentF !== 'all' && (p?.status ?? '') !== paymentF) return false;
+    if (payoutF !== 'all' && (p?.manual_payout_status ?? '') !== payoutF) return false;
+    if (q) {
+      const s = q.toLowerCase();
+      const hay = [o.lot?.title, o.buyer?.full_name, o.buyer?.email, o.id.slice(0,8), o.lot?.event?.organization?.name]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(s)) return false;
+    }
+    return true;
+  }), [rows, q, statusF, pickupF, paymentF, payoutF]);
+
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="p-6 space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Orders</h1>
-        <p className="text-muted-foreground">{rows.length} orders total</p>
+        <p className="text-muted-foreground">{filtered.length} of {rows.length} orders</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-8 w-[240px]" placeholder="Search lot, buyer, seller, ID" value={q} onChange={e=>setQ(e.target.value)} />
+        </div>
+        <Select value={statusF} onValueChange={setStatusF}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            {['all','pending_payment','paid','ready_for_pickup','collected','cancelled','refunded'].map(s=>
+              <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={pickupF} onValueChange={setPickupF}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Pickup" /></SelectTrigger>
+          <SelectContent>
+            {['all','awaiting_payment','awaiting_pickup_proposal','pickup_proposed','pickup_confirmed','ready_for_pickup','collected'].map(s=>
+              <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={paymentF} onValueChange={setPaymentF}>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Payment" /></SelectTrigger>
+          <SelectContent>
+            {['all','succeeded','pending','failed','cancelled','expired','refunded'].map(s=>
+              <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={payoutF} onValueChange={setPayoutF}>
+          <SelectTrigger className="w-[170px]"><SelectValue placeholder="Payout" /></SelectTrigger>
+          <SelectContent>
+            {['all','manual_payout_pending','manual_payout_paid','manual_payout_on_hold','manual_payout_failed'].map(s=>
+              <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       <div className="border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>#</TableHead>
               <TableHead>Lot</TableHead>
               <TableHead>Buyer</TableHead>
-              <TableHead>Amount</TableHead>
+              <TableHead>Seller</TableHead>
+              <TableHead>Item / Buyer paid</TableHead>
+              <TableHead>Net payout</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Payment</TableHead>
               <TableHead>Pickup</TableHead>
+              <TableHead>Payout</TableHead>
               <TableHead>Code</TableHead>
               <TableHead>Date</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(o => (
+            {filtered.map((o:any) => {
+              const p = Array.isArray(o.payment) ? o.payment[0] : o.payment;
+              return (
               <TableRow key={o.id}>
+                <TableCell className="font-mono text-xs">{o.id.slice(0,8)}</TableCell>
                 <TableCell className="font-medium">{o.lot?.title ?? '—'}</TableCell>
                 <TableCell>{o.buyer?.full_name ?? o.buyer?.email ?? '—'}</TableCell>
-                <TableCell>${Number(o.amount).toLocaleString()}</TableCell>
+                <TableCell className="text-muted-foreground">{o.lot?.event?.organization?.name ?? '—'}</TableCell>
+                <TableCell>
+                  <div>${Number(p?.base_amount ?? 0).toFixed(2)}</div>
+                  <div className="text-xs text-muted-foreground">paid ${Number(o.amount).toFixed(2)}</div>
+                </TableCell>
+                <TableCell>${Number(p?.seller_payout ?? 0).toFixed(2)}</TableCell>
                 <TableCell><Badge variant="muted">{o.status}</Badge></TableCell>
+                <TableCell><Badge variant={p?.status === 'succeeded' ? 'success' : 'muted'}>{p?.status ?? '—'}</Badge></TableCell>
                 <TableCell><Badge variant="muted">{o.pickup_status ?? '—'}</Badge></TableCell>
+                <TableCell><Badge variant={p?.manual_payout_status === 'manual_payout_paid' ? 'success' : p?.manual_payout_status === 'manual_payout_on_hold' ? 'destructive' : 'warning'}>{p?.manual_payout_status?.replace('manual_payout_','') ?? '—'}</Badge></TableCell>
                 <TableCell className="font-mono text-xs">
                   {o.pickup_code
                     ? <span>{o.pickup_code}</span>
@@ -118,6 +202,9 @@ export default function AdminOrders() {
                         <DropdownMenuItem onClick={() => forceComplete(o.id)} disabled={o.status === 'collected' || o.status === 'cancelled'}>
                           <CheckCircle2 className="h-4 w-4 mr-2" /> Force-complete order
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => cancelOrder(o.id)} disabled={o.status === 'cancelled' || o.status === 'collected'}>
+                          <Ban className="h-4 w-4 mr-2" /> Cancel order
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => addNote(o.id)}>
                           <StickyNote className="h-4 w-4 mr-2" /> Add admin note
@@ -127,7 +214,7 @@ export default function AdminOrders() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            ); })}
           </TableBody>
         </Table>
       </div>
