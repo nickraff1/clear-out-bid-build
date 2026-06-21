@@ -215,9 +215,9 @@ export default function BuyerOrders() {
                           onReviewed={fetchOrders}
                         />
                       )}
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link to={`/lot/${order.lot_id}`}>
-                          <ArrowUpRight className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link to={`/app/orders/${order.id}`}>
+                          View <ArrowUpRight className="h-4 w-4 ml-1" />
                         </Link>
                       </Button>
                     </div>

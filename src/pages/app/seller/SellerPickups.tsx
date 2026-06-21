@@ -143,12 +143,9 @@ export default function SellerPickups() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {order.status !== 'collected' && (
-                      <Button size="sm" onClick={() => markCollected(order.id)}>
-                        <Check className="h-4 w-4 mr-1" />
-                        Collected
-                      </Button>
-                    )}
+                    <Button size="sm" variant="outline" asChild>
+                      <Link to={`/app/orders/${order.id}`}>Manage</Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
