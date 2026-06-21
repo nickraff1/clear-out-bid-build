@@ -507,6 +507,11 @@ export default function LotDetail() {
                   <Share2 className="h-4 w-4" />
                 </Button>
               </div>
+              {!isOwnLot && (
+                <div className="flex justify-end">
+                  <ReportLotDialog lotId={lot.id} />
+                </div>
+              )}
             </div>
 
             <Separator className="my-6" />
