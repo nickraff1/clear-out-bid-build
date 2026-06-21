@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/app/EmptyState';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {

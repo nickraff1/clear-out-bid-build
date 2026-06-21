@@ -23,6 +23,7 @@ import {
 import { ArrowUpRight, Clock, Filter, Gavel, Loader2, Search } from 'lucide-react';
 import type { Bid, Lot, ClearanceEvent } from '@/types/database';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { EmptyState } from '@/components/app/EmptyState';
 
 type BidWithLot = Bid & {
   lot: Lot & { event: ClearanceEvent };
