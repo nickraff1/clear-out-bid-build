@@ -262,8 +262,8 @@ export default function CreateLot() {
         });
       }
 
-      // Navigate to event detail
-      navigate(`/app/seller/events/${formData.event_id}?lot_created=true`);
+      // Navigate back to listings
+      navigate(`/app/seller/lots?created=1`);
     } catch (err: any) {
       setError(err.message || 'Failed to create lot');
     } finally {
