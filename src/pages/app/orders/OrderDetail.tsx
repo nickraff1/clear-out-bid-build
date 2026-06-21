@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { PickupSafetyReminder } from '@/components/safety/SafetyNotice';
 import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
+import { OrderMessages } from '@/components/messaging/OrderMessages';
 
 const REPORT_REASONS = [
   'Pickup issue',
@@ -505,6 +506,15 @@ export default function OrderDetail() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Inline messaging panel */}
+          <OrderMessages
+            orderId={order.id}
+            buyerId={order.buyer_id}
+            sellerOrgId={order.event?.org_id}
+            lotId={order.lot_id}
+            paid={paid}
+          />
         </div>
 
         {/* Right column - payment summary */}
