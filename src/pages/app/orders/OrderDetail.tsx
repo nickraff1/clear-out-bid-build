@@ -348,7 +348,12 @@ export default function OrderDetail() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Propose pickup time</label>
                 <div className="flex gap-2">
-                  <Input type="datetime-local" value={proposedAt} onChange={(e) => setProposedAt(e.target.value)} />
+                   <Input
+                     type="datetime-local"
+                     value={proposedAt}
+                     onChange={(e) => setProposedAt(e.target.value)}
+                     min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                   />
                   <Button onClick={proposePickup} disabled={busy || !proposedAt}>Propose</Button>
                 </div>
               </div>
