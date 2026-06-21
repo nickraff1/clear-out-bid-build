@@ -92,6 +92,21 @@ export function Footer() {
                   Privacy Policy
                 </Link>
               </li>
+              <li>
+                <Link to="/prohibited-materials" className="text-sm text-muted-foreground hover:text-foreground">
+                  Prohibited Materials
+                </Link>
+              </li>
+              <li>
+                <Link to="/pickup-safety" className="text-sm text-muted-foreground hover:text-foreground">
+                  Pickup Safety
+                </Link>
+              </li>
+              <li>
+                <Link to="/refunds-and-disputes" className="text-sm text-muted-foreground hover:text-foreground">
+                  Refunds &amp; Disputes
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

@@ -14,8 +14,15 @@ import { Flag, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const REASONS = [
-  'Prohibited material (asbestos, hazardous)',
-  'Misleading description',
+  'Item not as described',
+  'Suspected hazardous material',
+  'Suspected asbestos or contamination',
+  'Suspected stolen goods',
+  'Misleading description or photos',
+  'Seller unavailable or non-responsive',
+  'Buyer did not show',
+  'Payment or payout issue',
+  'Pickup issue',
   'Suspected fraud or scam',
   'Duplicate listing',
   'Inappropriate content',
@@ -61,7 +68,10 @@ export function ReportLotDialog({ lotId }: { lotId: string }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Report this listing</DialogTitle>
-          <DialogDescription>Reports are reviewed by our moderation team.</DialogDescription>
+          <DialogDescription>
+            Reports are reviewed by our moderation team. Hazardous, contaminated, or
+            asbestos-containing materials are never permitted on Offcutt.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
