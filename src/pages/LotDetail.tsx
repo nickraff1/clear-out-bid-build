@@ -249,7 +249,16 @@ export default function LotDetail() {
 
       if (error) throw error;
 
-      await supabase.from('lots').update({ status: 'sold' }).eq('id', lot.id);
+      // Reserve the lot for 30 minutes while payment is in progress
+      const reservedUntil = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      await supabase
+        .from('lots')
+        .update({
+          status: 'reserved',
+          reserved_order_id: created!.id,
+          reserved_until: reservedUntil,
+        })
+        .eq('id', lot.id);
 
       navigate(`/app/buyer/checkout/${created!.id}`);
     } catch (error) {
@@ -473,7 +482,7 @@ export default function LotDetail() {
                        : `Bid increment: $${getBidIncrement(currentPrice)} • 5% buyer fee applies to winning bid`}
                    </p>
                 </form>
-              ) : !isAuction && lot.status === 'active' ? (
+               ) : !isAuction && lot.status === 'active' ? (
                  <div className="space-y-2">
                    <Button variant="hero" size="lg" className="w-full" onClick={handleBuyNow} disabled={isOwnLot}>
                      Buy Now - ${((lot.fixed_price ?? 0) * 1.05).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
