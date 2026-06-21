@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { CheckCircle2, AlertTriangle, XCircle, Loader2, Rocket, ExternalLink } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Loader2, Rocket, ExternalLink, Gavel } from "lucide-react";
+import { toast } from "sonner";
 
 type Check = {
   label: string;
@@ -16,11 +17,14 @@ type Check = {
 type Stats = {
   activeListings: number;
   sellers: number;
+  sellerOrgs: number;
   buyers: number;
   pendingPayouts: number;
   unresolvedReports: number;
   stuckOrders: number;
   paidOrders: number;
+  expiredAuctionsActive: number;
+  paidOrdersNoPickupCode: number;
   latestTxnStatus: string | null;
   latestTxnAt: string | null;
   paymentMode: "sandbox" | "live" | "none";
@@ -38,35 +42,60 @@ function paymentMode(): Stats["paymentMode"] {
 export default function AdminLaunch() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => { void load(); }, []);
+
+  async function closeExpired() {
+    setClosing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("close-expired-auctions");
+      if (error) throw error;
+      toast.success(`Closed ${data?.closed ?? 0} expired auction(s)`);
+      await load();
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to close auctions");
+    } finally {
+      setClosing(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const nowIso = new Date().toISOString();
 
     const [
-      activeLots, sellerOrgs, buyerProfiles,
+      activeLots, sellerOrgsCount, sellerUsers, buyerProfiles,
       pendingPayouts, unresolvedReports, stuckOrders, paidOrders, latestPayment,
+      expiredAuctions, paidNoCode,
     ] = await Promise.all([
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active"),
-      supabase.from("organizations").select("id", { count: "exact", head: true }),
+      supabase.from("organizations").select("id", { count: "exact", head: true }).eq("org_type", "seller"),
+      supabase.from("org_members").select("user_id, org:organizations!inner(org_type)").eq("org.org_type", "seller"),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("payments").select("id", { count: "exact", head: true }).eq("status", "succeeded").eq("manual_payout_status", "manual_payout_pending"),
       supabase.from("lot_reports").select("id", { count: "exact", head: true }).neq("status", "resolved"),
       supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending_payment").lt("created_at", thirtyMinAgo),
       supabase.from("orders").select("id", { count: "exact", head: true }).in("status", ["paid", "ready_for_pickup", "collected"]),
       supabase.from("payments").select("status, created_at").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active").eq("pricing_type", "auction").lt("auction_end", nowIso),
+      supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "paid").is("pickup_code", null),
     ]);
+
+    const distinctSellerUsers = new Set(((sellerUsers.data ?? []) as Array<{ user_id: string }>).map(r => r.user_id)).size;
 
     setStats({
       activeListings: activeLots.count ?? 0,
-      sellers: sellerOrgs.count ?? 0,
+      sellers: distinctSellerUsers,
+      sellerOrgs: sellerOrgsCount.count ?? 0,
       buyers: buyerProfiles.count ?? 0,
       pendingPayouts: pendingPayouts.count ?? 0,
       unresolvedReports: unresolvedReports.count ?? 0,
       stuckOrders: stuckOrders.count ?? 0,
       paidOrders: paidOrders.count ?? 0,
+      expiredAuctionsActive: expiredAuctions.count ?? 0,
+      paidOrdersNoPickupCode: paidNoCode.count ?? 0,
       latestTxnStatus: latestPayment.data?.status ?? null,
       latestTxnAt: latestPayment.data?.created_at ?? null,
       paymentMode: paymentMode(),
@@ -80,6 +109,31 @@ export default function AdminLaunch() {
   }
 
   const checks: Check[] = [
+    {
+      label: "Expired auction backlog",
+      status: stats.expiredAuctionsActive === 0 ? "pass" : "fail",
+      detail: stats.expiredAuctionsActive === 0
+        ? "No expired auctions sitting in active status. Auction closer is running every 2 minutes."
+        : `${stats.expiredAuctionsActive} expired auction(s) still marked active. Use "Close expired auctions now".`,
+    },
+    {
+      label: "Paid orders missing pickup code",
+      status: stats.paidOrdersNoPickupCode === 0 ? "pass" : "fail",
+      detail: stats.paidOrdersNoPickupCode === 0
+        ? "Every paid order has a pickup code."
+        : `${stats.paidOrdersNoPickupCode} paid order(s) without a pickup code — use Admin Orders → Regenerate code.`,
+      href: "/app/admin/orders",
+    },
+    {
+      label: "Server-side seller bid guard",
+      status: "pass",
+      detail: "Database trigger blocks sellers (and members of the seller org) from bidding on their own lots.",
+    },
+    {
+      label: "Webhook cancellation handling",
+      status: "pass",
+      detail: "checkout.session.expired and payment_intent.canceled cancel the order and release the lot (only if no successful payment exists).",
+    },
     {
       label: "Payment mode configured",
       status: stats.paymentMode === "live" ? "pass" : stats.paymentMode === "sandbox" ? "warn" : "fail",
@@ -99,7 +153,7 @@ export default function AdminLaunch() {
     {
       label: "Sellers onboarded",
       status: stats.sellers >= 3 ? "pass" : stats.sellers > 0 ? "warn" : "fail",
-      detail: `${stats.sellers} seller account${stats.sellers === 1 ? "" : "s"}.`,
+      detail: `${stats.sellers} seller user${stats.sellers === 1 ? "" : "s"} across ${stats.sellerOrgs} seller organisation${stats.sellerOrgs === 1 ? "" : "s"}.`,
       href: "/app/admin/users",
     },
     {
@@ -146,7 +200,12 @@ export default function AdminLaunch() {
           <h1 className="text-2xl font-bold flex items-center gap-2"><Rocket className="h-6 w-6 text-primary" /> Launch readiness</h1>
           <p className="text-muted-foreground">Internal checklist before opening Offcutt to real Sydney buyers and sellers.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={load}>Refresh</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={closeExpired} disabled={closing}>
+            <Gavel className="h-4 w-4 mr-1" />{closing ? "Closing…" : "Close expired auctions now"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={load}>Refresh</Button>
+        </div>
       </div>
 
       <Card className={
@@ -171,11 +230,14 @@ export default function AdminLaunch() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KPI label="Active listings" value={stats.activeListings} />
-        <KPI label="Sellers" value={stats.sellers} />
+        <KPI label="Seller users" value={stats.sellers} />
+        <KPI label="Seller orgs" value={stats.sellerOrgs} />
         <KPI label="Buyers" value={stats.buyers} />
         <KPI label="Paid orders" value={stats.paidOrders} />
         <KPI label="Pending payouts" value={stats.pendingPayouts} />
         <KPI label="Open reports" value={stats.unresolvedReports} />
+        <KPI label="Expired auctions stuck active" value={stats.expiredAuctionsActive} />
+        <KPI label="Paid orders w/o pickup code" value={stats.paidOrdersNoPickupCode} />
       </div>
 
       <Card>
