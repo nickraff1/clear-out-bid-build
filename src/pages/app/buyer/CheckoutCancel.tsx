@@ -1,9 +1,32 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { XCircle } from "lucide-react";
 
 export default function CheckoutCancel() {
+  const [params] = useSearchParams();
+  const orderId = params.get("order_id");
+
+  useEffect(() => {
+    (async () => {
+      // Best-effort: sweep any expired reservations so this listing returns to active for others.
+      await supabase.rpc("release_expired_reservations");
+      if (orderId) {
+        // Cancel the order — trigger will release the lot reservation.
+        const { data: o } = await supabase
+          .from("orders")
+          .select("id, status")
+          .eq("id", orderId)
+          .maybeSingle();
+        if (o && o.status === "pending_payment") {
+          await supabase.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+        }
+      }
+    })();
+  }, [orderId]);
+
   return (
     <div className="container max-w-xl mx-auto py-16 px-4">
       <Card>
@@ -12,7 +35,7 @@ export default function CheckoutCancel() {
             <XCircle className="h-8 w-8 text-muted-foreground" />
           </div>
           <CardTitle>Checkout cancelled</CardTitle>
-          <CardDescription>Your order is still pending payment. You can pay any time from your orders.</CardDescription>
+          <CardDescription>No payment was taken. The listing is back on the marketplace.</CardDescription>
         </CardHeader>
         <CardContent />
         <CardFooter className="flex gap-2">

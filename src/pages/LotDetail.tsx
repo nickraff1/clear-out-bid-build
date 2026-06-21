@@ -58,7 +58,8 @@ export default function LotDetail() {
 
   useEffect(() => {
     if (id) {
-      fetchLot();
+      // Best-effort: release any expired reservations before fetching.
+      supabase.rpc('release_expired_reservations').then(() => fetchLot());
       fetchBids();
       if (user) {
         checkWatchlist();
