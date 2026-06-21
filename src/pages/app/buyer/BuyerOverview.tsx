@@ -27,7 +27,7 @@ type BidWithLot = Bid & {
 };
 
 export default function BuyerOverview() {
-  const { user, profile } = useAuth();
+  const { user, profile, organizations } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     activeBids: 0,
@@ -43,7 +43,7 @@ export default function BuyerOverview() {
     if (user) {
       fetchData();
     }
-  }, [user]);
+  }, [user, organizations]);
 
   const fetchData = async () => {
     try {
@@ -71,11 +71,15 @@ export default function BuyerOverview() {
         setStats(prev => ({ ...prev, activeBids, outbidCount }));
       }
 
-      // Fetch orders
+      // Fetch orders — include orders made by the user OR by any org they belong to.
+      const orgIds = (organizations ?? []).map(o => o.org_id).filter(Boolean);
+      const orFilter = orgIds.length > 0
+        ? `buyer_id.eq.${user!.id},buyer_org_id.in.(${orgIds.join(',')})`
+        : `buyer_id.eq.${user!.id}`;
       const { data: ordersData } = await supabase
         .from('orders')
         .select('*, lot:lots(title)')
-        .eq('buyer_id', user!.id)
+        .or(orFilter)
         .order('created_at', { ascending: false })
         .limit(5);
 

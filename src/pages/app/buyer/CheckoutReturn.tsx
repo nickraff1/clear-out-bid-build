@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Check, Clock, Loader2, XCircle } from "lucide-react";
 
@@ -21,7 +20,7 @@ export default function CheckoutReturn() {
       if (cancelled) return;
       if (data?.status === "paid" || data?.status === "ready_for_pickup" || data?.status === "collected") {
         setStatus("paid");
-      } else if (attempts < 8) {
+      } else if (attempts < 10) {
         setAttempts(a => a + 1);
         setTimeout(poll, 1500);
       } else {
@@ -52,9 +51,9 @@ export default function CheckoutReturn() {
             {status === "failed" && "Something went wrong"}
           </CardTitle>
           <CardDescription>
-            {status === "paid" && "Thanks — the seller has been notified. Pickup details will appear in your orders."}
+            {status === "paid" && "Thanks — the seller has been notified. Open your order to arrange pickup."}
             {status === "loading" && "This usually takes just a few seconds."}
-            {status === "pending" && "We haven't received confirmation yet. Check back in a minute."}
+            {status === "pending" && "We haven't received confirmation yet. You can open your order to check the latest status."}
             {status === "failed" && "We couldn't find your order. Please contact support."}
           </CardDescription>
         </CardHeader>
@@ -63,8 +62,15 @@ export default function CheckoutReturn() {
             <p className="text-xs text-center text-muted-foreground">Reference: {sessionId.slice(0, 16)}…</p>
           </CardContent>
         )}
-        <CardFooter className="flex gap-2">
-          <Button asChild className="flex-1"><Link to="/app/buyer/orders">View my orders</Link></Button>
+        <CardFooter className="flex flex-col sm:flex-row gap-2">
+          {orderId && (status === "paid" || status === "pending") && (
+            <Button asChild className="flex-1 w-full sm:w-auto">
+              <Link to={`/app/orders/${orderId}`}>Open order & arrange pickup</Link>
+            </Button>
+          )}
+          <Button asChild variant="outline" className="flex-1 w-full sm:w-auto">
+            <Link to="/app/buyer/orders">View all orders</Link>
+          </Button>
         </CardFooter>
       </Card>
     </div>

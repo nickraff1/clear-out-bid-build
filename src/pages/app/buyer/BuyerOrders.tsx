@@ -34,7 +34,7 @@ type OrderWithDetails = Order & {
 };
 
 export default function BuyerOrders() {
-  const { user } = useAuth();
+  const { user, organizations } = useAuth();
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,14 +44,18 @@ export default function BuyerOrders() {
     if (user) {
       fetchOrders();
     }
-  }, [user]);
+  }, [user, organizations]);
 
   const fetchOrders = async () => {
     try {
+      const orgIds = (organizations ?? []).map(o => o.org_id).filter(Boolean);
+      const orFilter = orgIds.length > 0
+        ? `buyer_id.eq.${user!.id},buyer_org_id.in.(${orgIds.join(',')})`
+        : `buyer_id.eq.${user!.id}`;
       const { data } = await supabase
         .from('orders')
         .select('*, lot:lots(*, event:clearance_events(org_id, created_by)), event:clearance_events(*)')
-        .eq('buyer_id', user!.id)
+        .or(orFilter)
         .order('created_at', { ascending: false });
 
       if (data) {
