@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Lot, LotMedia, ClearanceEvent, Category, ComplianceTag, Bid, Organization } from '@/types/database';
 import { LOT_CONDITIONS, getMinNextBid, getBidIncrement } from '@/lib/constants';
 import { formatDistanceToNow, isPast, parseISO, format } from 'date-fns';
+import { MessageSellerDialog } from '@/components/messaging/MessageSellerDialog';
 
 type LotWithDetails = Lot & {
   media: LotMedia[];
@@ -285,6 +286,8 @@ export default function LotDetail() {
   const currentPrice = isAuction ? (lot.current_bid ?? lot.start_price ?? 0) : (lot.fixed_price ?? 0);
   const minNextBid = getMinNextBid(currentPrice);
   const images = lot.media?.length > 0 ? lot.media.sort((a, b) => (a.is_primary ? -1 : b.is_primary ? 1 : a.sort_order - b.sort_order)) : [];
+  const isOwnLot = !!primaryOrg && !!lot.event?.org_id && primaryOrg.id === lot.event.org_id;
+  const reserveMet = !!lot.reserve_price && (lot.current_bid ?? 0) >= lot.reserve_price;
 
   return (
     <Layout>
@@ -430,6 +433,13 @@ export default function LotDetail() {
             <div className="space-y-4 mb-6">
               {isAuction && !auctionEnded ? (
                 <form onSubmit={handleBid} className="space-y-3">
+                  {lot.reserve_price && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <Badge variant={reserveMet ? 'success' : 'warning'}>
+                        {reserveMet ? 'Reserve met' : 'Reserve not met'}
+                      </Badge>
+                    </div>
+                  )}
                   {bidError && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
@@ -451,26 +461,37 @@ export default function LotDetail() {
                       min={minNextBid}
                       step={getBidIncrement(currentPrice)}
                       className="flex-1"
-                      disabled={bidLoading}
+                      disabled={bidLoading || isOwnLot}
                     />
-                    <Button type="submit" variant="hero" disabled={bidLoading}>
+                    <Button type="submit" variant="hero" disabled={bidLoading || isOwnLot}>
                       {bidLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Place Bid'}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Bid increment: ${getBidIncrement(currentPrice)} • 10% buyer fee applies to winning bid
+                    {isOwnLot
+                      ? 'You cannot bid on your own listing.'
+                      : `Bid increment: $${getBidIncrement(currentPrice)} • 10% buyer fee applies to winning bid`}
                   </p>
                 </form>
               ) : !isAuction && lot.status === 'active' ? (
                 <div className="space-y-2">
-                  <Button variant="hero" size="lg" className="w-full" onClick={handleBuyNow}>
+                  <Button variant="hero" size="lg" className="w-full" onClick={handleBuyNow} disabled={isOwnLot}>
                     Buy Now - ${((lot.fixed_price ?? 0) * 1.10).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Button>
                   <p className="text-xs text-muted-foreground text-center">
-                    Price ${(lot.fixed_price ?? 0).toLocaleString()} + 10% buyer fee
+                    {isOwnLot ? 'This is your own listing.' : `Price $${(lot.fixed_price ?? 0).toLocaleString()} + 10% buyer fee`}
                   </p>
                 </div>
               ) : null}
+
+              {/* Message Seller */}
+              {!isOwnLot && lot.event?.org_id && (
+                <MessageSellerDialog
+                  lotId={lot.id}
+                  lotTitle={lot.title}
+                  sellerOrgId={lot.event.org_id}
+                />
+              )}
 
               <div className="flex gap-2">
                 <Button

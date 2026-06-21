@@ -82,6 +82,35 @@ export default function CreateLot() {
     }
   };
 
+  // Auto-create a default "Ongoing listings" event if seller has none
+  const ensureDefaultEvent = async (): Promise<string | null> => {
+    if (formData.event_id) return formData.event_id;
+    if (events.length > 0) return events[0].id;
+    if (!primaryOrg || !user) return null;
+    const now = new Date();
+    const end = new Date(); end.setMonth(end.getMonth() + 3);
+    const { data, error } = await supabase
+      .from('clearance_events')
+      .insert({
+        org_id: primaryOrg.id,
+        created_by: user.id,
+        title: 'Ongoing listings',
+        site_address: primaryOrg.address ?? 'TBC',
+        suburb: primaryOrg.suburb ?? 'TBC',
+        state: primaryOrg.state ?? 'NSW',
+        postcode: primaryOrg.postcode ?? '',
+        pickup_start: now.toISOString(),
+        pickup_end: end.toISOString(),
+        status: 'active',
+      })
+      .select('id').single();
+    if (error) {
+      console.error('ensureDefaultEvent', error);
+      return null;
+    }
+    return data.id;
+  };
+
   const updateFormData = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -114,10 +143,6 @@ export default function CreateLot() {
   const validate = (): boolean => {
     setError('');
     
-    if (!formData.event_id) {
-      setError('Please select an event');
-      return false;
-    }
     if (!formData.category) {
       setError('Please select a category');
       return false;
@@ -165,9 +190,17 @@ export default function CreateLot() {
     setError('');
 
     try {
+      // Ensure we have an event (auto-create default if seller has none)
+      const eventId = await ensureDefaultEvent();
+      if (!eventId) {
+        setError('Could not create or find a clearance event. Please try again.');
+        setLoading(false);
+        return;
+      }
+
       // Create lot
       const lotData: any = {
-        event_id: formData.event_id,
+        event_id: eventId,
         category_id: null, // Will need to map category slug to ID
         title: formData.title,
         description: formData.description || null,
@@ -229,8 +262,8 @@ export default function CreateLot() {
         });
       }
 
-      // Navigate to event detail
-      navigate(`/app/seller/events/${formData.event_id}?lot_created=true`);
+      // Navigate back to listings
+      navigate(`/app/seller/lots?created=1`);
     } catch (err: any) {
       setError(err.message || 'Failed to create lot');
     } finally {
@@ -251,17 +284,20 @@ export default function CreateLot() {
       </div>
 
       <div className="space-y-6">
-        {/* Event Selection */}
+        {/* Event Selection (optional - skipped when seller has no events) */}
+        {events.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Event</CardTitle>
+            <CardTitle className="text-lg">Clearance event (optional)</CardTitle>
+            <CardDescription>Group this listing under an existing material drop, or leave blank to list it on its own.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select value={formData.event_id} onValueChange={(v) => updateFormData('event_id', v)}>
+            <Select value={formData.event_id || 'none'} onValueChange={(v) => updateFormData('event_id', v === 'none' ? '' : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select an event" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">No event — list on its own</SelectItem>
                 {events.map(event => (
                   <SelectItem key={event.id} value={event.id}>
                     {event.title} ({event.suburb})
@@ -271,6 +307,7 @@ export default function CreateLot() {
             </Select>
           </CardContent>
         </Card>
+        )}
 
         {/* Photos */}
         <Card>

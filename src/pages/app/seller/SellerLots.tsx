@@ -20,7 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Filter, Loader2, Package, Search } from 'lucide-react';
+import { Filter, Loader2, Package, Search, MoreVertical, Eye, EyeOff, Trash2, Pencil } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from '@/hooks/use-toast';
 import type { Lot, ClearanceEvent } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 
@@ -44,10 +48,11 @@ export default function SellerLots() {
   }, [primaryOrg]);
 
   const fetchLots = async () => {
+    setLoading(true);
     try {
       const { data } = await supabase
         .from('lots')
-        .select('*, event:clearance_events(*)')
+        .select('*, event:clearance_events!inner(*)')
         .eq('event.org_id', primaryOrg!.id)
         .order('created_at', { ascending: false });
 
@@ -57,6 +62,27 @@ export default function SellerLots() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setLotStatus = async (lotId: string, status: 'active' | 'draft' | 'cancelled') => {
+    const { error } = await supabase.from('lots').update({ status }).eq('id', lotId);
+    if (error) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Listing updated', description: `Status: ${status}` });
+      fetchLots();
+    }
+  };
+
+  const deleteLot = async (lotId: string) => {
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
+    const { error } = await supabase.from('lots').delete().eq('id', lotId);
+    if (error) {
+      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Listing deleted' });
+      fetchLots();
     }
   };
 
@@ -90,9 +116,12 @@ export default function SellerLots() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">All Lots</h1>
-          <p className="text-muted-foreground">Manage lots across all your events</p>
+          <h1 className="text-2xl font-bold">My Listings</h1>
+          <p className="text-muted-foreground">Manage all the items you're selling</p>
         </div>
+        <Button asChild>
+          <Link to="/app/seller/lots/new">+ New Listing</Link>
+        </Button>
       </div>
 
       {/* Filters */}
@@ -151,6 +180,7 @@ export default function SellerLots() {
                 <TableHead>Type</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -195,6 +225,38 @@ export default function SellerLots() {
                     <Badge variant={getStatusColor(lot.status)}>
                       {lot.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {lot.status === 'draft' && (
+                          <DropdownMenuItem onClick={() => setLotStatus(lot.id, 'active')}>
+                            <Eye className="h-4 w-4 mr-2" /> Publish
+                          </DropdownMenuItem>
+                        )}
+                        {lot.status === 'active' && (
+                          <DropdownMenuItem onClick={() => setLotStatus(lot.id, 'draft')}>
+                            <EyeOff className="h-4 w-4 mr-2" /> Unpublish
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem asChild>
+                          <Link to={`/app/seller/lots/${lot.id}/edit`}>
+                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => deleteLot(lot.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}

@@ -2,7 +2,7 @@ import { Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck } from 'lucide-react';
+import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PortalSwitcher } from './PortalSwitcher';
 import { useActivePortal } from '@/hooks/useActivePortal';
@@ -33,14 +33,16 @@ export default function AppLayout() {
     { to: '/app/buyer/orders', label: 'Orders', icon: ShoppingCart },
     { to: '/app/buyer/watchlist', label: 'Watchlist', icon: Heart },
     { to: '/app/buyer/alerts', label: 'Alerts', icon: Bell },
+    { to: '/app/messages', label: 'Messages', icon: MessageSquare },
   ];
 
   const sellerNav = [
     { to: '/app/seller/overview', label: 'Overview', icon: LayoutDashboard },
     { to: '/app/seller/events', label: 'Events', icon: Calendar },
-    { to: '/app/seller/lots', label: 'All Lots', icon: Package },
+    { to: '/app/seller/lots', label: 'Listings', icon: Package },
     { to: '/app/seller/orders', label: 'Sales', icon: FileText },
     { to: '/app/seller/pickups', label: 'Pickups', icon: Truck },
+    { to: '/app/messages', label: 'Messages', icon: MessageSquare },
     { to: '/app/seller/payments', label: 'Payments', icon: Tag },
   ];
 

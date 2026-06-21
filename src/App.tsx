@@ -27,6 +27,7 @@ import SellerEvents from "./pages/app/seller/SellerEvents";
 import CreateEvent from "./pages/app/seller/CreateEvent";
 import EventDetail from "./pages/app/seller/EventDetail";
 import CreateLot from "./pages/app/seller/CreateLot";
+import EditLot from "./pages/app/seller/EditLot";
 import SellerLots from "./pages/app/seller/SellerLots";
 import SellerOrders from "./pages/app/seller/SellerOrders";
 import SellerPickups from "./pages/app/seller/SellerPickups";
@@ -46,6 +47,10 @@ import PaymentSettings from "./pages/app/seller/PaymentSettings";
 
 // Admin
 import AdminFees from "./pages/app/admin/AdminFees";
+
+// Messaging
+import MessagesInbox from "./pages/app/messages/MessagesInbox";
+import MessageThread from "./pages/app/messages/MessageThread";
 
 // SEO Landing Pages
 import {
@@ -130,6 +135,11 @@ const App = () => (
                   <CreateLot />
                 </RoleGuard>
               } />
+              <Route path="/app/seller/lots/:id/edit" element={
+                <RoleGuard allowedRoles={['seller', 'admin']}>
+                  <EditLot />
+                </RoleGuard>
+              } />
               <Route path="/app/seller/orders" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <SellerOrders />
@@ -190,6 +200,10 @@ const App = () => (
               {/* Common Routes */}
               <Route path="/app/settings" element={<AppSettings />} />
               <Route path="/app/add-role" element={<AddRole />} />
+
+              {/* Messages (buyer + seller) */}
+              <Route path="/app/messages" element={<MessagesInbox />} />
+              <Route path="/app/messages/:id" element={<MessageThread />} />
             </Route>
 
             {/* Legacy Dashboard Routes */}
