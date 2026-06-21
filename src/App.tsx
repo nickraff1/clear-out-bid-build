@@ -47,6 +47,14 @@ import PaymentSettings from "./pages/app/seller/PaymentSettings";
 
 // Admin
 import AdminFees from "./pages/app/admin/AdminFees";
+import AdminOverview from "./pages/app/admin/AdminOverview";
+import AdminUsers from "./pages/app/admin/AdminUsers";
+import AdminListings from "./pages/app/admin/AdminListings";
+import AdminOrders from "./pages/app/admin/AdminOrders";
+import AdminReports from "./pages/app/admin/AdminReports";
+
+// Seller bulk
+import BulkUpload from "./pages/app/seller/BulkUpload";
 
 // Messaging
 import MessagesInbox from "./pages/app/messages/MessagesInbox";
@@ -195,6 +203,32 @@ const App = () => (
                 <RoleGuard allowedRoles={['admin']}>
                   <AdminFees />
                 </RoleGuard>
+              } />
+              <Route path="/app/admin/overview" element={
+                <RoleGuard allowedRoles={['admin']}><AdminOverview /></RoleGuard>
+              } />
+              <Route path="/app/admin/analytics" element={
+                <RoleGuard allowedRoles={['admin']}><AdminOverview /></RoleGuard>
+              } />
+              <Route path="/app/admin/users" element={
+                <RoleGuard allowedRoles={['admin']}><AdminUsers /></RoleGuard>
+              } />
+              <Route path="/app/admin/listings" element={
+                <RoleGuard allowedRoles={['admin']}><AdminListings /></RoleGuard>
+              } />
+              <Route path="/app/admin/moderation" element={
+                <RoleGuard allowedRoles={['admin']}><AdminReports /></RoleGuard>
+              } />
+              <Route path="/app/admin/reports" element={
+                <RoleGuard allowedRoles={['admin']}><AdminReports /></RoleGuard>
+              } />
+              <Route path="/app/admin/orders" element={
+                <RoleGuard allowedRoles={['admin']}><AdminOrders /></RoleGuard>
+              } />
+
+              {/* Seller bulk upload */}
+              <Route path="/app/seller/bulk-upload" element={
+                <RoleGuard allowedRoles={['seller', 'admin']}><BulkUpload /></RoleGuard>
               } />
 
               {/* Common Routes */}

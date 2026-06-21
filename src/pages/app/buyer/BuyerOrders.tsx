@@ -23,10 +23,12 @@ import {
 import { ArrowUpRight, Filter, Loader2, MapPin, Search, ShoppingCart } from 'lucide-react';
 import type { Order, Lot, ClearanceEvent } from '@/types/database';
 import { format, parseISO } from 'date-fns';
+import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
 
 type OrderWithDetails = Order & {
-  lot: Lot;
+  lot: Lot & { event?: { org_id: string; created_by: string } };
   event: ClearanceEvent;
+  has_review?: boolean;
 };
 
 export default function BuyerOrders() {
@@ -46,12 +48,24 @@ export default function BuyerOrders() {
     try {
       const { data } = await supabase
         .from('orders')
-        .select('*, lot:lots(*), event:clearance_events(*)')
+        .select('*, lot:lots(*, event:clearance_events(org_id, created_by)), event:clearance_events(*)')
         .eq('buyer_id', user!.id)
         .order('created_at', { ascending: false });
 
       if (data) {
-        setOrders(data as OrderWithDetails[]);
+        const ordersData = data as unknown as OrderWithDetails[];
+        // Check existing reviews
+        const orderIds = ordersData.map(o => o.id);
+        if (orderIds.length > 0) {
+          const { data: reviews } = await supabase
+            .from('reviews')
+            .select('order_id')
+            .in('order_id', orderIds)
+            .eq('reviewer_id', user!.id);
+          const reviewed = new Set((reviews ?? []).map(r => r.order_id));
+          ordersData.forEach(o => { o.has_review = reviewed.has(o.id); });
+        }
+        setOrders(ordersData);
       }
     } finally {
       setLoading(false);
@@ -184,11 +198,22 @@ export default function BuyerOrders() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link to={`/lot/${order.lot_id}`}>
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <div className="flex items-center gap-2 justify-end">
+                      {order.status === 'collected' && !order.has_review && order.lot?.event?.created_by && (
+                        <LeaveReviewDialog
+                          orderId={order.id}
+                          revieweeId={order.lot.event.created_by}
+                          revieweeOrgId={order.lot.event.org_id}
+                          reviewerRole="buyer"
+                          onReviewed={fetchOrders}
+                        />
+                      )}
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link to={`/lot/${order.lot_id}`}>
+                          <ArrowUpRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
