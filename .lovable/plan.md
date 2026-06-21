@@ -1,116 +1,97 @@
+## Audit: Spec vs current Offcutt implementation
 
-# Offcutt Launch Build — All Stages
+Legend: ✅ implemented · 🟡 partial / deviation · ❌ missing
 
-Extends the existing schema (clearance_events + lots + bids + orders + payments + org_members) rather than refactoring. Preserves current frontend; wires it to real data and adds missing surfaces.
+### 1) Role-based app shell
+- ✅ `/app` redirect by role (`AppRedirect.tsx`)
+- ✅ Portals `/app/buyer/*`, `/app/seller/*`, `/app/admin/*`
+- ✅ RBAC via `RoleGuard.tsx` + `localStorage` fallback for fresh onboarding
 
-## Stage 1 — Backend additions
+### 2) Seller portal
+- ✅ Overview, events list, event detail, lots manager, lot create/edit
+- 🟡 **Event creation is a single form, not a 3-step wizard** (`CreateEvent.tsx`). Site-constraint fields (forklift, dock, pickup hours) are folded into a single `access_notes` text field — no structured constraints.
+- ✅ Lot create: category, title, qty/unit, condition, photos, compliance tags, fixed/auction pricing, draft/live
+- ✅ Lots belong to seller org (enforced by RLS + `is_org_member`)
+- 🟡 Event detail shows lots + add-lot deep link, but the **consolidated pickup schedule lives on a separate `/app/seller/pickups` page**, not embedded in the event page
 
-New tables (RLS + GRANTs in same migration, security-definer helpers reused):
+### 3) Buyer portal
+- ✅ Overview, bids, orders, watchlist, alerts pages all exist
+- 🟡 **`BuyerOrders` filters by `buyer_id` only, not `buyer_org_id`** (`BuyerOrders.tsx:54`). Spec explicitly requires org-scoped visibility so org staff see org orders. Same issue likely on `BuyerOverview`/`BuyerBids` — needs re-check.
+- ✅ Watchlist + saved searches + alerts tables exist
+- 🟡 Email delivery for saved-search alerts: table + UI present, but no scheduled job sending emails was found
 
-- `reviews` — reviewer_id, reviewee_id, order_id, role ('buyer'|'seller'), rating 1–5, comment, created_at. RLS: participants of the order can insert; public can read.
-- `messages` — conversation_id, sender_id, recipient_id, lot_id, body, read_at. RLS: only sender/recipient.
-- `conversations` — buyer_id, seller_id, lot_id, last_message_at, unique(buyer_id, seller_id, lot_id).
-- `lot_reports` — lot_id, reporter_id, reason, status. Admin-only read.
-- `saved_search_alerts` — saved_search_id, lot_id, sent_at (for de-dup).
-- `bulk_imports` — seller_org_id, file_url, status, rows_total, rows_ok, rows_error, error_json.
-- `bulk_import_rows` — import_id, row_index, payload jsonb, status, error.
-- `analytics_events` — user_id, event_name, props jsonb, created_at (insert-only by authenticated; admin read).
-- `fee_settings` — singleton row {buyer_fee_pct, seller_fee_pct, updated_by, updated_at}. Admin write; all read. Seeded 0.05 / 0.05.
-- `seller_badges` — org_id, badge ('verified'|'founding'), granted_at. Admin write.
-- Extend `lots`: add `reserve_met boolean`, `buy_now_price numeric`, `min_bid_increment numeric`, `status` already supports reserved/expired via enum extension.
-- Extend `organizations`: add `bio`, `website`, `rating_avg`, `rating_count`, `is_founding`, `is_verified`.
-- Extend `profiles`: add `bio`, `avatar_url` (exists).
-- Stripe Connect fields: `seller_stripe_accounts` already exists. Add `stripe_account_status`, `payouts_enabled`, `details_submitted`. Add `payments.stripe_session_id`, `payments.stripe_payment_intent`, `payments.platform_fee_buyer`, `platform_fee_seller`.
+### 4) Auction engine
+- ✅ Server-side bid validation, min-increment, end-time, self-bid block (`prevent_seller_self_bid` trigger)
+- ✅ Auto-create order at close (`close_expired_auction` SECURITY DEFINER + `close-expired-auctions` cron)
+- ✅ Immutable `bid_events` audit log
+- 🟡 **Soft-close extension on last-minute bid: not found** in `auction-engine` or DB triggers — needs confirmation
+- 🟡 **Per-user bid rate limit: not found**
 
-Security: keep existing RLS pattern (security-definer `has_role`, `is_org_member`, `has_order_for_event`). New policies follow same approach. Hide exact `site_address` from `clearance_events_public` view until buyer has paid order.
+### 5) Pickup scheduling & proof
+- 🟡 Spec calls for a slot picker bound to event window. Current model uses a **free-form pickup-time proposal** between buyer and seller (`proposed_pickup_at`, `agreed_pickup_at`) plus a `pickup_code` handshake. `pickup_slots` table exists but isn't used by the buyer flow.
+- ✅ Seller has consolidated pickup schedule (`SellerPickups.tsx`)
+- 🟡 **Proof-of-pickup photo upload: `pickup_confirmations` table exists but no UI uploads to it.** Completion is done via pickup-code entry instead.
 
-## Stage 2 — Core marketplace wiring
+### 6) Onboarding
+- ✅ `OnboardingWizard.tsx` runs on first login, picks role, creates org
+- 🟡 **3-step checklist with deep-links to first action: not present.** Wizard ends at role/org creation, no post-onboarding "list your first item / place your first bid" checklist.
 
-- `src/pages/Marketplace.tsx`: real Supabase query with filters (search text, category, suburb, state, price min/max, condition, pricing_type). URL-state filters.
-- `src/pages/LotDetail.tsx`: full lot view, gallery, seller card with rating/badges, watchlist toggle, bid/buy actions, message-seller button. Address hidden until paid.
-- Seller flows: existing CreateEvent/CreateLot extended with statuses (draft/active/reserved/sold/expired). Edit/delete pages added.
-- Seed ~40 Sydney listings via `supabase--insert` (stone, timber, tile, metal, mixed; suburbs: Alexandria, Marrickville, Parramatta, Chatswood, Bondi, Penrith, etc.). Mix of fixed-price and auctions.
+### 7) Design consistency
+- ✅ Orange/black/white tokens, dashboard cards, status chips, mobile-first lot create
+- ✅ Recent polish pass standardized empty states and status wording
 
-## Stage 3 — Auctions
+---
 
-- Bid modal with min-increment validation, confirmation.
-- `auction-engine` edge function (exists) extended: place_bid (rate-limited, increment check, soft-close +2min if bid in last 60s), close_auction (sets reserve_met, creates order for winner, marks unsold otherwise).
-- pg_cron job runs close_auction every minute for ended auctions (best-effort; documented if unavailable).
-- Bid history visible on lot detail.
+### Post-order workflow audit
 
-## Stage 4 — Stripe Connect (scaffold)
+**Database (`orders` table)**
+- ✅ buyer_id, buyer_org_id, lot_id, event_id, amount, status, pickup_status, pickup_code, admin_notes, proposed/agreed/collected timestamps
+- ❌ `order_number` (human-readable)
+- ❌ `seller_org_id` (derived via `lot → event → org_id` join; spec wants it denormalized)
+- ❌ Separate `platform_fee` / `total_amount` columns (fee is encoded in `amount` and free-text `notes`)
+- ❌ `order_items` table (single-lot orders only — fine for current model, but spec calls for it)
+- ❌ `order_status_history` table — status transitions are not logged
+- ❌ `payment_status` enum column (payment state lives in `payments` table instead)
+- 🟡 Status enum: has `pending_payment / paid / ready_for_pickup / collected / cancelled / disputed`. Missing `PICKUP_SCHEDULED`. Pickup state is tracked separately in `pickup_status`.
 
-- Edge functions (scaffolded, marked `// TODO: add STRIPE_SECRET_KEY`):
-  - `stripe-connect-onboard` — creates Express account link.
-  - `stripe-checkout` — creates Checkout Session with `payment_intent_data.application_fee_amount` (buyer fee 5%) and `transfer_data.destination = seller_stripe_account`.
-  - `stripe-webhook` — handles `checkout.session.completed`, `account.updated`, `payout.*`; updates `payments` + `orders`.
-- Frontend: Checkout page calls `stripe-checkout`; seller PaymentSettings shows Connect onboarding state.
-- Fee model reads `fee_settings`. Admin can edit.
-- Clear in-app banner: "Add STRIPE_SECRET_KEY in Backend → Secrets to go live."
+**Order creation**
+- ✅ Buy Now: creates order, reserves lot, redirects to checkout/order page
+- ✅ Auction close: `close_expired_auction` creates order for winner with `pending_payment` + notification
 
-## Stage 5 — Messaging
+**Buyer Orders page**
+- 🟡 Live and shows orders (7 paid orders confirmed in DB for the active test buyer) — **so the reported "orders not appearing" bug is NOT reproducing**. Likely fixed in an earlier pass.
+- 🟡 But query is `buyer_id = user.id`, **not `buyer_org_id IN user's orgs`** — org staff of the same buyer org won't see each other's orders. This is the only real gap vs the spec on this page.
 
-- `/app/messages` inbox, conversation thread view. Realtime via Supabase channels.
-- "Message seller" button on lot detail with quick-prompt chips ("Is this still available?", "Can I pick up tomorrow?", "Will you split the lot?").
-- Address remains masked until order paid.
+**Order detail (`/app/orders/:id`)**
+- ✅ Single shared page for buyer + seller, gated by role
+- ✅ Pickup proposal/accept, pickup-code reveal, seller confirm
+- ✅ Cancel order (admin), force-complete (admin), regenerate code (admin)
+- ❌ Buyer proof-of-pickup photo upload
+- 🟡 "Choose pickup slot" uses free-form datetime, not slot picker
 
-## Stage 6 — Reviews & trust
+**Seller**
+- ✅ Event detail lists lots; seller orders + pickups pages exist
+- 🟡 Per-event order list is not embedded in the event detail page
 
-- After order status = `collected`, both parties prompted to review (1–5 stars + text).
-- Seller profile shows rating_avg, badges, review list.
-- "Report listing" button → `lot_reports`.
-- Prohibited-materials checkbox required on CreateLot ("I confirm this lot contains no asbestos, lead paint, or hazardous waste").
+**Admin**
+- ✅ AdminOrders with manual status actions, payout controls, notes
 
-## Stage 7 — Saved searches & alerts
+**RBAC / RLS**
+- ✅ Orders RLS scopes buyers to own user + buyers org members; sellers to event-org members; admins all
+- ✅ `protect_order_critical_fields` trigger locks amount/buyer/lot/pickup_code; restricts seller/buyer status transitions
 
-- Save current filter set from Marketplace.
-- `/app/buyer/alerts` dashboard.
-- pg_cron job (hourly) matches new active lots against saved searches → inserts `notifications` + (if email enabled) enqueues email via existing edge function pattern. Scaffolded with TODO if email infra not yet set up.
+---
 
-## Stage 8 — Bulk upload
+### Net gaps if you later want spec-perfect
 
-- `/app/seller/bulk-upload`: CSV template download, drag-drop upload to `lot-photos` bucket subpath, parse client-side via PapaParse, preview grid, "Publish all" → creates lots in batch.
-- `bulk_imports` row tracks progress; row-level errors shown.
+1. Buyer orders/bids/overview queries → use `buyer_org_id IN (user's orgs)` instead of `buyer_id`.
+2. Add `order_status_history` table + trigger logging every status change.
+3. Add `order_number`, denormalized `seller_org_id`, `platform_fee`, `total_amount`, `payment_status` columns (or accept current model).
+4. Implement real `pickup_slots` selection flow + `pickup_confirmations` photo upload UI.
+5. Add soft-close auction extension (e.g. last-60s bid pushes `auction_end` by 2 min) and bid rate-limit.
+6. Convert event creation to 3-step wizard and add structured site-constraint fields (forklift/dock/hours).
+7. Embed per-event order/pickup schedule inside seller event detail.
+8. Onboarding: add post-role 3-step checklist with deep links to first listing / first bid.
+9. Saved-search email delivery job.
 
-## Stage 9 — SEO landing pages
-
-Public routes (Layout + hero + intro copy + filtered marketplace embed):
-
-- `/sell-surplus-building-materials-sydney`
-- `/buy-cheap-building-materials-sydney`
-- `/construction-waste-marketplace-sydney`
-- `/stone-offcuts-sydney`
-- `/timber-offcuts-sydney`
-- `/tile-offcuts-sydney`
-- `/metal-offcuts-sydney`
-
-Each: unique `<title>`, meta description, H1, JSON-LD (`ItemList` + `LocalBusiness`), canonical, OG tags. Sydney-specific copy.
-
-## Stage 10 — Admin analytics
-
-- `/app/admin/analytics`: cards + charts (Recharts).
-  - Total users, active sellers/buyers (30d), active listings, completed transactions, GMV, platform fees (sum of `payments.platform_fee_*`), top categories, top suburbs, auction conversion %, buy-now conversion %, saved search count.
-  - Sustainability: `estimated_kg_diverted` = SUM(lot.quantity * category.kg_per_unit) for sold lots; `estimated_buyer_savings` = SUM(retail_estimate - sale_price). Add `kg_per_unit` to categories and `retail_estimate` to lots.
-
-## Stage 11 — Full admin dashboard
-
-- `/app/admin/users`, `/sellers`, `/listings`, `/reports`, `/categories`, `/fees`, `/orders`, `/payments`, `/bids`, `/reviews`.
-- Actions: approve/remove listing, ban listing, feature listing (`lots.is_featured`), grant badges, edit fee_settings, resolve reports.
-
-## Technical notes
-
-- All new tables: explicit GRANTs (`authenticated`, `service_role`; `anon` only on public-read tables like `reviews`, `fee_settings`, `analytics_events.insert`).
-- All policies use existing security-definer helpers to avoid recursion.
-- Frontend: new pages under `src/pages/app/{buyer,seller,admin}/` and `src/pages/seo/`; routes added in `src/App.tsx`.
-- No `dangerouslySetInnerHTML`; zod validation on all forms; URL-encode outbound params.
-- Stripe code paths fall back to a clear error if `STRIPE_SECRET_KEY` is unset, so the UI remains usable in scaffold mode.
-
-## What you'll need to do after build
-
-1. Add `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in Backend → Secrets.
-2. Set the webhook endpoint URL in your Stripe dashboard (URL shown in PaymentSettings after build).
-3. (Optional) Enable email domain for alert emails — I'll scaffold the function either way.
-
-## Realistic expectations
-
-This is a very large pass. I'll get the schema, RLS, routes, and primary flows wired end-to-end, but expect a follow-up round to polish edge cases (especially Stripe webhook testing, pg_cron timing, and bulk-upload error handling) once you've added Stripe keys and exercised the flows.
+**No code changes made — this is audit-only.** Tell me which of the gaps above (if any) you want me to fix and I'll plan that work next.
