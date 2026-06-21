@@ -126,9 +126,11 @@ export default function OrderDetail() {
 
   async function proposePickup() {
     if (!proposedAt) { toast.error('Pick a date/time'); return; }
+    const when = new Date(proposedAt);
+    if (when.getTime() < Date.now()) { toast.error('Pickup time must be in the future'); return; }
     await update(
       {
-        proposed_pickup_at: new Date(proposedAt).toISOString(),
+        proposed_pickup_at: when.toISOString(),
         proposed_pickup_by: user!.id,
         pickup_status: 'pickup_proposed',
       },
@@ -348,7 +350,12 @@ export default function OrderDetail() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Propose pickup time</label>
                 <div className="flex gap-2">
-                  <Input type="datetime-local" value={proposedAt} onChange={(e) => setProposedAt(e.target.value)} />
+                   <Input
+                     type="datetime-local"
+                     value={proposedAt}
+                     onChange={(e) => setProposedAt(e.target.value)}
+                     min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                   />
                   <Button onClick={proposePickup} disabled={busy || !proposedAt}>Propose</Button>
                 </div>
               </div>
