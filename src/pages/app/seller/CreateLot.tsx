@@ -143,10 +143,6 @@ export default function CreateLot() {
   const validate = (): boolean => {
     setError('');
     
-    if (!formData.event_id) {
-      setError('Please select an event');
-      return false;
-    }
     if (!formData.category) {
       setError('Please select a category');
       return false;
