@@ -5,9 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger,
 } from '@/components/ui/dialog';
 import { Loader2, MessageCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 const QUICK_PROMPTS = [
   'Is this still available?',
@@ -36,17 +37,19 @@ export function MessageSellerDialog({ lotId, lotTitle, sellerOrgId, trigger }: P
     const content = (text ?? body).trim();
     if (!user) { navigate('/login'); return; }
     if (!content) { setError('Please enter a message.'); return; }
+    if (!sellerOrgId) { setError('This listing is missing a seller organisation.'); return; }
     setLoading(true);
     setError('');
     try {
-      // Find or create conversation
-      const { data: existing } = await supabase
+      // Find existing conversation (RLS scopes to participants).
+      const { data: existing, error: selErr } = await supabase
         .from('conversations')
         .select('id')
         .eq('buyer_id', user.id)
         .eq('seller_org_id', sellerOrgId)
         .eq('lot_id', lotId)
         .maybeSingle();
+      if (selErr) throw selErr;
 
       let convId = existing?.id;
       if (!convId) {
@@ -64,9 +67,13 @@ export function MessageSellerDialog({ lotId, lotTitle, sellerOrgId, trigger }: P
       if (mErr) throw mErr;
 
       setOpen(false);
+      toast.success('Message sent');
       navigate(`/app/messages/${convId}`);
     } catch (e: any) {
-      setError(e.message ?? 'Could not send message.');
+      console.error('[MessageSellerDialog] send failed', e);
+      const msg = e?.message ?? 'Could not send message.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -74,13 +81,13 @@ export function MessageSellerDialog({ lotId, lotTitle, sellerOrgId, trigger }: P
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <div onClick={() => setOpen(true)} className="contents">
+      <DialogTrigger asChild>
         {trigger ?? (
           <Button variant="outline" className="w-full">
             <MessageCircle className="h-4 w-4 mr-2" /> Message Seller
           </Button>
         )}
-      </div>
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Message seller</DialogTitle>

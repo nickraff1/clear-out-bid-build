@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Loader2, Send } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { toast } from 'sonner';
 
 type Msg = { id: string; body: string; sender_id: string; created_at: string; read_at: string | null };
 type Conv = {
@@ -76,7 +77,14 @@ export default function MessageThread() {
     const { error } = await supabase.from('messages').insert({
       conversation_id: id, sender_id: user.id, body: content,
     });
-    if (!error) setBody('');
+    if (error) {
+      console.error('[MessageThread] send failed', error);
+      toast.error(error.message ?? 'Could not send message');
+    } else {
+      setBody('');
+      // Optimistic refresh in case realtime is delayed.
+      load();
+    }
     setSending(false);
   };
 
