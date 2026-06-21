@@ -1599,6 +1599,26 @@ export type Database = {
       }
     }
     Functions: {
+      admin_add_order_note: {
+        Args: { _note: string; _order_id: string }
+        Returns: undefined
+      }
+      admin_force_complete_order: {
+        Args: { _note?: string; _order_id: string }
+        Returns: undefined
+      }
+      admin_regenerate_pickup_code: {
+        Args: { _note?: string; _order_id: string }
+        Returns: string
+      }
+      close_all_expired_auctions: {
+        Args: never
+        Returns: {
+          lot_id: string
+          result: string
+        }[]
+      }
+      close_expired_auction: { Args: { _lot_id: string }; Returns: string }
       generate_pickup_code: { Args: never; Returns: string }
       get_event_org_id: { Args: { _event_id: string }; Returns: string }
       has_order_for_event: {
