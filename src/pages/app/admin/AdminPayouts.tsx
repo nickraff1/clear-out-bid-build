@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 const STATUSES = ["manual_payout_pending", "manual_payout_paid", "manual_payout_failed", "manual_payout_on_hold"] as const;
@@ -42,14 +42,24 @@ export default function AdminPayouts() {
         status, manual_payout_status, manual_payout_paid_at, manual_payout_reference,
         admin_notes, environment, created_at,
         order:orders!payments_order_id_fkey(
-          id, buyer:profiles!orders_buyer_id_fkey(full_name, email),
+          id, status, pickup_status,
+          buyer:profiles!orders_buyer_id_fkey(full_name, email),
           lot:lots(title, event:clearance_events(org_id, organization:organizations(name)))
         )
       `)
       .eq("status", "succeeded")
       .order("created_at", { ascending: false })
       .limit(500);
-    setRows(data ?? []);
+    // attach open issue flag
+    const ordIds = (data ?? []).map((r:any)=>r.order?.id).filter(Boolean);
+    let issueSet = new Set<string>();
+    if (ordIds.length) {
+      const { data: rep } = await supabase.from('lot_reports')
+        .select('order_id').in('order_id', ordIds)
+        .in('status', ['open','investigating']);
+      issueSet = new Set((rep ?? []).map((r:any)=>r.order_id));
+    }
+    setRows((data ?? []).map((r:any)=>({ ...r, _has_issue: issueSet.has(r.order?.id) })));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -67,13 +77,27 @@ export default function AdminPayouts() {
 
   const save = async () => {
     if (!editing) return;
-    const patch: any = {
-      manual_payout_status: draft.status,
-      manual_payout_reference: draft.reference || null,
-      admin_notes: draft.notes || null,
-      manual_payout_paid_at: draft.status === "manual_payout_paid" ? new Date().toISOString() : null,
-    };
-    const { error } = await supabase.from("payments").update(patch).eq("id", editing.id);
+    // Safeguards
+    if (draft.status === 'manual_payout_paid') {
+      if (editing.status !== 'succeeded') {
+        return toast({ title: 'Blocked', description: 'Payment is not in succeeded state.', variant: 'destructive' });
+      }
+      if (['cancelled','refunded'].includes(editing.order?.status)) {
+        return toast({ title: 'Blocked', description: `Order is ${editing.order.status}.`, variant: 'destructive' });
+      }
+      if (editing._has_issue) {
+        if (!window.confirm('There is an OPEN ISSUE on this order. Continue marking payout paid?')) return;
+      }
+      if (editing.order?.status !== 'collected') {
+        if (!window.confirm('Pickup is NOT confirmed as collected. Continue marking payout paid?')) return;
+      }
+    }
+    const { error } = await (supabase.rpc as any)('admin_set_payout_status', {
+      _payment_id: editing.id,
+      _status: draft.status,
+      _reference: draft.reference || null,
+      _note: draft.notes || null,
+    });
     if (error) {
       toast({ title: "Failed to update", description: error.message, variant: "destructive" });
     } else {
@@ -100,6 +124,10 @@ export default function AdminPayouts() {
           </SelectContent>
         </Select>
       </div>
+      <div className="rounded-md border border-warning/40 bg-warning/10 text-sm p-3 flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
+        <span><strong>Manual payout required.</strong> Pay the seller off-platform (bank transfer or other), then mark as paid here. Marking paid does NOT trigger an automatic transfer.</span>
+      </div>
 
       <div className="border rounded-md overflow-x-auto">
         <Table>
@@ -119,9 +147,13 @@ export default function AdminPayouts() {
           </TableRow></TableHeader>
           <TableBody>
             {filtered.map(r => (
-              <TableRow key={r.id}>
+              <TableRow key={r.id} className={r._has_issue ? 'bg-destructive/5' : ''}>
                 <TableCell className="text-muted-foreground">{format(parseISO(r.created_at), "MMM d")}</TableCell>
-                <TableCell className="font-medium max-w-[200px] truncate">{r.order?.lot?.title}</TableCell>
+                <TableCell className="font-medium max-w-[200px] truncate">
+                  {r.order?.lot?.title}
+                  {r._has_issue && <Badge variant="destructive" className="ml-2 text-[10px]">issue</Badge>}
+                  {r.order?.status !== 'collected' && <Badge variant="warning" className="ml-2 text-[10px]">not collected</Badge>}
+                </TableCell>
                 <TableCell>{r.order?.buyer?.full_name ?? r.order?.buyer?.email ?? "—"}</TableCell>
                 <TableCell>{r.order?.lot?.event?.organization?.name ?? "—"}</TableCell>
                 <TableCell>${Number(r.base_amount).toFixed(2)}</TableCell>
