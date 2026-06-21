@@ -25,6 +25,7 @@ import { ArrowUpRight, CreditCard, Filter, Loader2, MapPin, Search, ShoppingCart
 import type { Order, Lot, ClearanceEvent } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
+import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
 
 type OrderWithDetails = Order & {
   lot: Lot & { event?: { org_id: string; created_by: string } };
@@ -73,21 +74,8 @@ export default function BuyerOrders() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'success' | 'warning' | 'info' | 'muted' | 'destructive'> = {
-      pending_payment: 'warning',
-      paid: 'success',
-      ready_for_pickup: 'info',
-      collected: 'success',
-      cancelled: 'destructive',
-      disputed: 'warning',
-    };
-    return variants[status] ?? 'muted';
-  };
-
-  const formatStatus = (status: string) => {
-    return status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  };
+  const getStatusBadge = orderStatusTone;
+  const formatStatus = orderStatusLabel;
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.lot?.title.toLowerCase().includes(searchQuery.toLowerCase());
