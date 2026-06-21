@@ -453,7 +453,7 @@ export default function LotDetail() {
 
             {/* Actions */}
             <div className="space-y-4 mb-6">
-              {isAuction && !auctionEnded ? (
+              {isAuction && !auctionEnded && lot.status === 'active' && !isOwnLot ? (
                 <form onSubmit={handleBid} className="space-y-3">
                   {lot.reserve_price && (
                     <div className="flex items-center gap-2 text-xs">
