@@ -371,6 +371,7 @@ export default function LotDetail() {
   };
 
   return (
+    <>
     <Layout>
       <div className="container py-6 md:py-8">
         <Link to="/marketplace" className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1">
