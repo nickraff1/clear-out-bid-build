@@ -35,6 +35,7 @@ import { ReportLotDialog } from '@/components/lots/ReportLotDialog';
 import { ListingSafetyNotice } from '@/components/safety/SafetyNotice';
 import { CountdownTimer } from '@/components/lots/CountdownTimer';
 import { useBidEligibility, reasonCopy, acceptAuctionTerms } from '@/lib/bidder';
+import { AddPaymentMethodDialog } from '@/components/bidder/AddPaymentMethodDialog';
 import { toast } from 'sonner';
 
 type LotWithDetails = Lot & {
@@ -66,6 +67,7 @@ export default function LotDetail() {
   const { eligibility, refresh: refreshEligibility } = useBidEligibility(id);
   const [acceptingTerms, setAcceptingTerms] = useState(false);
   const [settingUpAccount, setSettingUpAccount] = useState(false);
+  const [showAddPayment, setShowAddPayment] = useState(false);
 
   const ensureBuyerAccount = async (): Promise<boolean> => {
     if (!user) { navigate('/login'); return false; }
@@ -594,14 +596,12 @@ export default function LotDetail() {
                                   {acceptingTerms ? 'Saving…' : 'Verify & accept terms'}
                                 </Button>
                               )}
-                            </AlertDescription>
-                          </Alert>
-                        )}
-                        {eligibility?.allowed && eligibility.reason === 'ok_payment_method_pending' && (
-                          <Alert className="border-warning/30 bg-warning/10">
-                            <AlertCircle className="h-4 w-4 text-warning" />
-                            <AlertDescription className="text-xs">
-                              Beta: bidding is enabled with email + terms. A saved payment method will be required soon.
+                              {eligibility.reason === 'payment_method_required' && (
+                                <Button type="button" size="sm" variant="secondary"
+                                  onClick={() => setShowAddPayment(true)}>
+                                  Add payment method
+                                </Button>
+                              )}
                             </AlertDescription>
                           </Alert>
                         )}
