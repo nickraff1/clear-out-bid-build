@@ -49,6 +49,7 @@ This branch hardens the launch-critical admin access and messaging paths for Off
 - `/login`
 - `/app/messages` unauthenticated redirect
 - `/app/admin/launch-checklist` unauthenticated redirect
+- `/app/admin/messages` unauthenticated redirect
 
 ## Remaining Blockers
 

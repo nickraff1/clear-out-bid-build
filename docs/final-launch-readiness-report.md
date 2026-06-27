@@ -33,7 +33,7 @@ The app is not public launch ready. It has enough structure for a controlled clo
 - TypeScript check: passed.
 - Targeted lint on touched files: passed with warnings only.
 - Full repo lint: failed on pre-existing lint debt outside this pass, mostly `@typescript-eslint/no-explicit-any`, shadcn empty-interface warnings, hook dependency warnings, and one Tailwind `require()` import.
-- Local browser smoke: passed for `/`, `/marketplace`, policy pages, `/login`, `/app/messages`, and `/app/admin/launch-checklist`.
+- Local browser smoke: passed for `/`, `/marketplace`, policy pages, `/login`, `/app/messages`, `/app/admin/launch-checklist`, and `/app/admin/messages`.
 - Protected app routes redirect unauthenticated users to `/login`.
 
 ## Known remaining bugs/risks
