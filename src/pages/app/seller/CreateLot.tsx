@@ -43,6 +43,7 @@ export default function CreateLot() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [events, setEvents] = useState<ClearanceEvent[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
 
   const [attestations, setAttestations] = useState({
@@ -77,6 +78,12 @@ export default function CreateLot() {
       fetchEvents();
     }
   }, [primaryOrg]);
+
+  useEffect(() => {
+    supabase.from('categories').select('*').order('name').then(({ data }) => {
+      if (data) setCategories(data as Category[]);
+    });
+  }, []);
 
   const fetchEvents = async () => {
     const { data } = await supabase
@@ -219,7 +226,7 @@ export default function CreateLot() {
       // Create lot
       const lotData: any = {
         event_id: eventId,
-        category_id: null, // Will need to map category slug to ID
+        category_id: categories.find(c => c.slug === formData.category)?.id ?? null,
         title: formData.title,
         description: formData.description || null,
         quantity: formData.quantity,
