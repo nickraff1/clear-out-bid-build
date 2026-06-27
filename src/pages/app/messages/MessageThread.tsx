@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,26 +35,12 @@ export default function MessageThread() {
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!id) {
       setError('Missing conversation id.');
       setLoading(false);
       return;
     }
-    load();
-    const channel = supabase
-      .channel(`thread-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
-        (payload) => {
-          setMessages(prev => prev.find(m => m.id === (payload.new as Msg).id) ? prev : [...prev, payload.new as Msg]);
-        })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [id]);
-
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
-
-  const load = async () => {
     setLoading(true);
     setError(null);
     const [{ data: c, error: convError }, { data: m, error: messagesError }] = await Promise.all([
@@ -85,7 +71,25 @@ export default function MessageThread() {
       if (unread.length) await supabase.from('messages').update({ read_at: new Date().toISOString() }).in('id', unread);
     }
     setLoading(false);
-  };
+  }, [id, user?.id]);
+
+  useEffect(() => {
+    if (!id) {
+      void load();
+      return;
+    }
+    void load();
+    const channel = supabase
+      .channel(`thread-${id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
+        (payload) => {
+          setMessages(prev => prev.find(m => m.id === (payload.new as Msg).id) ? prev : [...prev, payload.new as Msg]);
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, load]);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
   const send = async (text?: string) => {
     const content = (text ?? body).trim();

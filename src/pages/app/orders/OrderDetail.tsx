@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import {
@@ -112,9 +112,8 @@ export default function OrderDetail() {
   const [reportReason, setReportReason] = useState('Pickup issue');
   const [reportDetails, setReportDetails] = useState('');
 
-  useEffect(() => { if (orderId) load(); }, [orderId]);
-
-  async function load() {
+  const load = useCallback(async () => {
+    if (!orderId) return;
     setLoading(true);
     const { data } = await supabase
       .from('orders')
@@ -141,7 +140,9 @@ export default function OrderDetail() {
       setHasReviewed(!!rev);
     }
     setLoading(false);
-  }
+  }, [orderId, user]);
+
+  useEffect(() => { void load(); }, [load]);
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!order) return <div className="p-6">Order not found.</div>;

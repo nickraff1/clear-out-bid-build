@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,23 +67,7 @@ export default function AdminLaunch() {
   const [loading, setLoading] = useState(true);
   const [closing, setClosing] = useState(false);
 
-  useEffect(() => { void load(); }, [user?.id]);
-
-  async function closeExpired() {
-    setClosing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("close-expired-auctions");
-      if (error) throw error;
-      toast.success(`Closed ${data?.closed ?? 0} expired auction(s)`);
-      await load();
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed to close auctions");
-    } finally {
-      setClosing(false);
-    }
-  }
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const nowIso = new Date().toISOString();
@@ -140,6 +124,22 @@ export default function AdminLaunch() {
       paidOrdersNoConversation: paidNoConversation.count ?? 0,
     });
     setLoading(false);
+  }, [isAdmin, roles, user]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function closeExpired() {
+    setClosing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("close-expired-auctions");
+      if (error) throw error;
+      toast.success(`Closed ${data?.closed ?? 0} expired auction(s)`);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to close auctions");
+    } finally {
+      setClosing(false);
+    }
   }
 
   if (loading || !stats) {

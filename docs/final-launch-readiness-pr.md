@@ -31,7 +31,7 @@ This branch hardens the launch-critical admin access and messaging paths for Off
 - Added payment-webhook regression coverage for idempotent order conversation creation and pickup-safe chat wording.
 - `npm run build` - passed.
 - `./node_modules/.bin/tsc --noEmit` - passed.
-- Targeted ESLint on changed source files - passed with warnings only.
+- Targeted ESLint on changed launch-critical source files - passed with no warnings.
 - `npm run lint` - failed on existing repo-wide lint debt outside this pass.
 
 ## Routes Checked Locally

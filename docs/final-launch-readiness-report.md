@@ -31,7 +31,7 @@ The app is not public launch ready. It has enough structure for a controlled clo
 - Production build: passed.
 - Vitest: passed, including final-launch regression coverage for migration `order_status` enum usage and payment-webhook order conversation messaging.
 - TypeScript check: passed.
-- Targeted lint on touched files: passed with warnings only.
+- Targeted lint on launch-critical touched files: passed with no warnings.
 - Full repo lint: failed on pre-existing lint debt outside this pass, mostly `@typescript-eslint/no-explicit-any`, shadcn empty-interface warnings, hook dependency warnings, and one Tailwind `require()` import.
 - Local browser smoke: passed for `/`, `/marketplace`, policy pages, `/login`, `/app/messages`, `/app/admin/launch-checklist`, and `/app/admin/messages`.
 - Protected app routes redirect unauthenticated users to `/login`.
