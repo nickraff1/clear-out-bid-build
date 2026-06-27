@@ -15,6 +15,8 @@ type Conv = {
   seller_org: { id: string; name: string } | null;
   buyer: { full_name: string | null; email: string } | null;
 };
+type ConvQuery = Omit<Conv, 'buyer'>;
+type BuyerProfile = { id: string; full_name: string | null; email: string | null };
 
 const QUICK_PROMPTS = [
   'Is this still available?',
@@ -47,8 +49,7 @@ export default function MessageThread() {
       supabase.from('conversations').select(`
         id, buyer_id, seller_org_id, lot_id,
         lot:lots(id, title),
-        seller_org:organizations(id, name),
-        buyer:profiles!conversations_buyer_id_fkey(full_name, email)
+        seller_org:organizations(id, name)
       `).eq('id', id!).maybeSingle(),
       supabase.from('messages').select('*').eq('conversation_id', id!).order('created_at', { ascending: true }),
     ]);
@@ -63,7 +64,23 @@ export default function MessageThread() {
       return;
     }
 
-    if (c) setConv(c as Conv);
+    if (c) {
+      const conversation = c as ConvQuery;
+      const { data: buyerProfile, error: buyerError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('id', conversation.buyer_id)
+        .maybeSingle();
+
+      if (buyerError) {
+        console.error('[MessageThread] buyer profile load failed', buyerError);
+      }
+
+      setConv({
+        ...conversation,
+        buyer: (buyerProfile as BuyerProfile | null) ?? null,
+      });
+    }
     if (m) {
       setMessages(m as Msg[]);
       // mark as read for messages not from me

@@ -18,6 +18,9 @@ type ConvRow = {
   buyer: { full_name: string | null; email: string } | null;
 };
 
+type ConvQueryRow = Omit<ConvRow, 'buyer'>;
+type BuyerProfile = { id: string; full_name: string | null; email: string | null };
+
 export default function MessagesInbox() {
   const { user, primaryOrg } = useAuth();
   const [convs, setConvs] = useState<ConvRow[]>([]);
@@ -41,8 +44,7 @@ export default function MessagesInbox() {
       .select(`
         id, buyer_id, seller_org_id, lot_id, last_message_at,
         lot:lots(id, title),
-        seller_org:organizations(id, name),
-        buyer:profiles!conversations_buyer_id_fkey(full_name, email)
+        seller_org:organizations(id, name)
       `)
       .order('last_message_at', { ascending: false });
     if (error) {
@@ -50,7 +52,27 @@ export default function MessagesInbox() {
       setError(error.message ?? 'Could not load messages.');
       setConvs([]);
     } else {
-      setConvs((data ?? []) as ConvRow[]);
+      const conversationRows = (data ?? []) as ConvQueryRow[];
+      const buyerIds = Array.from(new Set(conversationRows.map(c => c.buyer_id).filter(Boolean)));
+      let buyersById = new Map<string, BuyerProfile>();
+
+      if (buyerIds.length) {
+        const { data: buyerRows, error: buyerError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', buyerIds);
+
+        if (buyerError) {
+          console.error('[MessagesInbox] buyer profile load failed', buyerError);
+        } else {
+          buyersById = new Map(((buyerRows ?? []) as BuyerProfile[]).map(profile => [profile.id, profile]));
+        }
+      }
+
+      setConvs(conversationRows.map(c => ({
+        ...c,
+        buyer: buyersById.get(c.buyer_id) ?? null,
+      })));
     }
     setLoading(false);
   };
