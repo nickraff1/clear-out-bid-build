@@ -562,7 +562,21 @@ export default function LotDetail() {
 
                     {!auctionEnded && lot.status === 'active' && !isOwnLot ? (
                       <form onSubmit={handleBid} className="space-y-2">
-                        {eligibility && !eligibility.allowed && (
+                        {user && !primaryOrg && (
+                          <Alert className="border-primary/30 bg-primary/5">
+                            <AlertCircle className="h-4 w-4 text-primary" />
+                            <AlertDescription className="space-y-2">
+                              <div className="font-medium">Set up your bidding account</div>
+                              <div className="text-xs text-muted-foreground">
+                                One tap — we'll create a personal buyer account so you can place bids.
+                              </div>
+                              <Button type="button" size="sm" onClick={ensureBuyerAccount} disabled={settingUpAccount}>
+                                {settingUpAccount ? 'Setting up…' : 'Set up bidding account'}
+                              </Button>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        {primaryOrg && eligibility && !eligibility.allowed && (
                           <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription className="space-y-2">
@@ -615,7 +629,7 @@ export default function LotDetail() {
                             disabled={bidLoading || (eligibility ? !eligibility.allowed : false)}
                           />
                           <Button type="submit" size="lg"
-                            disabled={bidLoading || (eligibility ? !eligibility.allowed : false)}>
+                            disabled={bidLoading || !primaryOrg || (eligibility ? !eligibility.allowed : false)}>
                             {bidLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1.5" />Place bid</>}
                           </Button>
                         </div>
