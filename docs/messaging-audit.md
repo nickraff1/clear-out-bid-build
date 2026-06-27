@@ -47,6 +47,7 @@ Fixes in this branch:
 - Added `public.admin_messaging_integrity` diagnostic view.
 - Launch checklist now reports messaging integrity issues and paid orders missing conversations.
 - Inbox/thread/order-message UI now distinguishes loading, error, empty, and not-found states.
+- Conversation threads now show a clearer "Conversation unavailable" recovery state with retry, back-to-messages, and admin diagnostics actions instead of a bare not-found message.
 - Message thread and order-message sends append the inserted message immediately so users are not dependent on realtime latency to see their own message.
 
 ## Remaining limitations

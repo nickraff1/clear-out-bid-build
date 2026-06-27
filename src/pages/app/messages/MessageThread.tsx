@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Loader2, Send } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2, Send } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -26,7 +26,7 @@ const QUICK_PROMPTS = [
 
 export default function MessageThread() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [conv, setConv] = useState<Conv | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +36,11 @@ export default function MessageThread() {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setError('Missing conversation id.');
+      setLoading(false);
+      return;
+    }
     load();
     const channel = supabase
       .channel(`thread-${id}`)
@@ -111,12 +115,31 @@ export default function MessageThread() {
   }
 
   if (!conv) {
+    const messagesHref = isAdmin ? '/app/admin/messages' : '/app/messages';
     return (
-      <div className="p-6 space-y-3">
-        <Button asChild variant="ghost" size="sm"><Link to="/app/messages"><ArrowLeft className="h-4 w-4 mr-2" />Back</Link></Button>
-        <p className="font-medium">{error ? 'Could not load conversation' : 'Conversation not found.'}</p>
-        {error && <p className="text-sm text-muted-foreground">{error}</p>}
-        <Button variant="outline" size="sm" onClick={() => void load()}>Try again</Button>
+      <div className="p-6 max-w-2xl space-y-4">
+        <Button asChild variant="ghost" size="sm">
+          <Link to={messagesHref}><ArrowLeft className="h-4 w-4 mr-2" />Back to messages</Link>
+        </Button>
+        <div className="dashboard-card p-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
+            <div>
+              <p className="font-medium">{error ? 'Could not load conversation' : 'Conversation unavailable'}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                This conversation may have been removed, may not be linked to your account yet, or may need the order conversation repair to run from the order page.
+              </p>
+              {error && <p className="text-sm text-muted-foreground mt-2">{error}</p>}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => void load()}>Try again</Button>
+            <Button asChild variant="secondary" size="sm"><Link to={messagesHref}>Open messages</Link></Button>
+            {isAdmin && (
+              <Button asChild variant="ghost" size="sm"><Link to="/app/admin/launch-checklist">Check launch diagnostics</Link></Button>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

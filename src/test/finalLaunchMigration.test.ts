@@ -66,3 +66,14 @@ describe("payment webhook messaging", () => {
     expect(webhook).not.toContain("exact pickup address");
   });
 });
+
+describe("message thread recovery UX", () => {
+  it("guides users when a conversation cannot be loaded", () => {
+    const thread = readMigration("src/pages/app/messages/MessageThread.tsx");
+
+    expect(thread).toContain("Conversation unavailable");
+    expect(thread).toContain("order conversation repair");
+    expect(thread).toContain("Check launch diagnostics");
+    expect(thread).toContain("Back to messages");
+  });
+});
