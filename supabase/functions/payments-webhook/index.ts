@@ -4,6 +4,37 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
 
 let _supabase: ReturnType<typeof createClient> | null = null;
+const ORDER_CONFIRMED_MESSAGE =
+  "Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.";
+
+type CheckoutSession = {
+  id: string;
+  metadata?: { order_id?: string | null } | null;
+  payment_intent?: string | null;
+};
+
+type PaymentIntent = {
+  id: string;
+  last_payment_error?: { message?: string | null } | null;
+};
+
+type UpdatedOrder = {
+  buyer_id: string;
+  lot_id: string;
+  lot?: { title?: string | null } | null;
+  event?: { org_id?: string | null; created_by?: string | null } | null;
+};
+
+type ConversationRow = { id: string };
+type PaymentRow = { id: string; order_id?: string | null; status?: string | null };
+type NotificationInsert = {
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  data: { order_id: string };
+};
+
 function getSupabase() {
   if (!_supabase) {
     _supabase = createClient(
@@ -14,7 +45,7 @@ function getSupabase() {
   return _supabase;
 }
 
-async function handleSessionCompleted(session: any, env: StripeEnv) {
+async function handleSessionCompleted(session: CheckoutSession, env: StripeEnv) {
   const orderId = session.metadata?.order_id;
   if (!orderId) {
     console.log("session.completed without order_id metadata; ignoring");
@@ -43,53 +74,60 @@ async function handleSessionCompleted(session: any, env: StripeEnv) {
   }).eq("id", orderId).eq("status", "pending_payment").select("*, lot:lots(id, title, event_id), event:clearance_events(org_id, created_by)").maybeSingle();
 
   if (!updatedOrder) return;
+  const order = updatedOrder as unknown as UpdatedOrder;
 
   // Mark the lot as sold
   await sb.from("lots").update({
     status: "sold",
     reserved_until: null,
-  }).eq("id", (updatedOrder as any).lot_id);
+  }).eq("id", order.lot_id);
 
-  // Find or create conversation between buyer and seller org for this lot
-  const buyerId = (updatedOrder as any).buyer_id as string;
-  const lotId = (updatedOrder as any).lot_id as string;
-  const sellerOrgId = (updatedOrder as any).event?.org_id as string | undefined;
+  // Create or reuse the conversation between buyer and seller org for this lot.
+  const buyerId = order.buyer_id;
+  const lotId = order.lot_id;
+  const sellerOrgId = order.event?.org_id ?? undefined;
   let conversationId: string | null = null;
 
   if (sellerOrgId) {
-    const { data: existing } = await sb
+    const { data: conversation, error: conversationError } = await sb
       .from("conversations")
+      .upsert(
+        { buyer_id: buyerId, seller_org_id: sellerOrgId, lot_id: lotId, order_id: orderId },
+        { onConflict: "buyer_id,seller_org_id,lot_id" },
+      )
       .select("id")
-      .eq("buyer_id", buyerId)
-      .eq("seller_org_id", sellerOrgId)
-      .eq("lot_id", lotId)
-      .maybeSingle();
+      .single();
 
-    if (existing) {
-      conversationId = (existing as any).id;
-      await sb.from("conversations").update({ order_id: orderId }).eq("id", conversationId);
+    if (conversationError) {
+      console.error("Failed to create order conversation", conversationError);
     } else {
-      const { data: created } = await sb
-        .from("conversations")
-        .insert({ buyer_id: buyerId, seller_org_id: sellerOrgId, lot_id: lotId, order_id: orderId })
-        .select("id").single();
-      conversationId = (created as any)?.id ?? null;
+      conversationId = (conversation as unknown as ConversationRow | null)?.id ?? null;
     }
 
     if (conversationId) {
-      await sb.from("messages").insert({
-        conversation_id: conversationId,
-        sender_id: buyerId,
-        is_system: true,
-        body: `✅ Order confirmed. Please arrange pickup through this chat. The exact pickup address is now available to the buyer on the order page.`,
-      });
+      const { data: existingSystemMessage } = await sb
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", conversationId)
+        .eq("is_system", true)
+        .eq("body", ORDER_CONFIRMED_MESSAGE)
+        .maybeSingle();
+
+      if (!existingSystemMessage) {
+        await sb.from("messages").insert({
+          conversation_id: conversationId,
+          sender_id: buyerId,
+          is_system: true,
+          body: ORDER_CONFIRMED_MESSAGE,
+        });
+      }
     }
   }
 
   // Notifications
-  const sellerCreator = (updatedOrder as any).event?.created_by as string | undefined;
-  const lotTitle = (updatedOrder as any).lot?.title ?? "your lot";
-  const notifications: any[] = [
+  const sellerCreator = order.event?.created_by ?? undefined;
+  const lotTitle = order.lot?.title ?? "your lot";
+  const notifications: NotificationInsert[] = [
     {
       user_id: buyerId,
       type: "order_paid",
@@ -110,7 +148,7 @@ async function handleSessionCompleted(session: any, env: StripeEnv) {
   await sb.from("notifications").insert(notifications);
 }
 
-async function handlePaymentFailed(pi: any, env: StripeEnv) {
+async function handlePaymentFailed(pi: PaymentIntent, env: StripeEnv) {
   await getSupabase().from("payments").update({
     status: "failed",
     error_message: pi.last_payment_error?.message ?? "Payment failed",
@@ -131,7 +169,8 @@ async function cancelPendingOrderForSession(args: { sessionId?: string; paymentI
   if (sessionId) paymentQuery = paymentQuery.eq("stripe_session_id", sessionId);
   else if (paymentIntentId) paymentQuery = paymentQuery.eq("stripe_payment_intent_id", paymentIntentId);
   else return;
-  const { data: payment } = await paymentQuery.maybeSingle();
+  const { data: paymentData } = await paymentQuery.maybeSingle();
+  const payment = paymentData as unknown as PaymentRow | null;
   if (!payment) return;
 
   // Mark the payment cancelled (don't clobber a succeeded one).
@@ -176,20 +215,21 @@ Deno.serve(async (req) => {
 
   try {
     const event = await verifyWebhook(req, env);
+    const eventObject = event.data.object;
     switch (event.type) {
       case "checkout.session.completed":
-        await handleSessionCompleted(event.data.object, env);
+        await handleSessionCompleted(eventObject as CheckoutSession, env);
         break;
       case "payment_intent.payment_failed":
-        await handlePaymentFailed(event.data.object, env);
-        await cancelPendingOrderForSession({ paymentIntentId: event.data.object?.id }, env);
+        await handlePaymentFailed(eventObject as PaymentIntent, env);
+        await cancelPendingOrderForSession({ paymentIntentId: (eventObject as PaymentIntent).id }, env);
         break;
       case "checkout.session.expired":
       case "checkout.session.async_payment_failed":
-        await cancelPendingOrderForSession({ sessionId: event.data.object?.id }, env);
+        await cancelPendingOrderForSession({ sessionId: (eventObject as CheckoutSession).id }, env);
         break;
       case "payment_intent.canceled":
-        await cancelPendingOrderForSession({ paymentIntentId: event.data.object?.id }, env);
+        await cancelPendingOrderForSession({ paymentIntentId: (eventObject as PaymentIntent).id }, env);
         break;
       default:
         console.log("Unhandled event:", event.type);

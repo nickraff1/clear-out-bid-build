@@ -256,6 +256,9 @@ const App = () => (
               } />
 
               {/* Admin */}
+              <Route path="/app/admin" element={
+                <RoleGuard allowedRoles={['admin']}><AdminOverview /></RoleGuard>
+              } />
               <Route path="/app/admin/fees" element={
                 <RoleGuard allowedRoles={['admin']}>
                   <AdminFees />
@@ -285,7 +288,13 @@ const App = () => (
               <Route path="/app/admin/payouts" element={
                 <RoleGuard allowedRoles={['admin']}><AdminPayouts /></RoleGuard>
               } />
+              <Route path="/app/admin/payments" element={
+                <RoleGuard allowedRoles={['admin']}><AdminPayouts /></RoleGuard>
+              } />
               <Route path="/app/admin/launch" element={
+                <RoleGuard allowedRoles={['admin']}><AdminLaunch /></RoleGuard>
+              } />
+              <Route path="/app/admin/launch-checklist" element={
                 <RoleGuard allowedRoles={['admin']}><AdminLaunch /></RoleGuard>
               } />
               <Route path="/app/admin/sellers" element={
@@ -293,6 +302,15 @@ const App = () => (
               } />
               <Route path="/app/admin/bidders" element={
                 <RoleGuard allowedRoles={['admin']}><AdminBidders /></RoleGuard>
+              } />
+              <Route path="/app/admin/auctions" element={
+                <RoleGuard allowedRoles={['admin']}><AdminBidders /></RoleGuard>
+              } />
+              <Route path="/app/admin/notifications" element={
+                <RoleGuard allowedRoles={['admin']}><NotificationsPage /></RoleGuard>
+              } />
+              <Route path="/app/admin/messages" element={
+                <RoleGuard allowedRoles={['admin']}><MessagesInbox /></RoleGuard>
               } />
 
               {/* Notifications (any signed-in user) */}

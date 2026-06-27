@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { EmptyState } from '@/components/app/EmptyState';
+import { Button } from '@/components/ui/button';
 
 type ConvRow = {
   id: string;
@@ -20,13 +22,20 @@ export default function MessagesInbox() {
   const { user, primaryOrg } = useAuth();
   const [convs, setConvs] = useState<ConvRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) load();
+    if (user) {
+      void load();
+    } else {
+      setConvs([]);
+      setLoading(false);
+    }
   }, [user, primaryOrg?.id]);
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     const { data, error } = await supabase
       .from('conversations')
       .select(`
@@ -36,7 +45,13 @@ export default function MessagesInbox() {
         buyer:profiles!conversations_buyer_id_fkey(full_name, email)
       `)
       .order('last_message_at', { ascending: false });
-    if (!error && data) setConvs(data as any);
+    if (error) {
+      console.error('[MessagesInbox] load failed', error);
+      setError(error.message ?? 'Could not load messages.');
+      setConvs([]);
+    } else {
+      setConvs((data ?? []) as ConvRow[]);
+    }
     setLoading(false);
   };
 
@@ -51,12 +66,18 @@ export default function MessagesInbox() {
         <p className="text-muted-foreground">Conversations with buyers and sellers</p>
       </div>
 
-      {convs.length === 0 ? (
-        <div className="text-center py-16 dashboard-card">
-          <MessageSquare className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No messages yet</h3>
-          <p className="text-muted-foreground">Conversations from listings will appear here.</p>
+      {error ? (
+        <div className="dashboard-card space-y-3">
+          <p className="font-medium text-destructive">Could not load messages</p>
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => void load()}>Try again</Button>
         </div>
+      ) : convs.length === 0 ? (
+        <EmptyState
+          icon={MessageSquare}
+          title="No messages yet"
+          description="Conversations will appear here when buyers or sellers contact you about a listing or order."
+        />
       ) : (
         <div className="dashboard-card divide-y divide-border p-0">
           {convs.map(c => {

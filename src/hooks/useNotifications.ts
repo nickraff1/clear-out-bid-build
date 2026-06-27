@@ -19,6 +19,10 @@ export type Notification = {
   created_at: string;
 };
 
+const markAllNotificationsRead = supabase.rpc as unknown as (
+  fn: 'mark_all_notifications_read',
+) => Promise<{ error: { message?: string } | null }>;
+
 export function useNotifications(limit = 30) {
   const { user } = useAuth();
   const [items, setItems] = useState<Notification[]>([]);
@@ -58,7 +62,7 @@ export function useNotifications(limit = 30) {
     refresh();
   };
   const markAllRead = async () => {
-    await (supabase.rpc as any)('mark_all_notifications_read');
+    await markAllNotificationsRead('mark_all_notifications_read');
     refresh();
   };
 

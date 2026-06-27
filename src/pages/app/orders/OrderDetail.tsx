@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import {
@@ -8,7 +8,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import { PickupSafetyReminder } from '@/components/safety/SafetyNotice';
 import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
 import { OrderMessages } from '@/components/messaging/OrderMessages';
 import { orderStatusLabel } from '@/lib/order-status';
+import { ensureConversation } from '@/lib/conversations';
 
 const REPORT_REASONS = [
   'Pickup issue',
@@ -35,8 +36,50 @@ const REPORT_REASONS = [
   'Other',
 ];
 
+type OrderDetailRow = {
+  id: string;
+  buyer_id: string;
+  buyer_org_id?: string;
+  lot_id: string;
+  event_id: string;
+  amount: number;
+  status: string;
+  pickup_status: string | null;
+  pickup_code: string | null;
+  proposed_pickup_at: string | null;
+  proposed_pickup_by: string | null;
+  agreed_pickup_at: string | null;
+  buyer_collected_at: string | null;
+  seller_confirmed_at: string | null;
+  admin_notes: string | null;
+  lot: {
+    id: string;
+    title: string;
+    fixed_price: number | null;
+    status: string;
+    media?: Array<{ url: string; is_primary: boolean | null }>;
+  } | null;
+  event: {
+    id: string;
+    org_id: string;
+    created_by: string;
+    title: string;
+    site_address: string;
+    suburb: string;
+    state: string | null;
+    postcode: string | null;
+    pickup_start: string;
+    pickup_end: string;
+    access_notes: string | null;
+    contact_name: string | null;
+    contact_phone: string | null;
+    organization?: { id: string; name: string } | null;
+  } | null;
+  buyer: { id: string; full_name: string | null; email: string; phone: string | null } | null;
+};
+
 function PickupStatusBadge({ status }: { status: string }) {
-  const labels: Record<string, { label: string; variant: any }> = {
+  const labels: Record<string, { label: string; variant: BadgeProps['variant'] }> = {
     awaiting_arrangement: { label: 'Awaiting arrangement', variant: 'warning' },
     pickup_proposed: { label: 'Pickup proposed', variant: 'info' },
     pickup_confirmed: { label: 'Pickup confirmed', variant: 'info' },
@@ -53,7 +96,7 @@ export default function OrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
   const { user, primaryOrg } = useAuth();
   const navigate = useNavigate();
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<OrderDetailRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
@@ -69,9 +112,8 @@ export default function OrderDetail() {
   const [reportReason, setReportReason] = useState('Pickup issue');
   const [reportDetails, setReportDetails] = useState('');
 
-  useEffect(() => { if (orderId) load(); }, [orderId]);
-
-  async function load() {
+  const load = useCallback(async () => {
+    if (!orderId) return;
     setLoading(true);
     const { data } = await supabase
       .from('orders')
@@ -87,7 +129,7 @@ export default function OrderDetail() {
       `)
       .eq('id', orderId)
       .maybeSingle();
-    setOrder(data);
+    setOrder(data as OrderDetailRow | null);
     if (data && user) {
       const { data: rev } = await supabase
         .from('reviews')
@@ -98,7 +140,9 @@ export default function OrderDetail() {
       setHasReviewed(!!rev);
     }
     setLoading(false);
-  }
+  }, [orderId, user]);
+
+  useEffect(() => { void load(); }, [load]);
 
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!order) return <div className="p-6">Order not found.</div>;
@@ -121,11 +165,11 @@ export default function OrderDetail() {
   const sellerFee = Math.round(basePrice * 0.10 * 100) / 100;
   const sellerPayout = Math.round((basePrice - sellerFee) * 100) / 100;
 
-  const primaryImage = order.lot?.media?.find((m: any) => m.is_primary)?.url ?? order.lot?.media?.[0]?.url;
+  const primaryImage = order.lot?.media?.find((m) => m.is_primary)?.url ?? order.lot?.media?.[0]?.url;
 
-  async function update(fields: Record<string, any>, successMsg: string) {
+  async function update(fields: Record<string, unknown>, successMsg: string) {
     setBusy(true);
-    const { error } = await supabase.from('orders').update(fields as any).eq('id', order.id);
+    const { error } = await supabase.from('orders').update(fields).eq('id', order.id);
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success(successMsg);
@@ -219,26 +263,23 @@ export default function OrderDetail() {
 
   async function openConversation() {
     const sellerOrgId = order.event?.org_id;
-    if (!sellerOrgId) return;
-    const { data: existing } = await supabase
-      .from('conversations')
-      .select('id')
-      .eq('buyer_id', order.buyer_id)
-      .eq('seller_org_id', sellerOrgId)
-      .eq('lot_id', order.lot_id)
-      .maybeSingle();
-    let id = existing?.id;
-    if (!id) {
-      const { data: created } = await supabase
-        .from('conversations')
-        .insert({
-          buyer_id: order.buyer_id, seller_org_id: sellerOrgId,
-          lot_id: order.lot_id, order_id: order.id,
-        })
-        .select('id').single();
-      id = created?.id;
+    if (!sellerOrgId) {
+      toast.error('This order is missing a seller organisation.');
+      return;
     }
-    if (id) navigate(`/app/messages/${id}`);
+    try {
+      const id = await ensureConversation({
+        buyerId: order.buyer_id,
+        sellerOrgId,
+        lotId: order.lot_id,
+        orderId: order.id,
+      });
+      navigate(`/app/messages/${id}`);
+    } catch (error) {
+      console.error('[OrderDetail] could not open conversation', error);
+      toast.error(error instanceof Error ? error.message : 'Could not open conversation.');
+      return;
+    }
   }
 
   return (

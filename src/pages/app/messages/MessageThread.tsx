@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Loader2, Send } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2, Send } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -26,32 +26,24 @@ const QUICK_PROMPTS = [
 
 export default function MessageThread() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [conv, setConv] = useState<Conv | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!id) return;
-    load();
-    const channel = supabase
-      .channel(`thread-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
-        (payload) => {
-          setMessages(prev => prev.find(m => m.id === (payload.new as Msg).id) ? prev : [...prev, payload.new as Msg]);
-        })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [id]);
-
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (!id) {
+      setError('Missing conversation id.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const [{ data: c }, { data: m }] = await Promise.all([
+    setError(null);
+    const [{ data: c, error: convError }, { data: m, error: messagesError }] = await Promise.all([
       supabase.from('conversations').select(`
         id, buyer_id, seller_org_id, lot_id,
         lot:lots(id, title),
@@ -60,7 +52,18 @@ export default function MessageThread() {
       `).eq('id', id!).maybeSingle(),
       supabase.from('messages').select('*').eq('conversation_id', id!).order('created_at', { ascending: true }),
     ]);
-    if (c) setConv(c as any);
+
+    if (convError || messagesError) {
+      const message = convError?.message ?? messagesError?.message ?? 'Could not load this conversation.';
+      console.error('[MessageThread] load failed', convError ?? messagesError);
+      setError(message);
+      setConv(null);
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    if (c) setConv(c as Conv);
     if (m) {
       setMessages(m as Msg[]);
       // mark as read for messages not from me
@@ -68,22 +71,45 @@ export default function MessageThread() {
       if (unread.length) await supabase.from('messages').update({ read_at: new Date().toISOString() }).in('id', unread);
     }
     setLoading(false);
-  };
+  }, [id, user?.id]);
+
+  useEffect(() => {
+    if (!id) {
+      void load();
+      return;
+    }
+    void load();
+    const channel = supabase
+      .channel(`thread-${id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
+        (payload) => {
+          setMessages(prev => prev.find(m => m.id === (payload.new as Msg).id) ? prev : [...prev, payload.new as Msg]);
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, load]);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
   const send = async (text?: string) => {
     const content = (text ?? body).trim();
     if (!content || !user || !id) return;
     setSending(true);
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: id, sender_id: user.id, body: content,
-    });
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: id, sender_id: user.id, body: content,
+      })
+      .select('id, body, sender_id, created_at, read_at')
+      .single();
     if (error) {
       console.error('[MessageThread] send failed', error);
       toast.error(error.message ?? 'Could not send message');
     } else {
       setBody('');
-      // Optimistic refresh in case realtime is delayed.
-      load();
+      if (data) {
+        setMessages(prev => prev.find(m => m.id === data.id) ? prev : [...prev, data as Msg]);
+      }
     }
     setSending(false);
   };
@@ -93,7 +119,33 @@ export default function MessageThread() {
   }
 
   if (!conv) {
-    return <div className="p-6">Conversation not found.</div>;
+    const messagesHref = isAdmin ? '/app/admin/messages' : '/app/messages';
+    return (
+      <div className="p-6 max-w-2xl space-y-4">
+        <Button asChild variant="ghost" size="sm">
+          <Link to={messagesHref}><ArrowLeft className="h-4 w-4 mr-2" />Back to messages</Link>
+        </Button>
+        <div className="dashboard-card p-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
+            <div>
+              <p className="font-medium">{error ? 'Could not load conversation' : 'Conversation unavailable'}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                This conversation may have been removed, may not be linked to your account yet, or may need the order conversation repair to run from the order page.
+              </p>
+              {error && <p className="text-sm text-muted-foreground mt-2">{error}</p>}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => void load()}>Try again</Button>
+            <Button asChild variant="secondary" size="sm"><Link to={messagesHref}>Open messages</Link></Button>
+            {isAdmin && (
+              <Button asChild variant="ghost" size="sm"><Link to="/app/admin/launch-checklist">Check launch diagnostics</Link></Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const isBuyer = conv.buyer_id === user?.id;

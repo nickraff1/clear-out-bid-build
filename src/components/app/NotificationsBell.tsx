@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useNotifications } from '@/hooks/useNotifications';
+import { Notification, useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,7 +12,7 @@ export function NotificationsBell() {
   const { items, unread, markRead, markAllRead } = useNotifications(20);
   const navigate = useNavigate();
 
-  const open = async (n: any) => {
+  const open = async (n: Notification) => {
     if (!n.read) await markRead(n.id);
     if (n.link_url) navigate(n.link_url);
   };

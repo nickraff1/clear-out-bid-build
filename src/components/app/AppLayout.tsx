@@ -58,6 +58,7 @@ export default function AppLayout() {
     { to: '/app/admin/bidders', label: 'Bidders', icon: ShieldCheck },
     { to: '/app/admin/listings', label: 'Listings', icon: Package },
     { to: '/app/admin/orders', label: 'Orders', icon: ShoppingCart },
+    { to: '/app/admin/messages', label: 'Messages', icon: MessageSquare },
     { to: '/app/admin/payouts', label: 'Payouts', icon: DollarSign },
     { to: '/app/admin/reports', label: 'Reports', icon: Flag },
     { to: '/app/admin/fees', label: 'Fees', icon: Tag },

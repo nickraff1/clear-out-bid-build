@@ -111,11 +111,12 @@ export function PortalSwitcher({ activePortal, onPortalChange }: PortalSwitcherP
 
       // Switch to the new portal
       handlePortalSwitch(role);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding role:', error);
+      const message = error instanceof Error ? error.message : 'Please try again';
       toast({
         title: 'Failed to add account',
-        description: error.message || 'Please try again',
+        description: message,
         variant: 'destructive'
       });
     } finally {
