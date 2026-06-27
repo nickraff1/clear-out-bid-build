@@ -47,7 +47,7 @@ type LotWithDetails = Lot & {
 export default function LotDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, profile, primaryOrg } = useAuth();
+  const { user, profile, primaryOrg, refreshProfile } = useAuth();
   
   const [lot, setLot] = useState<LotWithDetails | null>(null);
   const [bids, setBids] = useState<(Bid & { profile?: { full_name: string } })[]>([]);
@@ -65,8 +65,46 @@ export default function LotDetail() {
 
   const { eligibility, refresh: refreshEligibility } = useBidEligibility(id);
   const [acceptingTerms, setAcceptingTerms] = useState(false);
+  const [settingUpAccount, setSettingUpAccount] = useState(false);
+
+  const ensureBuyerAccount = async (): Promise<boolean> => {
+    if (!user) { navigate('/login'); return false; }
+    if (primaryOrg) return true;
+    setSettingUpAccount(true);
+    try {
+      const orgName = profile?.full_name ? `${profile.full_name}'s Account` : 'My Account';
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .insert({ name: orgName, org_type: 'buyer', email: profile?.email || user.email, is_approved: true })
+        .select()
+        .single();
+      if (orgError) throw orgError;
+      const { error: memberError } = await supabase
+        .from('org_members')
+        .insert({ org_id: org.id, user_id: user.id, is_primary: true });
+      if (memberError) throw memberError;
+      // Only insert buyer role if user has no role yet
+      const { data: existingRoles } = await supabase
+        .from('user_roles').select('role').eq('user_id', user.id);
+      if (!existingRoles || existingRoles.length === 0) {
+        await supabase.from('user_roles').insert({ user_id: user.id, role: 'buyer_admin' });
+      }
+      localStorage.setItem(`onboarding_complete_${user.id}`, 'true');
+      localStorage.setItem(`user_role_${user.id}`, 'buyer');
+      await refreshProfile();
+      toast.success('Bidding account ready');
+      return true;
+    } catch (e: any) {
+      console.error('[Setup] Failed to create buyer account', e);
+      toast.error(e?.message || 'Could not set up bidding account');
+      return false;
+    } finally {
+      setSettingUpAccount(false);
+    }
+  };
 
   const handleAcceptTerms = async () => {
+    if (!primaryOrg && !(await ensureBuyerAccount())) return;
     setAcceptingTerms(true);
     const { error } = await acceptAuctionTerms();
     setAcceptingTerms(false);
@@ -176,9 +214,11 @@ export default function LotDetail() {
       return;
     }
     
-    // Check if user has completed onboarding
+    // Auto-create a personal bidding account if missing.
     if (!primaryOrg) {
-      setBidError('Please complete your account setup first. Go to the Dashboard to set up your account.');
+      const ok = await ensureBuyerAccount();
+      if (!ok) return;
+      setBidError('Account ready — tap Place bid again to confirm.');
       return;
     }
     
@@ -522,7 +562,21 @@ export default function LotDetail() {
 
                     {!auctionEnded && lot.status === 'active' && !isOwnLot ? (
                       <form onSubmit={handleBid} className="space-y-2">
-                        {eligibility && !eligibility.allowed && (
+                        {user && !primaryOrg && (
+                          <Alert className="border-primary/30 bg-primary/5">
+                            <AlertCircle className="h-4 w-4 text-primary" />
+                            <AlertDescription className="space-y-2">
+                              <div className="font-medium">Set up your bidding account</div>
+                              <div className="text-xs text-muted-foreground">
+                                One tap — we'll create a personal buyer account so you can place bids.
+                              </div>
+                              <Button type="button" size="sm" onClick={ensureBuyerAccount} disabled={settingUpAccount}>
+                                {settingUpAccount ? 'Setting up…' : 'Set up bidding account'}
+                              </Button>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        {primaryOrg && eligibility && !eligibility.allowed && (
                           <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription className="space-y-2">
@@ -575,7 +629,7 @@ export default function LotDetail() {
                             disabled={bidLoading || (eligibility ? !eligibility.allowed : false)}
                           />
                           <Button type="submit" size="lg"
-                            disabled={bidLoading || (eligibility ? !eligibility.allowed : false)}>
+                            disabled={bidLoading || !primaryOrg || (eligibility ? !eligibility.allowed : false)}>
                             {bidLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1.5" />Place bid</>}
                           </Button>
                         </div>
