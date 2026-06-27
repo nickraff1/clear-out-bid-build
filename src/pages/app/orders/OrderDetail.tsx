@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { PickupSafetyReminder } from '@/components/safety/SafetyNotice';
 import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
 import { OrderMessages } from '@/components/messaging/OrderMessages';
+import { orderStatusLabel } from '@/lib/order-status';
 
 const REPORT_REASONS = [
   'Pickup issue',
