@@ -61,6 +61,8 @@ Currently surfaced:
 - conversations without messages
 - paid-order conversations missing the order-confirmed system message
 
+The admin overview also surfaces messaging integrity as a first-screen operations tile so the founder can see broken conversation states without opening the launch checklist first.
+
 ## Manual recovery procedures
 
 Order missing pickup code:

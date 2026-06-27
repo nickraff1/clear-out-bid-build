@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 type Tone = 'green' | 'amber' | 'red' | 'muted';
 const toneClass: Record<Tone, string> = {
@@ -26,50 +26,147 @@ function Tile({ label, value, tone = 'muted', sub, to }: { label: string; value:
   return to ? <Link to={to}>{inner}</Link> : inner;
 }
 
-export default function AdminOverview() {
-  const [k, setK] = useState<any>(null);
+type LotRow = { id: string; status: string | null };
+type OrderRow = {
+  id: string;
+  status: string | null;
+  pickup_status: string | null;
+  pickup_code: string | null;
+  created_at: string;
+  amount: number | null;
+  buyer_id: string | null;
+};
+type PaymentRow = {
+  id: string;
+  status: string | null;
+  manual_payout_status: string | null;
+  base_amount: number | null;
+  buyer_fee: number | null;
+  seller_fee: number | null;
+  seller_payout: number | null;
+};
+type ReportRow = { id: string; status: string | null };
+type MemberRow = { user_id: string | null; role: string | null };
+type BadgeRow = { id: string };
 
-  useEffect(() => { (async () => {
-    const [lots, orders, payments, reports, stuck, members, badges] = await Promise.all([
+type OverviewStats = {
+  activeLots: number;
+  reservedLots: number;
+  soldLots: number;
+  paidPendingPickup: number;
+  completedOrders: number;
+  issueOrders: number;
+  pendingPayouts: number;
+  payoutsOnHold: number;
+  failedPayments: number;
+  unresolvedReports: number;
+  activeSellers: number;
+  activeBuyers: number;
+  stuckOrders: number;
+  ordersMissingPickupCode: number;
+  stuckPendingPayment: number;
+  messagingIntegrityIssues: number;
+  foundingBadges: number;
+  gmv: number;
+  buyerFees: number;
+  sellerFees: number;
+  sellerNetTotal: number;
+  payoutsPaid: number;
+};
+
+type CountOnlyQuery = {
+  select: (columns: string, options: { count: 'exact'; head: true }) => {
+    not: (column: string, operator: string, value: null) => Promise<{ count: number | null; error: { message?: string } | null }>;
+  };
+};
+
+const fromUntyped = supabase.from as unknown as (table: string) => CountOnlyQuery;
+
+export default function AdminOverview() {
+  const [k, setK] = useState<OverviewStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    const [
+      lots, orders, payments, reports, stuck, members, badges, messagingIssues,
+    ] = await Promise.all([
       supabase.from('lots').select('id, status'),
       supabase.from('orders').select('id, status, pickup_status, pickup_code, created_at, amount, buyer_id'),
       supabase.from('payments').select('id, status, manual_payout_status, base_amount, buyer_fee, seller_fee, seller_payout'),
       supabase.from('lot_reports').select('id, status'),
-      (supabase as any).from('admin_stuck_orders').select('order_id, stuck_reason').not('stuck_reason','is',null),
+      fromUntyped('admin_stuck_orders').select('order_id', { count: 'exact', head: true }).not('stuck_reason', 'is', null),
       supabase.from('org_members').select('user_id, role'),
       supabase.from('seller_badges').select('id'),
+      fromUntyped('admin_messaging_integrity').select('conversation_id', { count: 'exact', head: true }).not('issue', 'is', null),
     ]);
-    const L = lots.data ?? []; const O = orders.data ?? []; const P = payments.data ?? [];
-    const R = reports.data ?? []; const S = stuck.data ?? []; const M = members.data ?? [];
 
-    const expiredAuctionBacklog = L.filter((l:any)=>l.status==='active').length; // placeholder; close-cron now active
-    const sellerUserIds = new Set(M.filter((m:any)=>['owner','admin','member'].includes(m.role)).map((m:any)=>m.user_id));
-    const buyerUserIds = new Set(O.map((o:any)=>o.buyer_id));
+    const firstError = lots.error ?? orders.error ?? payments.error ?? reports.error
+      ?? stuck.error ?? members.error ?? badges.error ?? messagingIssues.error;
+
+    if (firstError) {
+      setError(firstError.message ?? 'Could not load admin overview.');
+      setK(null);
+      return;
+    }
+
+    const L = (lots.data ?? []) as LotRow[];
+    const O = (orders.data ?? []) as OrderRow[];
+    const P = (payments.data ?? []) as PaymentRow[];
+    const R = (reports.data ?? []) as ReportRow[];
+    const M = (members.data ?? []) as MemberRow[];
+
+    const sellerUserIds = new Set(
+      M.filter((m) => ['owner', 'admin', 'member'].includes(m.role ?? '') && m.user_id)
+        .map((m) => m.user_id),
+    );
+    const buyerUserIds = new Set(O.map((o) => o.buyer_id).filter(Boolean));
+    const succeededPayments = P.filter((p) => p.status === 'succeeded');
 
     setK({
-      activeLots: L.filter((l:any)=>l.status==='active').length,
-      reservedLots: L.filter((l:any)=>l.status==='reserved').length,
-      soldLots: L.filter((l:any)=>l.status==='sold').length,
-      paidPendingPickup: O.filter((o:any)=>['paid','ready_for_pickup'].includes(o.status)).length,
-      completedOrders: O.filter((o:any)=>o.status==='collected').length,
-      issueOrders: R.filter((r:any)=>r.status==='open' || r.status==='investigating').length,
-      pendingPayouts: P.filter((p:any)=>p.status==='succeeded' && p.manual_payout_status==='manual_payout_pending').length,
-      payoutsOnHold: P.filter((p:any)=>p.manual_payout_status==='manual_payout_on_hold').length,
-      failedPayments: P.filter((p:any)=>['failed','cancelled','expired'].includes(p.status)).length,
-      unresolvedReports: R.filter((r:any)=>r.status==='open' || r.status==='investigating').length,
+      activeLots: L.filter((l) => l.status === 'active').length,
+      reservedLots: L.filter((l) => l.status === 'reserved').length,
+      soldLots: L.filter((l) => l.status === 'sold').length,
+      paidPendingPickup: O.filter((o) => ['paid', 'ready_for_pickup'].includes(o.status ?? '')).length,
+      completedOrders: O.filter((o) => o.status === 'collected').length,
+      issueOrders: R.filter((r) => r.status === 'open' || r.status === 'investigating').length,
+      pendingPayouts: P.filter((p) => p.status === 'succeeded' && p.manual_payout_status === 'manual_payout_pending').length,
+      payoutsOnHold: P.filter((p) => p.manual_payout_status === 'manual_payout_on_hold').length,
+      failedPayments: P.filter((p) => ['failed', 'cancelled', 'expired'].includes(p.status ?? '')).length,
+      unresolvedReports: R.filter((r) => r.status === 'open' || r.status === 'investigating').length,
       activeSellers: sellerUserIds.size,
       activeBuyers: buyerUserIds.size,
-      stuckOrders: S.length,
-      ordersMissingPickupCode: O.filter((o:any)=>['paid','ready_for_pickup'].includes(o.status) && !o.pickup_code).length,
-      stuckPendingPayment: O.filter((o:any)=>o.status==='pending_payment' && new Date(o.created_at).getTime() < Date.now() - 30*60*1000).length,
-      foundingBadges: (badges.data ?? []).length,
-      gmv: P.filter((p:any)=>p.status==='succeeded').reduce((s:number,p:any)=>s+Number(p.base_amount||0),0),
-      buyerFees: P.filter((p:any)=>p.status==='succeeded').reduce((s:number,p:any)=>s+Number(p.buyer_fee||0),0),
-      sellerFees: P.filter((p:any)=>p.status==='succeeded').reduce((s:number,p:any)=>s+Number(p.seller_fee||0),0),
-      sellerNetTotal: P.filter((p:any)=>p.status==='succeeded').reduce((s:number,p:any)=>s+Number(p.seller_payout||0),0),
-      payoutsPaid: P.filter((p:any)=>p.manual_payout_status==='manual_payout_paid').reduce((s:number,p:any)=>s+Number(p.seller_payout||0),0),
+      stuckOrders: stuck.count ?? 0,
+      ordersMissingPickupCode: O.filter((o) => ['paid', 'ready_for_pickup'].includes(o.status ?? '') && !o.pickup_code).length,
+      stuckPendingPayment: O.filter((o) => o.status === 'pending_payment' && new Date(o.created_at).getTime() < Date.now() - 30 * 60 * 1000).length,
+      messagingIntegrityIssues: messagingIssues.count ?? 0,
+      foundingBadges: ((badges.data ?? []) as BadgeRow[]).length,
+      gmv: succeededPayments.reduce((sum, p) => sum + Number(p.base_amount || 0), 0),
+      buyerFees: succeededPayments.reduce((sum, p) => sum + Number(p.buyer_fee || 0), 0),
+      sellerFees: succeededPayments.reduce((sum, p) => sum + Number(p.seller_fee || 0), 0),
+      sellerNetTotal: succeededPayments.reduce((sum, p) => sum + Number(p.seller_payout || 0), 0),
+      payoutsPaid: P.filter((p) => p.manual_payout_status === 'manual_payout_paid')
+        .reduce((sum, p) => sum + Number(p.seller_payout || 0), 0),
     });
-  })(); }, []);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card className="border-destructive/40">
+          <CardContent className="flex items-start gap-3 p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
+            <div>
+              <p className="font-medium text-destructive">Could not load admin overview</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!k) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
@@ -91,6 +188,7 @@ export default function AdminOverview() {
           <Tile label="Issue-reported orders" value={k.issueOrders} tone={k.issueOrders ? 'red' : 'green'} to="/app/admin/reports" />
           <Tile label="Stuck pending payment" value={k.stuckPendingPayment} tone={k.stuckPendingPayment ? 'amber' : 'green'} to="/app/admin/orders" />
           <Tile label="Failed payments" value={k.failedPayments} tone={k.failedPayments ? 'amber' : 'green'} to="/app/admin/payouts" />
+          <Tile label="Messaging issues" value={k.messagingIntegrityIssues} tone={k.messagingIntegrityIssues ? 'red' : 'green'} to="/app/admin/messages" />
         </div>
       </section>
 
