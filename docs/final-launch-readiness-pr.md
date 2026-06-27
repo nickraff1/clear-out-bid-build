@@ -17,6 +17,7 @@ This branch hardens the launch-critical admin access and messaging paths for Off
 - Added transaction-level locking to reduce duplicate conversation races.
 - Updated listing enquiry, order messaging and order message buttons to use the shared conversation resolver.
 - Hardened the payment webhook to upsert order conversations and avoid duplicate order-confirmed system messages.
+- Tightened payment webhook event/row typing while preserving existing webhook behavior.
 - Improved message inbox/thread/order-message loading, empty, error and send states.
 - Added messaging integrity diagnostics and launch checklist counters, including paid-order conversations missing the required order-confirmed system message.
 - Replaced default Lovable metadata with Offcutt launch metadata.
