@@ -55,6 +55,7 @@ export default function AppLayout() {
     { to: '/app/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/app/admin/users', label: 'Users', icon: Users },
     { to: '/app/admin/sellers', label: 'Sellers', icon: Building2 },
+    { to: '/app/admin/bidders', label: 'Bidders', icon: ShieldCheck },
     { to: '/app/admin/listings', label: 'Listings', icon: Package },
     { to: '/app/admin/orders', label: 'Orders', icon: ShoppingCart },
     { to: '/app/admin/payouts', label: 'Payouts', icon: DollarSign },
