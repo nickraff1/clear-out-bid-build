@@ -12,6 +12,7 @@ This branch hardens the launch-critical admin access and messaging paths for Off
 - Added expected admin route aliases.
 - Added `/app/admin/messages` and an admin sidebar entry for conversation inspection.
 - Added admin overview messaging-issues visibility and a clear overview load-error state.
+- Removed `any` usage from the notification bell, notification hook and portal switcher.
 - Added canonical `ensure_conversation` RPC for buyer/seller/admin conversation creation.
 - Added transaction-level locking to reduce duplicate conversation races.
 - Updated listing enquiry, order messaging and order message buttons to use the shared conversation resolver.
