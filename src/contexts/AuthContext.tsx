@@ -73,31 +73,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
-        // Defer data fetching
+
         if (session?.user) {
+          // Keep loading=true until profile, orgs, and roles are populated so
+          // RoleGuard does not redirect before roles are known.
+          setIsLoading(true);
           setTimeout(() => {
-            fetchUserData(session.user.id);
+            fetchUserData(session.user.id).finally(() => setIsLoading(false));
           }, 0);
         } else {
           setProfile(null);
           setOrganizations([]);
           setRoles([]);
+          setIsLoading(false);
         }
-        
-        setIsLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        fetchUserData(session.user.id);
+        await fetchUserData(session.user.id);
       }
-      
+
       setIsLoading(false);
     });
 

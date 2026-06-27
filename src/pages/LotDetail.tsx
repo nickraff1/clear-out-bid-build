@@ -660,7 +660,8 @@ export default function LotDetail() {
                           </Button>
                         </div>
                         <p className="text-[11px] text-muted-foreground">
-                          By bidding you commit to buy if you win. Bids in the final 5 minutes may extend the auction (anti-snipe). 10% buyer fee added at checkout.
+                          By bidding you commit to buy if you win. Bids in the final 5 minutes may extend the auction (anti-snipe). 10% buyer fee added at checkout.{' '}
+                          <Link to="/auction-terms" className="underline hover:text-primary">See auction terms</Link>.
                         </p>
                       </form>
                     ) : (
