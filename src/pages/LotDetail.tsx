@@ -774,6 +774,13 @@ export default function LotDetail() {
         </div>
       </div>
     </Layout>
+      {/* Payment method dialog (rendered outside layout grid) */}
+      <AddPaymentMethodDialog
+        open={showAddPayment}
+        onOpenChange={setShowAddPayment}
+        onSaved={() => { refreshEligibility(); toast.success('Card saved. You can now place bids.'); }}
+      />
+      </>
   );
 }
 
