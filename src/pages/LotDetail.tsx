@@ -522,6 +522,35 @@ export default function LotDetail() {
 
                     {!auctionEnded && lot.status === 'active' && !isOwnLot ? (
                       <form onSubmit={handleBid} className="space-y-2">
+                        {eligibility && !eligibility.allowed && (
+                          <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription className="space-y-2">
+                              <div className="font-medium">{reasonCopy(eligibility.reason).title}</div>
+                              <div className="text-xs">{reasonCopy(eligibility.reason).body}</div>
+                              {eligibility.reason === 'terms_acceptance_required' && (
+                                <Button type="button" size="sm" variant="secondary"
+                                  onClick={handleAcceptTerms} disabled={acceptingTerms}>
+                                  {acceptingTerms ? 'Saving…' : 'Accept auction terms'}
+                                </Button>
+                              )}
+                              {eligibility.reason === 'verification_required' && (
+                                <Button type="button" size="sm" variant="secondary"
+                                  onClick={handleAcceptTerms} disabled={acceptingTerms}>
+                                  {acceptingTerms ? 'Saving…' : 'Verify & accept terms'}
+                                </Button>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        {eligibility?.allowed && eligibility.reason === 'ok_payment_method_pending' && (
+                          <Alert className="border-warning/30 bg-warning/10">
+                            <AlertCircle className="h-4 w-4 text-warning" />
+                            <AlertDescription className="text-xs">
+                              Beta: bidding is enabled with email + terms. A saved payment method will be required soon.
+                            </AlertDescription>
+                          </Alert>
+                        )}
                         {bidError && (
                           <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
@@ -543,9 +572,10 @@ export default function LotDetail() {
                             min={minNextBid}
                             step={bidIncrement}
                             className="flex-1"
-                            disabled={bidLoading}
+                            disabled={bidLoading || (eligibility ? !eligibility.allowed : false)}
                           />
-                          <Button type="submit" size="lg" disabled={bidLoading}>
+                          <Button type="submit" size="lg"
+                            disabled={bidLoading || (eligibility ? !eligibility.allowed : false)}>
                             {bidLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1.5" />Place bid</>}
                           </Button>
                         </div>
