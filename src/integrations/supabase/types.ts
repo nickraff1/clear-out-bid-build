@@ -79,6 +79,132 @@ export type Database = {
         }
         Relationships: []
       }
+      auction_deposit_settings: {
+        Row: {
+          auto_charge_winner: boolean
+          current_terms_version: string
+          enabled: boolean
+          id: string
+          singleton: boolean
+          thresholds: Json
+          trusted_waived: boolean
+          updated_at: string
+          updated_by: string | null
+          winner_payment_deadline_hours: number
+        }
+        Insert: {
+          auto_charge_winner?: boolean
+          current_terms_version?: string
+          enabled?: boolean
+          id?: string
+          singleton?: boolean
+          thresholds?: Json
+          trusted_waived?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          winner_payment_deadline_hours?: number
+        }
+        Update: {
+          auto_charge_winner?: boolean
+          current_terms_version?: string
+          enabled?: boolean
+          id?: string
+          singleton?: boolean
+          thresholds?: Json
+          trusted_waived?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          winner_payment_deadline_hours?: number
+        }
+        Relationships: []
+      }
+      auction_deposits: {
+        Row: {
+          admin_notes: string | null
+          amount: number
+          bid_id: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          lot_id: string
+          order_id: string | null
+          payment_method_id: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          stripe_setup_intent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          amount: number
+          bid_id?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          lot_id: string
+          order_id?: string | null
+          payment_method_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_setup_intent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          amount?: number
+          bid_id?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          lot_id?: string
+          order_id?: string | null
+          payment_method_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_setup_intent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auction_deposits_bid_id_fkey"
+            columns: ["bid_id"]
+            isOneToOne: false
+            referencedRelation: "bids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auction_deposits_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "auction_deposits_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auction_deposits_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "auction_deposits_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bid_events: {
         Row: {
           amount: number
@@ -136,6 +262,150 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      bidder_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          bid_id: string | null
+          created_at: string
+          id: string
+          lot_id: string | null
+          metadata: Json
+          order_id: string | null
+          reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          bid_id?: string | null
+          created_at?: string
+          id?: string
+          lot_id?: string | null
+          metadata?: Json
+          order_id?: string | null
+          reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          bid_id?: string | null
+          created_at?: string
+          id?: string
+          lot_id?: string | null
+          metadata?: Json
+          order_id?: string | null
+          reason?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bidder_audit_log_bid_id_fkey"
+            columns: ["bid_id"]
+            isOneToOne: false
+            referencedRelation: "bids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bidder_audit_log_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "bidder_audit_log_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bidder_audit_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "bidder_audit_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bidder_verifications: {
+        Row: {
+          admin_notes: string | null
+          auction_terms_accepted_at: string | null
+          auction_terms_version: string | null
+          created_at: string
+          email_verified_at: string | null
+          failed_payment_count: number
+          payment_method_brand: string | null
+          payment_method_last4: string | null
+          payment_method_verified_at: string | null
+          phone_verified_at: string | null
+          restricted_at: string | null
+          restricted_by: string | null
+          restricted_reason: string | null
+          risk_level: string
+          status: Database["public"]["Enums"]["bidder_status"]
+          stripe_customer_id: string | null
+          stripe_payment_method_id: string | null
+          unpaid_auction_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          auction_terms_accepted_at?: string | null
+          auction_terms_version?: string | null
+          created_at?: string
+          email_verified_at?: string | null
+          failed_payment_count?: number
+          payment_method_brand?: string | null
+          payment_method_last4?: string | null
+          payment_method_verified_at?: string | null
+          phone_verified_at?: string | null
+          restricted_at?: string | null
+          restricted_by?: string | null
+          restricted_reason?: string | null
+          risk_level?: string
+          status?: Database["public"]["Enums"]["bidder_status"]
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
+          unpaid_auction_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          auction_terms_accepted_at?: string | null
+          auction_terms_version?: string | null
+          created_at?: string
+          email_verified_at?: string | null
+          failed_payment_count?: number
+          payment_method_brand?: string | null
+          payment_method_last4?: string | null
+          payment_method_verified_at?: string | null
+          phone_verified_at?: string | null
+          restricted_at?: string | null
+          restricted_by?: string | null
+          restricted_reason?: string | null
+          risk_level?: string
+          status?: Database["public"]["Enums"]["bidder_status"]
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
+          unpaid_auction_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       bids: {
         Row: {
@@ -1790,6 +2060,7 @@ export type Database = {
       }
     }
     Functions: {
+      accept_auction_terms: { Args: never; Returns: undefined }
       admin_add_order_note: {
         Args: { _note: string; _order_id: string }
         Returns: undefined
@@ -1808,6 +2079,14 @@ export type Database = {
       }
       admin_resolve_report: {
         Args: { _note?: string; _report_id: string; _status: string }
+        Returns: undefined
+      }
+      admin_set_bidder_status: {
+        Args: {
+          _reason?: string
+          _status: Database["public"]["Enums"]["bidder_status"]
+          _user_id: string
+        }
         Returns: undefined
       }
       admin_set_org_disabled: {
@@ -1831,6 +2110,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      can_user_bid: {
+        Args: { _lot_id: string; _user_id: string }
+        Returns: {
+          allowed: boolean
+          reason: string
+          required_deposit: number
+        }[]
+      }
       close_all_expired_auctions: {
         Args: never
         Returns: {
@@ -1840,6 +2127,10 @@ export type Database = {
       }
       close_expired_auction: { Args: { _lot_id: string }; Returns: string }
       generate_pickup_code: { Args: never; Returns: string }
+      get_bidder_status: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["bidder_status"]
+      }
       get_event_org_id: { Args: { _event_id: string }; Returns: string }
       has_order_for_event: {
         Args: { _event_id: string; _user_id: string }
@@ -1907,6 +2198,10 @@ export type Database = {
       }
       release_expired_reservations: { Args: never; Returns: number }
       release_lot_reservation: { Args: { _lot_id: string }; Returns: undefined }
+      required_deposit_for: {
+        Args: { _amount: number; _user_id: string }
+        Returns: number
+      }
     }
     Enums: {
       app_role:
@@ -1915,6 +2210,15 @@ export type Database = {
         | "seller_staff"
         | "buyer_admin"
         | "buyer_staff"
+      bidder_status:
+        | "unverified"
+        | "email_verified"
+        | "phone_verified"
+        | "payment_method_added"
+        | "verified_bidder"
+        | "trusted_bidder"
+        | "restricted"
+        | "banned"
       event_status: "draft" | "active" | "completed" | "cancelled"
       lot_condition: "unused" | "like_new" | "good" | "fair"
       lot_status:
@@ -2079,6 +2383,16 @@ export const Constants = {
         "seller_staff",
         "buyer_admin",
         "buyer_staff",
+      ],
+      bidder_status: [
+        "unverified",
+        "email_verified",
+        "phone_verified",
+        "payment_method_added",
+        "verified_bidder",
+        "trusted_bidder",
+        "restricted",
+        "banned",
       ],
       event_status: ["draft", "active", "completed", "cancelled"],
       lot_condition: ["unused", "like_new", "good", "fair"],
