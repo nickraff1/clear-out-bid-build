@@ -31,9 +31,9 @@ const REASON_COPY: Record<string, { title: string; body: string }> = {
   },
   auction_not_active: { title: 'Auction not active', body: 'This lot is not currently accepting bids.' },
   auction_ended: { title: 'Auction ended', body: 'This auction has already ended.' },
-  ok_payment_method_pending: {
-    title: 'Beta: payment method coming soon',
-    body: 'Bidding is enabled in beta with email + terms. A saved card will be required soon.',
+  payment_method_required: {
+    title: 'Add a payment method',
+    body: 'Save a card on file so we can charge it automatically if you win.',
   },
   ok: { title: 'Eligible to bid', body: '' },
 };
