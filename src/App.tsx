@@ -217,6 +217,11 @@ const App = () => (
                   <BuyerWatchlist />
                 </RoleGuard>
               } />
+              <Route path="/app/watchlist" element={
+                <RoleGuard allowedRoles={['buyer', 'admin']}>
+                  <BuyerWatchlist />
+                </RoleGuard>
+              } />
               <Route path="/app/buyer/alerts" element={
                 <RoleGuard allowedRoles={['buyer', 'admin']}>
                   <BuyerAlerts />
