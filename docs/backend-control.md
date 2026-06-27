@@ -59,6 +59,7 @@ Currently surfaced:
 - active listings without category
 - messaging integrity issues
 - conversations without messages
+- paid-order conversations missing the order-confirmed system message
 
 ## Manual recovery procedures
 
@@ -75,6 +76,13 @@ Paid order missing conversation:
 2. Use the message action or `public.ensure_conversation`.
 3. Confirm buyer and seller can see `/app/messages/:id`.
 4. Add admin note to the order.
+
+Paid order conversation missing system message:
+
+1. Open the order detail as admin.
+2. Use the message action or `public.ensure_conversation`.
+3. Confirm the thread includes: "Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed."
+4. Add an admin note if the conversation needed manual review.
 
 Payout issue:
 

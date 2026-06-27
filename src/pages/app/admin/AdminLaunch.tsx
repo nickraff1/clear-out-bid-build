@@ -37,6 +37,7 @@ type Stats = {
   adminRpcAvailable: boolean;
   messagingIntegrityIssues: number;
   conversationsNoMessages: number;
+  paidOrderMissingSystemMessages: number;
   paidOrdersNoConversation: number;
 };
 
@@ -76,7 +77,7 @@ export default function AdminLaunch() {
       activeLots, sellerOrgsCount, sellerUsers, buyerProfiles,
       pendingPayouts, unresolvedReports, stuckOrders, paidOrders, latestPayment,
       expiredAuctions, paidNoCode, expiredPickupLots, uncategorizedLots,
-      adminRpcCheck, messagingIssues, conversationsNoMessages, paidNoConversation,
+      adminRpcCheck, messagingIssues, conversationsNoMessages, paidOrderMissingSystemMessages, paidNoConversation,
     ] = await Promise.all([
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active"),
       supabase.from("organizations").select("id", { count: "exact", head: true }).eq("org_type", "seller"),
@@ -94,6 +95,7 @@ export default function AdminLaunch() {
       user ? isAdminRpc("is_admin", { _user_id: user.id }) : Promise.resolve({ data: false, error: null }),
       fromUntyped("admin_messaging_integrity").select("conversation_id", { count: "exact", head: true }).not("issue", "is", null),
       fromUntyped("admin_messaging_integrity").select("conversation_id", { count: "exact", head: true }).eq("issue", "conversation_no_messages"),
+      fromUntyped("admin_messaging_integrity").select("conversation_id", { count: "exact", head: true }).eq("issue", "paid_order_missing_system_message"),
       fromUntyped("admin_stuck_orders").select("order_id", { count: "exact", head: true }).eq("stuck_reason", "paid_no_conversation"),
     ]);
 
@@ -121,6 +123,7 @@ export default function AdminLaunch() {
       adminRpcAvailable: !!adminRpcCheck.data && !adminRpcCheck.error,
       messagingIntegrityIssues: messagingIssues.count ?? 0,
       conversationsNoMessages: conversationsNoMessages.count ?? 0,
+      paidOrderMissingSystemMessages: paidOrderMissingSystemMessages.count ?? 0,
       paidOrdersNoConversation: paidNoConversation.count ?? 0,
     });
     setLoading(false);
@@ -271,7 +274,7 @@ export default function AdminLaunch() {
     {
       label: "Messaging integrity",
       status: stats.messagingIntegrityIssues === 0 && stats.paidOrdersNoConversation === 0 ? "pass" : stats.paidOrdersNoConversation > 0 ? "fail" : "warn",
-      detail: `${stats.messagingIntegrityIssues} conversation integrity issue${stats.messagingIntegrityIssues === 1 ? "" : "s"}; ${stats.conversationsNoMessages} empty conversation${stats.conversationsNoMessages === 1 ? "" : "s"}; ${stats.paidOrdersNoConversation} paid order${stats.paidOrdersNoConversation === 1 ? "" : "s"} missing conversation.`,
+      detail: `${stats.messagingIntegrityIssues} conversation integrity issue${stats.messagingIntegrityIssues === 1 ? "" : "s"}; ${stats.conversationsNoMessages} empty conversation${stats.conversationsNoMessages === 1 ? "" : "s"}; ${stats.paidOrderMissingSystemMessages} paid order conversation${stats.paidOrderMissingSystemMessages === 1 ? "" : "s"} missing the order message; ${stats.paidOrdersNoConversation} paid order${stats.paidOrdersNoConversation === 1 ? "" : "s"} missing conversation.`,
       href: "/app/admin/messages",
     },
     {

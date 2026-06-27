@@ -45,7 +45,7 @@ Fixes in this branch:
 - Order messaging widget now uses the RPC and shows errors.
 - Admin can inspect conversations/messages through RLS-aware policies.
 - Added `public.admin_messaging_integrity` diagnostic view.
-- Launch checklist now reports messaging integrity issues and paid orders missing conversations.
+- Launch checklist now reports messaging integrity issues, empty conversations, paid-order conversations missing the required order-confirmed system message, and paid orders missing conversations.
 - Inbox/thread/order-message UI now distinguishes loading, error, empty, and not-found states.
 - Conversation threads now show a clearer "Conversation unavailable" recovery state with retry, back-to-messages, and admin diagnostics actions instead of a bare not-found message.
 - Message thread and order-message sends append the inserted message immediately so users are not dependent on realtime latency to see their own message.
@@ -55,7 +55,8 @@ Fixes in this branch:
 - No one-click admin conversation repair UI yet.
 - No end-to-end automated browser test for buyer-to-seller messaging yet.
 - Email notifications are not proven live.
-- Historical paid orders without conversations are repaired when a participant/admin opens the order conversation; other historical message gaps may still need admin review.
+- Historical paid orders without conversations are repaired when a participant/admin opens the order conversation.
+- Historical paid-order conversations missing the order-confirmed system message are now flagged in admin diagnostics and repaired when `public.ensure_conversation` runs for that order.
 
 ## Manual QA checklist
 

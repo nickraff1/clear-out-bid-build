@@ -21,15 +21,15 @@ The app is not public launch ready. It has enough structure for a controlled clo
 - Updated message send flows to append the saved message immediately instead of waiting only for realtime.
 - Hardened the payment webhook to upsert the order conversation, avoid duplicate order-confirmed system messages, and keep pickup-address wording out of chat.
 - Improved inbox, thread and order-message loading/error/empty states.
-- Added messaging integrity diagnostics view.
-- Added launch checklist admin status and messaging integrity checks.
+- Added messaging integrity diagnostics view, including a specific paid-order missing system-message issue.
+- Added launch checklist admin status and messaging integrity checks, including empty conversations, missing order conversations and missing order-confirmed system messages.
 - Added launch docs for admin access, backend control, messaging audit, deployment readiness and QA.
 - Replaced default Lovable app metadata with Offcutt launch metadata.
 
 ## Tests run
 
 - Production build: passed.
-- Vitest: passed, including final-launch regression coverage for migration `order_status` enum usage and payment-webhook order conversation messaging.
+- Vitest: passed, including final-launch regression coverage for migration `order_status` enum usage, paid-order missing system-message diagnostics and payment-webhook order conversation messaging.
 - TypeScript check: passed.
 - Targeted lint on launch-critical touched files: passed with no warnings.
 - Full repo lint: failed on pre-existing lint debt outside this pass, mostly `@typescript-eslint/no-explicit-any`, shadcn empty-interface warnings, hook dependency warnings, and one Tailwind `require()` import.

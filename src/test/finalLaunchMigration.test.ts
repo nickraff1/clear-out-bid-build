@@ -52,6 +52,19 @@ describe("final launch migration", () => {
       "WHERE m.conversation_id = resolved_conversation_id\n      )",
     );
   });
+
+  it("flags paid order conversations that are missing the order-confirmed system message", () => {
+    const finalLaunchMigration = readMigration(
+      "supabase/migrations/20260628010000_final_launch_admin_messaging_control.sql",
+    );
+
+    expect(finalLaunchMigration).toContain("has_order_confirmed_message");
+    expect(finalLaunchMigration).toContain("paid_order_missing_system_message");
+    expect(finalLaunchMigration).toContain("o.status IN ('paid', 'ready_for_pickup', 'collected')");
+    expect(finalLaunchMigration).toContain(
+      "m.body = 'Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.'",
+    );
+  });
 });
 
 describe("payment webhook messaging", () => {

@@ -254,11 +254,32 @@ SELECT
   c.created_at,
   c.last_message_at,
   EXISTS(SELECT 1 FROM public.messages m WHERE m.conversation_id = c.id) AS has_messages,
+  EXISTS(
+    SELECT 1
+    FROM public.messages m
+    WHERE m.conversation_id = c.id
+      AND m.is_system = true
+      AND m.body = 'Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.'
+  ) AS has_order_confirmed_message,
   EXISTS(SELECT 1 FROM public.profiles p WHERE p.id = c.buyer_id) AS has_buyer_profile,
   EXISTS(SELECT 1 FROM public.organizations o WHERE o.id = c.seller_org_id) AS has_seller_org,
   (c.lot_id IS NULL OR EXISTS(SELECT 1 FROM public.lots l WHERE l.id = c.lot_id)) AS has_listing_context,
   (c.order_id IS NULL OR EXISTS(SELECT 1 FROM public.orders o WHERE o.id = c.order_id)) AS has_order_context,
   CASE
+    WHEN c.order_id IS NOT NULL
+      AND EXISTS(
+        SELECT 1
+        FROM public.orders o
+        WHERE o.id = c.order_id
+          AND o.status IN ('paid', 'ready_for_pickup', 'collected')
+      )
+      AND NOT EXISTS(
+        SELECT 1
+        FROM public.messages m
+        WHERE m.conversation_id = c.id
+          AND m.is_system = true
+          AND m.body = 'Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.'
+      ) THEN 'paid_order_missing_system_message'
     WHEN NOT EXISTS(SELECT 1 FROM public.messages m WHERE m.conversation_id = c.id) THEN 'conversation_no_messages'
     WHEN NOT EXISTS(SELECT 1 FROM public.profiles p WHERE p.id = c.buyer_id) THEN 'missing_buyer_profile'
     WHEN NOT EXISTS(SELECT 1 FROM public.organizations o WHERE o.id = c.seller_org_id) THEN 'missing_seller_org'

@@ -16,7 +16,7 @@ This branch hardens the launch-critical admin access and messaging paths for Off
 - Updated listing enquiry, order messaging and order message buttons to use the shared conversation resolver.
 - Hardened the payment webhook to upsert order conversations and avoid duplicate order-confirmed system messages.
 - Improved message inbox/thread/order-message loading, empty, error and send states.
-- Added messaging integrity diagnostics and launch checklist counters.
+- Added messaging integrity diagnostics and launch checklist counters, including paid-order conversations missing the required order-confirmed system message.
 - Replaced default Lovable metadata with Offcutt launch metadata.
 - Added launch-readiness docs for admin access, backend control, messaging, deployment and QA.
 
@@ -28,6 +28,7 @@ This branch hardens the launch-critical admin access and messaging paths for Off
 
 - `npm run test` - passed.
 - Added final-launch migration regression test for valid `order_status` enum usage.
+- Added final-launch migration regression test for paid-order missing system-message diagnostics.
 - Added payment-webhook regression coverage for idempotent order conversation creation and pickup-safe chat wording.
 - `npm run build` - passed.
 - `./node_modules/.bin/tsc --noEmit` - passed.
