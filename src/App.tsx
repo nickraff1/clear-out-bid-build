@@ -64,6 +64,7 @@ import AdminReports from "./pages/app/admin/AdminReports";
 import AdminPayouts from "./pages/app/admin/AdminPayouts";
 import AdminLaunch from "./pages/app/admin/AdminLaunch";
 import AdminSellers from "./pages/app/admin/AdminSellers";
+import AdminBidders from "./pages/app/admin/AdminBidders";
 import SellerPayouts from "./pages/app/seller/SellerPayouts";
 
 // Seller bulk
