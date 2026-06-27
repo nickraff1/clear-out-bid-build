@@ -1,16 +1,23 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/hooks/useNotifications';
+import { EmptyState } from '@/components/app/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { BellOff, CheckCheck, Loader2 } from 'lucide-react';
+import { Bell, BellOff, CheckCheck, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 export default function NotificationsPage() {
   const { items, unread, loading, markRead, markAllRead } = useNotifications(200);
   const navigate = useNavigate();
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-4 max-w-4xl">
@@ -25,10 +32,11 @@ export default function NotificationsPage() {
       </div>
 
       {items.length === 0 ? (
-        <Card className="p-12 text-center text-muted-foreground">
-          <BellOff className="h-10 w-10 mx-auto mb-2 opacity-50" />
-          You have no notifications yet.
-        </Card>
+        <EmptyState
+          icon={Bell}
+          title="No notifications yet"
+          description="When you have new bids, orders, messages or pickup updates, they'll show up here."
+        />
       ) : (
         <div className="border rounded-md divide-y bg-card">
           {items.map(n => (
@@ -40,7 +48,7 @@ export default function NotificationsPage() {
                 <div className="flex items-center gap-2">
                   <div className="font-medium">{n.title}</div>
                   {n.priority === 'high' && <Badge variant="warning" className="text-[10px]">High</Badge>}
-                  <Badge variant="muted" className="text-[10px]">{n.type}</Badge>
+                  {n.type && <Badge variant="muted" className="text-[10px]">{n.type}</Badge>}
                 </div>
                 <div className="text-sm text-muted-foreground">{n.message}</div>
                 <div className="text-xs text-muted-foreground mt-1">

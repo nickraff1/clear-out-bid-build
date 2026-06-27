@@ -4,9 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -17,7 +15,6 @@ const REASONS = [
   'Item not as described',
   'Suspected hazardous material',
   'Suspected asbestos or contamination',
-  'Suspected stolen goods',
   'Stolen or ownership concern',
   'Unsafe pickup location or conditions',
   'Misleading description or photos',
@@ -79,12 +76,21 @@ export function ReportLotDialog({ lotId }: { lotId: string }) {
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label>Reason</Label>
-            <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {REASONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <RadioGroup
+              value={reason}
+              onValueChange={setReason}
+              className="max-h-72 overflow-y-auto rounded-md border border-border p-2"
+            >
+              {REASONS.map(r => (
+                <label
+                  key={r}
+                  className="flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                >
+                  <RadioGroupItem value={r} id={`reason-${r}`} className="mt-0.5" />
+                  <span>{r}</span>
+                </label>
+              ))}
+            </RadioGroup>
           </div>
           <div className="space-y-2">
             <Label>Details (optional)</Label>

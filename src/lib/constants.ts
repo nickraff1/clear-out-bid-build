@@ -39,18 +39,16 @@ export const AUSTRALIAN_STATES = [
 ] as const;
 
 export const DEFAULT_CATEGORIES = [
-  { name: 'Doors & Frames', slug: 'doors-frames', icon: 'door-open' },
-  { name: 'Windows & Glazing', slug: 'windows-glazing', icon: 'square' },
-  { name: 'Timber & Flooring', slug: 'timber-flooring', icon: 'layers' },
-  { name: 'Stone & Tiles', slug: 'stone-tiles', icon: 'grid-3x3' },
-  { name: 'Plumbing', slug: 'plumbing', icon: 'droplets' },
+  { name: 'Doors & Windows', slug: 'doors-windows', icon: 'door-open' },
+  { name: 'Timber & Joinery', slug: 'timber-joinery', icon: 'layers' },
+  { name: 'Flooring', slug: 'flooring', icon: 'grid-3x3' },
+  { name: 'Stone & Benchtops', slug: 'stone-benchtops', icon: 'grid-3x3' },
   { name: 'Electrical', slug: 'electrical', icon: 'zap' },
-  { name: 'Hardware & Fixings', slug: 'hardware-fixings', icon: 'wrench' },
-  { name: 'Insulation', slug: 'insulation', icon: 'thermometer' },
-  { name: 'Roofing', slug: 'roofing', icon: 'home' },
-  { name: 'Landscaping', slug: 'landscaping', icon: 'tree-palm' },
+  { name: 'Fixtures & Fittings', slug: 'fixtures-fittings', icon: 'wrench' },
+  { name: 'Insulation & Cladding', slug: 'insulation-cladding', icon: 'thermometer' },
   { name: 'Steel & Metal', slug: 'steel-metal', icon: 'hard-hat' },
-  { name: 'Other', slug: 'other', icon: 'package' },
+  { name: 'Industrial', slug: 'industrial', icon: 'package' },
+  { name: 'Office & Commercial', slug: 'office-commercial', icon: 'package' },
 ] as const;
 
 export const BID_INCREMENTS = [
