@@ -63,6 +63,18 @@ export default function LotDetail() {
   // Watchlist state
   const [isWatched, setIsWatched] = useState(false);
 
+  const { eligibility, refresh: refreshEligibility } = useBidEligibility(id);
+  const [acceptingTerms, setAcceptingTerms] = useState(false);
+
+  const handleAcceptTerms = async () => {
+    setAcceptingTerms(true);
+    const { error } = await acceptAuctionTerms();
+    setAcceptingTerms(false);
+    if (error) { toast.error('Could not save terms acceptance'); return; }
+    toast.success('Auction terms accepted');
+    refreshEligibility();
+  };
+
   useEffect(() => {
     if (id) {
       // Best-effort: release any expired reservations before fetching.
