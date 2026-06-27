@@ -25,20 +25,39 @@ export default function SellerPayouts() {
   const { primaryOrg } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!primaryOrg) { setLoading(false); return; }
     (async () => {
-      const { data: events } = await supabase.from("clearance_events").select("id").eq("org_id", primaryOrg.id);
-      const ids = (events ?? []).map(e => e.id);
-      if (ids.length === 0) { setLoading(false); return; }
-      const { data } = await supabase
-        .from("orders")
-        .select("id, amount, status, created_at, lot:lots(title), payment:payments(base_amount, buyer_fee, seller_fee, seller_payout, status, manual_payout_status, manual_payout_paid_at)")
-        .in("event_id", ids)
-        .order("created_at", { ascending: false });
-      setRows(data ?? []);
-      setLoading(false);
+      try {
+        setError(null);
+        const { data: events, error: eventsError } = await supabase
+          .from("clearance_events")
+          .select("id")
+          .eq("org_id", primaryOrg.id);
+        if (eventsError) throw eventsError;
+
+        const ids = (events ?? []).map(e => e.id);
+        if (ids.length === 0) {
+          setRows([]);
+          return;
+        }
+
+        const { data, error: ordersError } = await supabase
+          .from("orders")
+          .select("id, amount, status, created_at, lot:lots(title), payment:payments(base_amount, buyer_fee, seller_fee, seller_payout, status, manual_payout_status, manual_payout_paid_at)")
+          .in("event_id", ids)
+          .order("created_at", { ascending: false });
+        if (ordersError) throw ordersError;
+
+        setRows(data ?? []);
+      } catch (e) {
+        console.error("Error loading seller payouts:", e);
+        setError("Could not load payouts. Please refresh and try again.");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [primaryOrg]);
 
@@ -57,6 +76,14 @@ export default function SellerPayouts() {
         <h1 className="text-2xl font-bold">Payouts</h1>
         <p className="text-muted-foreground">Track your sold items and net payouts. Payouts are sent manually by Offcutt during the beta.</p>
       </div>
+
+      {error && (
+        <Card>
+          <CardContent className="p-4 text-sm text-destructive">
+            {error}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid sm:grid-cols-3 gap-3">
         <Card><CardContent className="p-4 flex items-center gap-3">
