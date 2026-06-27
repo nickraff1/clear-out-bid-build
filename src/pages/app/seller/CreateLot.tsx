@@ -440,7 +440,7 @@ export default function CreateLot() {
                     <SelectItem value="sqm">Sqm</SelectItem>
                     <SelectItem value="lm">Linear m</SelectItem>
                     <SelectItem value="pack">Pack</SelectItem>
-                    <SelectItem value="lot">Lot</SelectItem>
+                    <SelectItem value="lot">Whole job lot</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
