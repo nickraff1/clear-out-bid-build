@@ -17,8 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ArrowLeft, Camera, Check, Gavel, Loader2, Tag, Trash2, X } from 'lucide-react';
-import { DEFAULT_CATEGORIES, LOT_CONDITIONS } from '@/lib/constants';
-import type { ClearanceEvent, ComplianceTag } from '@/types/database';
+import { LOT_CONDITIONS } from '@/lib/constants';
+import type { ClearanceEvent, ComplianceTag, Category } from '@/types/database';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Link } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
@@ -43,6 +43,7 @@ export default function CreateLot() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [events, setEvents] = useState<ClearanceEvent[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
 
   const [attestations, setAttestations] = useState({
@@ -77,6 +78,12 @@ export default function CreateLot() {
       fetchEvents();
     }
   }, [primaryOrg]);
+
+  useEffect(() => {
+    supabase.from('categories').select('*').order('name').then(({ data }) => {
+      if (data) setCategories(data as Category[]);
+    });
+  }, []);
 
   const fetchEvents = async () => {
     const { data } = await supabase
@@ -219,7 +226,7 @@ export default function CreateLot() {
       // Create lot
       const lotData: any = {
         event_id: eventId,
-        category_id: null, // Will need to map category slug to ID
+        category_id: categories.find(c => c.slug === formData.category)?.id ?? null,
         title: formData.title,
         description: formData.description || null,
         quantity: formData.quantity,
@@ -390,7 +397,7 @@ export default function CreateLot() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DEFAULT_CATEGORIES.map(cat => (
+                  {categories.map(cat => (
                     <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>

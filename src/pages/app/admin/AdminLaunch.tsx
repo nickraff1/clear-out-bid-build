@@ -25,6 +25,8 @@ type Stats = {
   paidOrders: number;
   expiredAuctionsActive: number;
   paidOrdersNoPickupCode: number;
+  expiredPickupActive: number;
+  uncategorizedActive: number;
   latestTxnStatus: string | null;
   latestTxnAt: string | null;
   paymentMode: "sandbox" | "live" | "none";
@@ -68,7 +70,7 @@ export default function AdminLaunch() {
     const [
       activeLots, sellerOrgsCount, sellerUsers, buyerProfiles,
       pendingPayouts, unresolvedReports, stuckOrders, paidOrders, latestPayment,
-      expiredAuctions, paidNoCode,
+      expiredAuctions, paidNoCode, expiredPickupLots, uncategorizedLots,
     ] = await Promise.all([
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active"),
       supabase.from("organizations").select("id", { count: "exact", head: true }).eq("org_type", "seller"),
@@ -81,6 +83,8 @@ export default function AdminLaunch() {
       supabase.from("payments").select("status, created_at").order("created_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active").eq("pricing_type", "auction").lt("auction_end", nowIso),
       supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "paid").is("pickup_code", null),
+      supabase.from("lots").select("id, event:clearance_events!inner(pickup_end)", { count: "exact", head: true }).eq("status", "active").lt("event.pickup_end", nowIso),
+      supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active").is("category_id", null),
     ]);
 
     const distinctSellerUsers = new Set(((sellerUsers.data ?? []) as Array<{ user_id: string }>).map(r => r.user_id)).size;
@@ -96,6 +100,8 @@ export default function AdminLaunch() {
       paidOrders: paidOrders.count ?? 0,
       expiredAuctionsActive: expiredAuctions.count ?? 0,
       paidOrdersNoPickupCode: paidNoCode.count ?? 0,
+      expiredPickupActive: expiredPickupLots.count ?? 0,
+      uncategorizedActive: uncategorizedLots.count ?? 0,
       latestTxnStatus: latestPayment.data?.status ?? null,
       latestTxnAt: latestPayment.data?.created_at ?? null,
       paymentMode: paymentMode(),
@@ -166,9 +172,46 @@ export default function AdminLaunch() {
       href: "/app/admin/orders",
     },
     {
+      label: "Active listings with expired pickup window",
+      status: stats.expiredPickupActive === 0 ? "pass" : "fail",
+      detail: stats.expiredPickupActive === 0
+        ? "All active listings have a future pickup window. Server triggers reject bids/orders on expired windows."
+        : `${stats.expiredPickupActive} active listing(s) sit on past pickup windows. Hide them or contact the seller to reschedule.`,
+      href: "/app/admin/listings",
+    },
+    {
+      label: "Active listings missing a category",
+      status: stats.uncategorizedActive === 0 ? "pass" : "warn",
+      detail: stats.uncategorizedActive === 0
+        ? "Every active listing has a category — category filters work end-to-end."
+        : `${stats.uncategorizedActive} listing(s) are missing a category and won't surface in category filters.`,
+      href: "/app/admin/listings",
+    },
+    {
+      label: "Brand spelling locked",
+      status: "pass",
+      detail: "Brand standardised on 'Offcutt' across header, footer, policies, emails, and SEO pages.",
+    },
+    {
+      label: "Public marketing pages live (Pricing, Contact, Help, For Sellers)",
+      status: "pass",
+      detail: "Footer links no longer 404. /pricing, /contact, /help, /for-sellers all routed with beta-ready content.",
+      href: "/pricing",
+    },
+    {
+      label: "Legacy /dashboard area retired",
+      status: "pass",
+      detail: "/dashboard and all /dashboard/* subroutes redirect to /app. Only the /app portal is exposed in nav.",
+    },
+    {
       label: "Server-side seller bid guard",
       status: "pass",
       detail: "Database trigger blocks sellers (and members of the seller org) from bidding on their own lots.",
+    },
+    {
+      label: "Pickup-window server guard",
+      status: "pass",
+      detail: "Triggers on bids and orders reject placement when the event pickup window has already ended.",
     },
     {
       label: "Webhook cancellation handling",

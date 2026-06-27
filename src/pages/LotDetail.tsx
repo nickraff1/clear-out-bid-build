@@ -313,7 +313,7 @@ export default function LotDetail() {
     // Create order with 5% buyer fee, then go to Stripe checkout
     try {
       const basePrice = lot.fixed_price!;
-      const buyerFee = Math.round(basePrice * 0.05 * 100) / 100;
+      const buyerFee = Math.round(basePrice * 0.10 * 100) / 100;
       const totalAmount = Math.round((basePrice + buyerFee) * 100) / 100;
 
       const { data: created, error } = await supabase.from('orders').insert({
@@ -323,7 +323,7 @@ export default function LotDetail() {
         event_id: lot.event_id,
         amount: totalAmount,
         status: 'pending_payment',
-        notes: `Base price: $${basePrice.toFixed(2)}, Buyer fee (5%): $${buyerFee.toFixed(2)}`
+        notes: `Base price: $${basePrice.toFixed(2)}, Buyer fee (10%): $${buyerFee.toFixed(2)}`
       }).select('id').single();
 
       if (error) throw error;

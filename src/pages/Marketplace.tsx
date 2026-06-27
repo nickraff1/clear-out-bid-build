@@ -15,7 +15,7 @@ import {
 import { Search, SlidersHorizontal, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Lot, LotMedia, ClearanceEvent, Category } from '@/types/database';
-import { DEFAULT_CATEGORIES, AUSTRALIAN_STATES, LOT_CONDITIONS } from '@/lib/constants';
+import { AUSTRALIAN_STATES, LOT_CONDITIONS } from '@/lib/constants';
 
 type LotWithDetails = Lot & {
   media?: LotMedia[];
@@ -28,6 +28,7 @@ export default function Marketplace() {
   const [lots, setLots] = useState<LotWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   
   // Filters
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
@@ -42,6 +43,12 @@ export default function Marketplace() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    supabase.from('categories').select('*').order('name').then(({ data }) => {
+      if (data) setCategories(data as Category[]);
+    });
+  }, []);
+
+  useEffect(() => {
     fetchLots();
   }, [categoryFilter, pricingType, stateFilter, conditionFilter, sortBy, minPrice, maxPrice]);
 
@@ -54,17 +61,24 @@ export default function Marketplace() {
         .select(`
           *,
           media:lot_media(*),
-          event:clearance_events(
+          event:clearance_events!inner(
             id, org_id, title, description,
             site_address, suburb, state, postcode,
             pickup_start, pickup_end, status
           ),
           category:categories(*)
         `)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .gte('clearance_events.pickup_end', new Date().toISOString());
 
       if (categoryFilter) {
-        query = query.eq('category.slug', categoryFilter);
+        const cat = categories.find(c => c.slug === categoryFilter);
+        if (cat) {
+          query = query.eq('category_id', cat.id);
+        } else {
+          // Unknown slug — return no results rather than all results
+          query = query.eq('category_id', '00000000-0000-0000-0000-000000000000');
+        }
       }
 
       if (pricingType === 'auction' || pricingType === 'fixed') {
@@ -209,7 +223,7 @@ export default function Marketplace() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {DEFAULT_CATEGORIES.map(cat => (
+                  {categories.map(cat => (
                     <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -297,7 +311,7 @@ export default function Marketplace() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {DEFAULT_CATEGORIES.map(cat => (
+                {categories.map(cat => (
                   <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -374,7 +388,7 @@ export default function Marketplace() {
             <span className="text-sm text-muted-foreground">Active filters:</span>
             {categoryFilter && (
               <Badge variant="secondary" className="gap-1">
-                {DEFAULT_CATEGORIES.find(c => c.slug === categoryFilter)?.name}
+                {categories.find(c => c.slug === categoryFilter)?.name ?? categoryFilter}
                 <button onClick={() => setCategoryFilter('')}><X className="h-3 w-3" /></button>
               </Badge>
             )}
