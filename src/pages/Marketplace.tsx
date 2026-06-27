@@ -29,6 +29,7 @@ export default function Marketplace() {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   
   // Filters
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
@@ -45,12 +46,13 @@ export default function Marketplace() {
   useEffect(() => {
     supabase.from('categories').select('*').order('name').then(({ data }) => {
       if (data) setCategories(data as Category[]);
-    });
+    }).finally(() => setCategoriesLoaded(true));
   }, []);
 
   useEffect(() => {
+    if (categoryFilter && !categoriesLoaded) return;
     fetchLots();
-  }, [categoryFilter, pricingType, stateFilter, conditionFilter, sortBy, minPrice, maxPrice]);
+  }, [categoryFilter, pricingType, stateFilter, conditionFilter, sortBy, minPrice, maxPrice, categoriesLoaded]);
 
   const fetchLots = async () => {
     setLoading(true);
