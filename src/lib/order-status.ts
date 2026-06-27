@@ -36,3 +36,22 @@ export function orderStatusLabel(status: string): string {
 export function orderStatusTone(status: string): BadgeTone {
   return TONES[status] ?? 'muted';
 }
+
+const PICKUP_LABELS: Record<string, string> = {
+  awaiting_payment: 'Awaiting payment',
+  awaiting_arrangement: 'Awaiting pickup arrangement',
+  pickup_proposed: 'Pickup time proposed',
+  pickup_agreed: 'Pickup time confirmed',
+  ready_for_pickup: 'Ready for pickup',
+  collected_pending_seller_confirmation: 'Awaiting seller confirmation',
+  collected: 'Collected',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+export function pickupStatusLabel(status: string): string {
+  return (
+    PICKUP_LABELS[status] ??
+    status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  );
+}

@@ -10,21 +10,11 @@ export default function CheckoutCancel() {
   const orderId = params.get("order_id");
 
   useEffect(() => {
-    (async () => {
-      // Best-effort: sweep any expired reservations so this listing returns to active for others.
-      await supabase.rpc("release_expired_reservations");
-      if (orderId) {
-        // Cancel the order — trigger will release the lot reservation.
-        const { data: o } = await supabase
-          .from("orders")
-          .select("id, status")
-          .eq("id", orderId)
-          .maybeSingle();
-        if (o && o.status === "pending_payment") {
-          await supabase.from("orders").update({ status: "cancelled" }).eq("id", orderId);
-        }
-      }
-    })();
+    if (!orderId) return;
+    // Server-side cancel: auth-checked, atomic, releases lot reservation via trigger,
+    // and refuses to cancel if a successful payment already landed.
+    supabase.functions.invoke("cancel-pending-order", { body: { order_id: orderId } })
+      .catch((e) => console.error("cancel-pending-order failed", e));
   }, [orderId]);
 
   return (

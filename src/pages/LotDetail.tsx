@@ -359,7 +359,7 @@ export default function LotDetail() {
     return (
       <Layout>
         <div className="container py-16 text-center">
-          <h1 className="text-2xl font-bold mb-4">Lot not found</h1>
+          <h1 className="text-2xl font-bold mb-4">Listing not found</h1>
           <Button asChild>
             <Link to="/marketplace">Back to Marketplace</Link>
           </Button>
@@ -403,7 +403,7 @@ export default function LotDetail() {
                 {lot.status === 'sold'
                   ? 'This item has been sold'
                   : lot.status === 'reserved'
-                    ? 'This item is reserved'
+                    ? 'Currently in checkout with another buyer'
                     : 'This item is no longer available'}
               </div>
               <div className="text-xs text-muted-foreground">
@@ -586,12 +586,12 @@ export default function LotDetail() {
                           <Alert className="border-primary/30 bg-primary/5">
                             <AlertCircle className="h-4 w-4 text-primary" />
                             <AlertDescription className="space-y-2">
-                              <div className="font-medium">Set up your bidding account</div>
+                              <div className="font-medium">Verify your details to start bidding</div>
                               <div className="text-xs text-muted-foreground">
-                                One tap — we'll create a personal buyer account so you can place bids.
+                                One tap — we'll set up your buyer account so you can place bids.
                               </div>
                               <Button type="button" size="sm" onClick={ensureBuyerAccount} disabled={settingUpAccount}>
-                                {settingUpAccount ? 'Setting up…' : 'Set up bidding account'}
+                                {settingUpAccount ? 'Setting up…' : 'Set up buyer account'}
                               </Button>
                             </AlertDescription>
                           </Alert>

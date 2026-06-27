@@ -1,119 +1,81 @@
 
-# M3 — Bidder Commitment, Deposits & Default Handling
+# Launch-Readiness Audit — Offcutt Closed Beta
 
-Built on the existing Lovable sandbox Stripe gateway (`lovable_gateway_sandbox`). No live payments, no Stripe Connect, no fake automation — anything the sandbox can't do is scaffolded with an explicit admin state instead of being simulated.
-
-## 1. Payment-mode flag (explicit, future-ready)
-
-Add a single source of truth so we can later switch to live / Connect without rewrites.
-
-- New enum `payment_mode`: `lovable_gateway_sandbox | lovable_gateway_live | stripe_connect_future`.
-- New row in `platform_settings` (or extend `auction_deposit_settings`) with `current_payment_mode` — defaulted to `lovable_gateway_sandbox`.
-- Stamp every `payments`, `auction_deposits`, and bidder-charge row with the mode that created it.
-- Show the active mode in the admin header and on the Launch Readiness page.
-
-## 2. Bidder verification states (full set)
-
-Extend the `bidder_status` enum to the full M3 set:
-
-`unverified → payment_method_required → payment_method_added → auction_terms_accepted → verified_bidder → trusted_bidder`, plus `restricted` and `banned`.
-
-- Update `can_user_bid` so only `verified_bidder` and `trusted_bidder` may bid (everything else returns a specific reason code already wired into `reasonCopy`).
-- Status auto-advances as the user completes each step (email confirm → add card → accept terms → verified). `trusted_bidder` remains admin-only.
-- Backfill existing `email_verified` rows into the new states based on what they already have on file.
-
-## 3. Tiered deposit / default-fee model
-
-Seed `auction_deposit_settings.thresholds` with the Grays-style ladder (≤$250 $0, ≤$1k $25, ≤$2.5k $75, ≤$5k $250, ≤$10k $500, >$10k $1,000) and expose an admin editor at `/app/admin/fees` so the ladder is fully configurable.
-
-`required_deposit_for(amount, user)` already drives `can_user_bid` — no signature change needed.
-
-## 4. Deposit authorization at bid time
-
-Where the sandbox supports it: place a Stripe `PaymentIntent` with `capture_method=manual` against the saved card for the tier amount whenever a bid crosses into a higher deposit band. We hold one active auth per (user, lot); previous auth is released when superseded or when the user is outbid for >10 min.
-
-- New edge function `authorize-bid-deposit` — creates/updates the PaymentIntent through the gateway and writes an `auction_deposits` row (`status`: `requires_action | authorized | released | captured | failed`).
-- Bid trigger refuses the bid if the latest deposit row for that tier isn't `authorized`.
-- If the sandbox rejects manual-capture (gateway limitation), the row is written as `scaffolded_unsupported` and the admin Deposits view shows a clear "gateway cannot authorize — manual follow-up" badge. No silent success.
-
-## 5. Winner payment flow
-
-- On auction close (`close_expired_auction`) the existing order is already created with a 24h reservation. Add a follow-up edge function `charge-winner` that:
-  - Tries to capture the held deposit (if any) toward the order total.
-  - Creates a Checkout Session for the remaining balance and emails/notifies the winner.
-- Webhook (`payments-webhook`) handles `payment_intent.succeeded` / `.payment_failed` / `.canceled` and updates `orders.status`, `auction_deposits.status`, and the bidder's `failed_payment_count`.
-
-## 6. Failed-payment & default handling
-
-- After 24h unpaid, scheduled job `handle-defaulted-winners` runs:
-  1. Capture the held deposit as a **default fee** (`auction_deposits.status='captured'`, `purpose='default_fee'`).
-  2. Increment `bidder_verifications.unpaid_auction_count` and `failed_payment_count`. Two strikes ⇒ auto `restricted`.
-  3. Release the lot reservation.
-  4. Insert an admin notification offering "Offer to next highest bidder" or "Relist".
-- New RPC `offer_to_next_bidder(lot_id)` — creates a fresh order for the runner-up at their last bid amount, 24h reservation, notifies them.
-- New RPC `relist_auction(lot_id, new_end)` — clones the lot back to `active`.
-
-## 7. Admin risk tools (`/app/admin/bidders`)
-
-New page listing every `bidder_verifications` row with filters (status, unpaid count, failed payments, risk level). Per-bidder drawer with:
-
-- Status changer (restrict / ban / mark trusted) — already wired via `admin_set_bidder_status`.
-- Deposits & default-fee history.
-- Unpaid auction history with links to orders.
-- Action buttons: "Remove suspicious bid", "Offer to next highest bidder", "Relist auction", "Mark deposit refunded / applied / forfeited".
-- Audit log tail from `bidder_audit_log`.
-
-Also add a "Suspicious bids" tab on `/app/admin/listings` powered by simple heuristics (sniping in last 5s by an unverified-recent account, repeated outbid-then-cancel patterns).
-
-## 8. Public policy pages
-
-Add three new legal pages reusing `LegalPage.tsx`:
-
-- `/auction-terms` — binding-bid attestation copy (exact wording from the request).
-- `/buyer-default-policy` — what happens when a winner doesn't pay (deposit captured, account restricted, item re-offered/relisted).
-- `/prohibited-bidding-policy` — self-bidding, shill bidding, sniping with throwaway accounts, etc.
-
-The acceptance dialog in `LotDetail` links to all three; `accept_auction_terms` continues to record the version.
-
-## 9. Server-side bid rejection (single source of truth)
-
-Confirm every rule lives in `can_user_bid` + `enforce_bidder_eligibility` trigger + `auction-engine`:
-
-verified ✓ · payment method ✓ · terms ✓ · deposit satisfied (new) · not restricted/banned ✓ · not seller ✓ · lot active ✓ · auction not ended ✓ · min increment ✓ (already enforced in auction-engine).
-
-## 10. Seller payouts — honest labelling
-
-No change to payout mechanics. Audit copy across `AdminPayouts`, `SellerPayouts`, and order detail so nothing says "automatic Stripe Connect payout". Replace with "Manual payout — tracked by Offcutt ops" badge wherever a `payments.manual_payout_status` row drives the UI.
+I audited every flow you listed. Here's what's broken, what's polish, and exactly what I'll fix. **The fee bug (P0 #1) is financially consequential — buyers are being charged 5% instead of 10%, and the platform is under-collecting on every transaction.** Nothing should go live until that's fixed.
 
 ---
 
-## Technical notes
+## P0 — Blockers (must fix before real money)
 
-**Migrations**
-- Extend `bidder_status` enum; backfill existing rows.
-- Add `payment_mode` enum + `current_payment_mode` setting; stamp on `payments` and `auction_deposits`.
-- Add columns to `auction_deposits`: `purpose` (`bid_hold | default_fee | refund`), `stripe_payment_intent_id`, `tier_band`, `released_at`, `captured_at`.
-- New RPCs: `offer_to_next_bidder`, `relist_auction`, `mark_deposit_outcome`.
-- Update `can_user_bid` to check latest deposit row vs `required_deposit_for`.
+| # | Issue | Files | Fix |
+|---|---|---|---|
+| 1 | **Buyer fee is 5%, not 10%** — order totals, displayed math, and `application_fee_amount` are all wrong | `src/pages/app/buyer/Checkout.tsx:78,118`, `supabase/functions/create-checkout/index.ts:3,74` | Change divisor to `1.10`, label to "Buyer fee (10%)", server fee math to 10%, update stale comment |
+| 2 | Raw order-status enum (`pending_payment`, `ready_for_pickup`) shown to buyers | `src/pages/app/orders/OrderDetail.tsx:256` | Use the existing `lib/order-status.ts` label map for the status badge |
+| 3 | Raw `pickup_status` enum (`collected_pending_seller_confirmation`) shown to buyers | `src/pages/app/buyer/BuyerOrders.tsx:179` | Add `PICKUP_STATUS_LABELS` to `lib/order-status.ts` and use it |
+| 4 | Client-side order cancel is racy | `src/pages/app/buyer/CheckoutCancel.tsx:17–23` | Move cancel to an edge function (`cancel-pending-order`) that releases the lot reservation atomically |
 
-**Edge functions** (all `verify_jwt=false` where the gateway calls back, otherwise authed)
-- `authorize-bid-deposit` — manual-capture PaymentIntent via `_shared/stripe.ts`.
-- `charge-winner` — capture deposit + Checkout Session for balance.
-- `handle-defaulted-winners` — scheduled hourly via `pg_cron`.
-- Extend `payments-webhook` for `payment_intent.*` events and deposit lifecycle.
+## P1 — Polish (do before closed beta opens)
 
-**Frontend**
-- `LotDetail.tsx` — show deposit tier and "Authorize $X deposit" step in the bid sidebar; refresh on outbid.
-- New `/app/admin/bidders` page + drawer.
-- Admin Fees editor for tier ladder.
-- Payment-mode badge in admin header.
-- "Suspicious bids" tab + bid-remove confirmation.
+| # | Issue | Files | Fix |
+|---|---|---|---|
+| 5 | "Lot" jargon in buyer/seller table headers and buttons | `BuyerBids.tsx:158`, `SellerLots.tsx:178`, `SellerEvents.tsx:221,274`, `EventDetail.tsx:184,258,267,319,327,335` | Replace with "Listing" / "Add listing" / "Edit listing" / "Publish listing" / "Cancel listing" |
+| 6 | "This item is reserved" / "Lot not found" leak internal model | `LotDetail.tsx:362,406` | "Listing not found"; "Currently in checkout with another buyer" |
+| 7 | "Set up bidding account" copy is odd | `LotDetail.tsx:589–594` | "Verify your details to start bidding" |
+| 8 | Stale fee comment in checkout function | `supabase/functions/create-checkout/index.ts:3` | Update to 10% |
+| 9 | Unit option "Lot" in CreateLot quantity-unit dropdown | `CreateLot.tsx:443` | Rename to "Whole job lot" (kept value `lot` for DB compat) |
+| 10 | Verify payout-status row is gated to sellers only | `OrderDetail.tsx:530–537` | Confirm `isSeller` wrapper; tighten if leaking |
 
-**Out of scope for M3**
-- Live keys / go-live flow.
-- Stripe Connect / automated seller payouts.
-- KYC/ID verification beyond email + saved card.
-- Buyer-facing dispute portal (covered by existing `/refunds-and-disputes`).
+## Confirmed working (no change)
 
-**Gateway-unsupported fallback rule**
-Any sandbox action that fails or isn't supported is recorded as `scaffolded_unsupported` with a visible admin badge and a "manual follow-up required" notification — never silently marked as success.
+- All 8 policy pages routed correctly (`/terms`, `/privacy`, `/prohibited-materials`, `/pickup-safety`, `/refunds-and-disputes`, `/auction-terms`, `/buyer-default-policy`, `/prohibited-bidding-policy`)
+- Outbid notifications fire from `auction-engine`
+- Winner order creation uses correct 10% buyer fee (server-side); only the buy-now path was wrong
+- Pickup code generated on successful payment
+- Bid form correctly hidden on ended / sold / reserved / own lots
+- Admin RPCs wired: `sweep_defaulted_winners`, `mark_deposit_outcome`, `offer_to_next_bidder`, `relist_auction`, `admin_regenerate_pickup_code`, `admin_force_complete_order`
+- CheckoutReturn polls with sensible fallback
+- `admin_remove_bid` exists in DB but has no UI — I'll add a "Remove bid" action in the lot's bid history on `AdminBidders` / lot detail admin view
+
+## Out of scope for this pass
+
+- Visual redesign (per your instruction)
+- New features beyond fixing what's audited
+- Stripe go-live (separate workflow)
+- Mobile QA beyond CSS overflow spot-checks — full device QA stays with you
+
+---
+
+## Execution plan
+
+**Step 1 — P0 fixes (single commit)**
+- Fix fee math + label in `Checkout.tsx` and `create-checkout` edge function
+- Extend `lib/order-status.ts` with `ORDER_STATUS_LABELS` + `PICKUP_STATUS_LABELS` and apply in `OrderDetail.tsx` and `BuyerOrders.tsx`
+- New `cancel-pending-order` edge function; rewrite `CheckoutCancel.tsx` to call it
+
+**Step 2 — P1 copy + jargon sweep**
+- Find/replace "Lot" → "Listing" across buyer/seller pages listed (admin pages untouched)
+- Reword "reserved" / "bidding account" / "Lot not found" strings
+- Verify mobile layout on listing detail, bid sidebar, checkout iframe, order detail by reading the JSX (no redesign)
+
+**Step 3 — Admin `admin_remove_bid` wiring**
+- Add a "Remove bid" button to the bid history table in `AdminBidders` drawer with confirm dialog and audit note
+
+**Step 4 — Update Launch Checklist (`AdminLaunch.tsx`)**
+Add new checks and refresh statuses:
+
+| Check | Status |
+|---|---|
+| Buyer journey (browse → buy → order → pickup → review) | **PASS** after P0 #1–3 |
+| Seller journey (create → publish → sell → pickup → payout) | **PASS** after P1 #5 |
+| Admin journey (orders, payouts, reports, bidders) | **PASS** after Step 3 |
+| Auction journey (verify → bid → close → winner order) | **PASS** (already wired) |
+| Payment states (success, fail, expired, cancel, stuck) | **PASS** after P0 #1 + #4 |
+| Policy pages | **PASS** (all 8 live) |
+| Mobile marketplace / listing creation | **PASS** (spot-check, no fixed widths found) |
+| Closed-beta readiness | **PASS** when above all green AND Stripe go-live complete |
+
+**No new database migrations needed** — only one new edge function (`cancel-pending-order`) and one frontend label helper.
+
+---
+
+Reply **approve** and I'll execute Steps 1–4 in order, ending with an updated Launch Checklist screenshot. Or tell me to drop/reorder any item.

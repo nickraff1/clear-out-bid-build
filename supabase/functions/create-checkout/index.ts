@@ -1,6 +1,6 @@
 // Creates a Stripe Embedded Checkout session for an existing pending_payment order.
 // Uses dynamic price_data (one-off charge built from the order amount).
-// Tracks platform fees (5% buyer + 5% seller) on the payments row.
+// Tracks platform fees (10% buyer + 10% seller) on the payments row.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 
@@ -69,11 +69,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Compute fee breakdown from total `amount` (already includes 5% buyer fee)
+    // Compute fee breakdown from total `amount` (already includes 10% buyer fee)
     const total = Number(order.amount);
-    const basePrice = Math.round((total / 1.05) * 100) / 100;
+    const basePrice = Math.round((total / 1.10) * 100) / 100;
     const buyerFee = Math.round((total - basePrice) * 100) / 100;
-    const sellerFee = Math.round(basePrice * 0.05 * 100) / 100;
+    const sellerFee = Math.round(basePrice * 0.10 * 100) / 100;
     const sellerPayout = Math.round((basePrice - sellerFee) * 100) / 100;
 
     const stripe = createStripeClient(env);

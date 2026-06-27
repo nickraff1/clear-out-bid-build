@@ -181,7 +181,7 @@ export default function EventDetail() {
             <Button asChild>
               <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Lot
+                Add listing
               </Link>
             </Button>
             <DropdownMenu>
@@ -234,7 +234,7 @@ export default function EventDetail() {
       <Tabs defaultValue="lots">
         <TabsList>
           <TabsTrigger value="lots">
-            Lots ({event.lots.length})
+            Listings ({event.lots.length})
           </TabsTrigger>
           <TabsTrigger value="pickups">
             Pickups ({orders.length})
@@ -248,14 +248,14 @@ export default function EventDetail() {
           {event.lots.length === 0 ? (
             <div className="text-center py-16 dashboard-card">
               <Package className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No lots yet</h3>
+              <h3 className="text-lg font-semibold mb-2">No listings yet</h3>
               <p className="text-muted-foreground mb-4">
-                Add your first lot to this event
+                Add your first listing to this event
               </p>
               <Button asChild>
                 <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Lot
+                  Add listing
                 </Link>
               </Button>
             </div>
@@ -264,7 +264,7 @@ export default function EventDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Lot</TableHead>
+                    <TableHead>Listing</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Status</TableHead>
@@ -316,7 +316,7 @@ export default function EventDetail() {
                               View Listing
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => navigate(`/app/seller/lots/${lot.id}/edit`)}>
-                              Edit Lot
+                              Edit listing
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {lot.status === 'draft' && (
@@ -324,7 +324,7 @@ export default function EventDetail() {
                                 onClick={() => updateLotStatus(lot.id, 'active')}
                                 className="text-success"
                               >
-                                Publish Lot
+                                Publish listing
                               </DropdownMenuItem>
                             )}
                             {lot.status === 'active' && (
@@ -332,7 +332,7 @@ export default function EventDetail() {
                                 onClick={() => updateLotStatus(lot.id, 'cancelled')}
                                 className="text-destructive"
                               >
-                                Cancel Lot
+                                Cancel listing
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>

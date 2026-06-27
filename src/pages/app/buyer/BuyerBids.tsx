@@ -155,7 +155,7 @@ export default function BuyerBids() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Lot</TableHead>
+                <TableHead>Listing</TableHead>
                 <TableHead>Your Bid</TableHead>
                 <TableHead>Current Bid</TableHead>
                 <TableHead>Time Left</TableHead>

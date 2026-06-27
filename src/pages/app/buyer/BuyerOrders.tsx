@@ -12,7 +12,7 @@ import {
 import { ArrowRight, CreditCard, Filter, Loader2, Search, ShoppingCart } from 'lucide-react';
 import type { Order, Lot, ClearanceEvent } from '@/types/database';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { orderStatusLabel, orderStatusTone } from '@/lib/order-status';
+import { orderStatusLabel, orderStatusTone, pickupStatusLabel } from '@/lib/order-status';
 
 type OrderWithDetails = Order & {
   lot: Lot & { event?: { org_id: string; created_by: string } };
@@ -176,7 +176,7 @@ export default function BuyerOrders() {
                   </Badge>
                   {order.pickup_status && order.pickup_status !== 'completed' && (
                     <Badge variant="muted">
-                      {order.pickup_status.replace(/_/g, ' ')}
+                      {pickupStatusLabel(order.pickup_status)}
                     </Badge>
                   )}
                 </div>

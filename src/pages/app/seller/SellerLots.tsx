@@ -175,7 +175,7 @@ export default function SellerLots() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Lot</TableHead>
+                <TableHead>Listing</TableHead>
                 <TableHead>Event</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Price</TableHead>

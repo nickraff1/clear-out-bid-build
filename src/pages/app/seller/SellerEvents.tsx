@@ -218,7 +218,7 @@ export default function SellerEvents() {
                             Edit Event
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => navigate(`/app/seller/lots/new?eventId=${event.id}`)}>
-                            Add Lot
+                            Add listing
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {event.status === 'draft' && (
@@ -271,7 +271,7 @@ export default function SellerEvents() {
                       <Button variant="outline" size="sm" asChild>
                         <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
                           <Plus className="h-4 w-4 mr-1" />
-                          Add Lot
+                          Add listing
                         </Link>
                       </Button>
                       <Button variant="ghost" size="sm" asChild>
