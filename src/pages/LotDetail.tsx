@@ -34,6 +34,8 @@ import { MessageSellerDialog } from '@/components/messaging/MessageSellerDialog'
 import { ReportLotDialog } from '@/components/lots/ReportLotDialog';
 import { ListingSafetyNotice } from '@/components/safety/SafetyNotice';
 import { CountdownTimer } from '@/components/lots/CountdownTimer';
+import { useBidEligibility, reasonCopy, acceptAuctionTerms } from '@/lib/bidder';
+import { toast } from 'sonner';
 
 type LotWithDetails = Lot & {
   media: LotMedia[];
