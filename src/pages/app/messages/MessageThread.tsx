@@ -32,6 +32,7 @@ export default function MessageThread() {
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,7 +52,8 @@ export default function MessageThread() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: c }, { data: m }] = await Promise.all([
+    setError(null);
+    const [{ data: c, error: convError }, { data: m, error: messagesError }] = await Promise.all([
       supabase.from('conversations').select(`
         id, buyer_id, seller_org_id, lot_id,
         lot:lots(id, title),
@@ -60,7 +62,18 @@ export default function MessageThread() {
       `).eq('id', id!).maybeSingle(),
       supabase.from('messages').select('*').eq('conversation_id', id!).order('created_at', { ascending: true }),
     ]);
-    if (c) setConv(c as any);
+
+    if (convError || messagesError) {
+      const message = convError?.message ?? messagesError?.message ?? 'Could not load this conversation.';
+      console.error('[MessageThread] load failed', convError ?? messagesError);
+      setError(message);
+      setConv(null);
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    if (c) setConv(c as Conv);
     if (m) {
       setMessages(m as Msg[]);
       // mark as read for messages not from me
@@ -74,16 +87,21 @@ export default function MessageThread() {
     const content = (text ?? body).trim();
     if (!content || !user || !id) return;
     setSending(true);
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: id, sender_id: user.id, body: content,
-    });
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: id, sender_id: user.id, body: content,
+      })
+      .select('id, body, sender_id, created_at, read_at')
+      .single();
     if (error) {
       console.error('[MessageThread] send failed', error);
       toast.error(error.message ?? 'Could not send message');
     } else {
       setBody('');
-      // Optimistic refresh in case realtime is delayed.
-      load();
+      if (data) {
+        setMessages(prev => prev.find(m => m.id === data.id) ? prev : [...prev, data as Msg]);
+      }
     }
     setSending(false);
   };
@@ -93,7 +111,14 @@ export default function MessageThread() {
   }
 
   if (!conv) {
-    return <div className="p-6">Conversation not found.</div>;
+    return (
+      <div className="p-6 space-y-3">
+        <Button asChild variant="ghost" size="sm"><Link to="/app/messages"><ArrowLeft className="h-4 w-4 mr-2" />Back</Link></Button>
+        <p className="font-medium">{error ? 'Could not load conversation' : 'Conversation not found.'}</p>
+        {error && <p className="text-sm text-muted-foreground">{error}</p>}
+        <Button variant="outline" size="sm" onClick={() => void load()}>Try again</Button>
+      </div>
+    );
   }
 
   const isBuyer = conv.buyer_id === user?.id;

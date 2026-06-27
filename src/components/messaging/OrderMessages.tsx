@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, MessageSquare, Send } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
+import { ensureConversation, errorMessage } from '@/lib/conversations';
 
 type Msg = {
   id: string;
@@ -29,6 +30,7 @@ export function OrderMessages({ orderId, buyerId, sellerOrgId, lotId, paid }: Pr
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   // Resolve (or create) the conversation tied to this order/lot/buyer/seller.
@@ -37,39 +39,33 @@ export function OrderMessages({ orderId, buyerId, sellerOrgId, lotId, paid }: Pr
     async function resolve() {
       if (!user || !sellerOrgId) { setLoading(false); return; }
       setLoading(true);
-      const { data: existing } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('buyer_id', buyerId)
-        .eq('seller_org_id', sellerOrgId)
-        .eq('lot_id', lotId)
-        .maybeSingle();
-      let id = existing?.id;
-      if (!id) {
-        const { data: created, error } = await supabase
-          .from('conversations')
-          .insert({
-            buyer_id: buyerId,
-            seller_org_id: sellerOrgId,
-            lot_id: lotId,
-            order_id: orderId,
-          })
-          .select('id')
-          .single();
-        if (error) {
-          console.error('[OrderMessages] could not create conversation', error);
-          if (!cancelled) setLoading(false);
-          return;
+      setError(null);
+      let id: string;
+      try {
+        id = await ensureConversation({ buyerId, sellerOrgId, lotId, orderId });
+      } catch (e: unknown) {
+        console.error('[OrderMessages] could not resolve conversation', e);
+        if (!cancelled) {
+          setError(errorMessage(e, 'Could not create order conversation.'));
+          setLoading(false);
         }
-        id = created?.id;
+        return;
       }
       if (!id || cancelled) return;
       setConvId(id);
-      const { data: msgs } = await supabase
+      const { data: msgs, error: messagesError } = await supabase
         .from('messages')
         .select('id, body, sender_id, created_at')
         .eq('conversation_id', id)
         .order('created_at', { ascending: true });
+      if (messagesError) {
+        console.error('[OrderMessages] could not load messages', messagesError);
+        if (!cancelled) {
+          setError(messagesError.message ?? 'Could not load order messages.');
+          setLoading(false);
+        }
+        return;
+      }
       if (!cancelled) {
         setMessages((msgs as Msg[]) ?? []);
         setLoading(false);
@@ -105,11 +101,15 @@ export function OrderMessages({ orderId, buyerId, sellerOrgId, lotId, paid }: Pr
     const content = body.trim();
     if (!content || !convId || !user) return;
     setSending(true);
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: convId,
-      sender_id: user.id,
-      body: content,
-    });
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: convId,
+        sender_id: user.id,
+        body: content,
+      })
+      .select('id, body, sender_id, created_at')
+      .single();
     setSending(false);
     if (error) {
       console.error('[OrderMessages] send failed', error);
@@ -117,6 +117,9 @@ export function OrderMessages({ orderId, buyerId, sellerOrgId, lotId, paid }: Pr
       return;
     }
     setBody('');
+    if (data) {
+      setMessages(prev => prev.find(m => m.id === data.id) ? prev : [...prev, data as Msg]);
+    }
   }
 
   return (
@@ -128,6 +131,11 @@ export function OrderMessages({ orderId, buyerId, sellerOrgId, lotId, paid }: Pr
       {loading ? (
         <div className="flex justify-center py-6">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        </div>
+      ) : error ? (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-destructive">Could not load order messages</p>
+          <p className="text-sm text-muted-foreground">{error}</p>
         </div>
       ) : !convId ? (
         <p className="text-sm text-muted-foreground">

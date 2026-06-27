@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { CheckCircle2, AlertTriangle, XCircle, Loader2, Rocket, ExternalLink, Gavel } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Check = {
   label: string;
@@ -31,7 +32,26 @@ type Stats = {
   latestTxnAt: string | null;
   paymentMode: "sandbox" | "live" | "none";
   authEnabled: boolean;
+  currentUserAdmin: boolean;
+  adminRoleSource: string;
+  adminRpcAvailable: boolean;
+  messagingIntegrityIssues: number;
+  conversationsNoMessages: number;
+  paidOrdersNoConversation: number;
 };
+
+type CountOnlyQuery = {
+  select: (columns: string, options: { count: "exact"; head: true }) => {
+    not: (column: string, operator: string, value: null) => Promise<{ count: number | null }>;
+    eq: (column: string, value: string) => Promise<{ count: number | null }>;
+  };
+};
+
+const fromUntyped = supabase.from as unknown as (table: string) => CountOnlyQuery;
+const isAdminRpc = supabase.rpc as unknown as (
+  fn: "is_admin",
+  args: { _user_id: string },
+) => Promise<{ data: boolean | null; error: { message?: string } | null }>;
 
 const env = (import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined) ?? "";
 
@@ -42,11 +62,12 @@ function paymentMode(): Stats["paymentMode"] {
 }
 
 export default function AdminLaunch() {
+  const { user, roles, isAdmin } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [closing, setClosing] = useState(false);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [user?.id]);
 
   async function closeExpired() {
     setClosing(true);
@@ -55,8 +76,8 @@ export default function AdminLaunch() {
       if (error) throw error;
       toast.success(`Closed ${data?.closed ?? 0} expired auction(s)`);
       await load();
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to close auctions");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to close auctions");
     } finally {
       setClosing(false);
     }
@@ -71,6 +92,7 @@ export default function AdminLaunch() {
       activeLots, sellerOrgsCount, sellerUsers, buyerProfiles,
       pendingPayouts, unresolvedReports, stuckOrders, paidOrders, latestPayment,
       expiredAuctions, paidNoCode, expiredPickupLots, uncategorizedLots,
+      adminRpcCheck, messagingIssues, conversationsNoMessages, paidNoConversation,
     ] = await Promise.all([
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active"),
       supabase.from("organizations").select("id", { count: "exact", head: true }).eq("org_type", "seller"),
@@ -85,6 +107,10 @@ export default function AdminLaunch() {
       supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "paid").is("pickup_code", null),
       supabase.from("lots").select("id, event:clearance_events!inner(pickup_end)", { count: "exact", head: true }).eq("status", "active").lt("event.pickup_end", nowIso),
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active").is("category_id", null),
+      user ? isAdminRpc("is_admin", { _user_id: user.id }) : Promise.resolve({ data: false, error: null }),
+      fromUntyped("admin_messaging_integrity").select("conversation_id", { count: "exact", head: true }).not("issue", "is", null),
+      fromUntyped("admin_messaging_integrity").select("conversation_id", { count: "exact", head: true }).eq("issue", "conversation_no_messages"),
+      fromUntyped("admin_stuck_orders").select("order_id", { count: "exact", head: true }).eq("stuck_reason", "paid_no_conversation"),
     ]);
 
     const distinctSellerUsers = new Set(((sellerUsers.data ?? []) as Array<{ user_id: string }>).map(r => r.user_id)).size;
@@ -106,6 +132,12 @@ export default function AdminLaunch() {
       latestTxnAt: latestPayment.data?.created_at ?? null,
       paymentMode: paymentMode(),
       authEnabled: true, // Lovable Cloud auth is always available
+      currentUserAdmin: isAdmin,
+      adminRoleSource: roles.includes("admin") ? "user_roles.role=admin" : "none",
+      adminRpcAvailable: !!adminRpcCheck.data && !adminRpcCheck.error,
+      messagingIntegrityIssues: messagingIssues.count ?? 0,
+      conversationsNoMessages: conversationsNoMessages.count ?? 0,
+      paidOrdersNoConversation: paidNoConversation.count ?? 0,
     });
     setLoading(false);
   }
@@ -229,6 +261,20 @@ export default function AdminLaunch() {
     },
     { label: "Authentication enabled", status: stats.authEnabled ? "pass" : "fail", detail: "Email/password sign-in is active via Lovable Cloud." },
     {
+      label: "Current user admin access",
+      status: stats.currentUserAdmin && stats.adminRpcAvailable ? "pass" : "fail",
+      detail: stats.currentUserAdmin
+        ? `Admin role confirmed via ${stats.adminRoleSource}; public.is_admin RPC is callable.`
+        : "Current user does not have user_roles.role=admin. Admin routes will block this account.",
+      href: "/app/admin",
+    },
+    {
+      label: "Messaging integrity",
+      status: stats.messagingIntegrityIssues === 0 && stats.paidOrdersNoConversation === 0 ? "pass" : stats.paidOrdersNoConversation > 0 ? "fail" : "warn",
+      detail: `${stats.messagingIntegrityIssues} conversation integrity issue${stats.messagingIntegrityIssues === 1 ? "" : "s"}; ${stats.conversationsNoMessages} empty conversation${stats.conversationsNoMessages === 1 ? "" : "s"}; ${stats.paidOrdersNoConversation} paid order${stats.paidOrdersNoConversation === 1 ? "" : "s"} missing conversation.`,
+      href: "/app/messages",
+    },
+    {
       label: "Active listings available",
       status: stats.activeListings >= 5 ? "pass" : stats.activeListings > 0 ? "warn" : "fail",
       detail: `${stats.activeListings} active listing${stats.activeListings === 1 ? "" : "s"} on the marketplace.`,
@@ -322,6 +368,8 @@ export default function AdminLaunch() {
         <KPI label="Open reports" value={stats.unresolvedReports} />
         <KPI label="Expired auctions stuck active" value={stats.expiredAuctionsActive} />
         <KPI label="Paid orders w/o pickup code" value={stats.paidOrdersNoPickupCode} />
+        <KPI label="Message integrity issues" value={stats.messagingIntegrityIssues} />
+        <KPI label="Paid orders w/o conversation" value={stats.paidOrdersNoConversation} />
       </div>
 
       <Card>

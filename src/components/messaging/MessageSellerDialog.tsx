@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { ensureConversation, errorMessage } from '@/lib/conversations';
 
 const QUICK_PROMPTS = [
   'Is this still available?',
@@ -41,25 +42,11 @@ export function MessageSellerDialog({ lotId, lotTitle, sellerOrgId, trigger }: P
     setLoading(true);
     setError('');
     try {
-      // Find existing conversation (RLS scopes to participants).
-      const { data: existing, error: selErr } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('buyer_id', user.id)
-        .eq('seller_org_id', sellerOrgId)
-        .eq('lot_id', lotId)
-        .maybeSingle();
-      if (selErr) throw selErr;
-
-      let convId = existing?.id;
-      if (!convId) {
-        const { data: created, error: cErr } = await supabase
-          .from('conversations')
-          .insert({ buyer_id: user.id, seller_org_id: sellerOrgId, lot_id: lotId })
-          .select('id').single();
-        if (cErr) throw cErr;
-        convId = created.id;
-      }
+      const convId = await ensureConversation({
+        buyerId: user.id,
+        sellerOrgId,
+        lotId,
+      });
 
       const { error: mErr } = await supabase.from('messages').insert({
         conversation_id: convId, sender_id: user.id, body: content,
@@ -69,9 +56,9 @@ export function MessageSellerDialog({ lotId, lotTitle, sellerOrgId, trigger }: P
       setOpen(false);
       toast.success('Message sent');
       navigate(`/app/messages/${convId}`);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[MessageSellerDialog] send failed', e);
-      const msg = e?.message ?? 'Could not send message.';
+      const msg = errorMessage(e, 'Could not send message.');
       setError(msg);
       toast.error(msg);
     } finally {
