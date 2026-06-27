@@ -39,7 +39,7 @@ Fixes in this branch:
 
 - Added `public.ensure_conversation(...)`.
 - Added a transaction-level advisory lock inside `ensure_conversation` to reduce duplicate conversation creation under concurrent buyer/seller actions.
-- `ensure_conversation` now seeds the order-confirmed system message when it repairs or creates an empty paid-order conversation.
+- `ensure_conversation` now seeds the order-confirmed system message when it repairs or creates a paid-order conversation missing that specific system message, even if the thread already has enquiry chat history.
 - Listing enquiry now uses the RPC before inserting a message.
 - Order detail message button now uses the RPC and shows errors.
 - Order messaging widget now uses the RPC and shows errors.

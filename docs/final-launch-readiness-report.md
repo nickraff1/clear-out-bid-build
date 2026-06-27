@@ -17,7 +17,7 @@ The app is not public launch ready. It has enough structure for a controlled clo
 - Added `ensure_conversation` RPC for buyer/seller/admin message creation.
 - Updated listing/order messaging flows to use the RPC.
 - Added transaction locking to conversation creation to reduce duplicate thread races.
-- Added server-side reseeding of the order-confirmed system message when a paid-order conversation is created later from the order page.
+- Added server-side reseeding of the order-confirmed system message when a paid-order conversation is created later from the order page or when an existing enquiry thread is missing that order message.
 - Updated message send flows to append the saved message immediately instead of waiting only for realtime.
 - Hardened the payment webhook to upsert the order conversation, avoid duplicate order-confirmed system messages, and keep pickup-address wording out of chat.
 - Improved inbox, thread and order-message loading/error/empty states.

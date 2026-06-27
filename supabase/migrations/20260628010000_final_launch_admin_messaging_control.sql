@@ -148,6 +148,8 @@ BEGIN
         SELECT 1
         FROM public.messages m
         WHERE m.conversation_id = resolved_conversation_id
+          AND m.is_system = true
+          AND m.body = 'Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.'
       )
     THEN
       INSERT INTO public.messages (conversation_id, sender_id, is_system, body)

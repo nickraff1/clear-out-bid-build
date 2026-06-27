@@ -38,6 +38,20 @@ describe("final launch migration", () => {
     expect(seedStatuses).toEqual(["paid", "ready_for_pickup", "collected"]);
     expect(seedStatuses.every((status) => validStatuses.has(status))).toBe(true);
   });
+
+  it("repairs missing order-confirmed system messages even when a conversation already has chat history", () => {
+    const finalLaunchMigration = readMigration(
+      "supabase/migrations/20260628010000_final_launch_admin_messaging_control.sql",
+    );
+
+    expect(finalLaunchMigration).toContain("m.is_system = true");
+    expect(finalLaunchMigration).toContain(
+      "m.body = 'Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.'",
+    );
+    expect(finalLaunchMigration).not.toContain(
+      "WHERE m.conversation_id = resolved_conversation_id\n      )",
+    );
+  });
 });
 
 describe("payment webhook messaging", () => {
