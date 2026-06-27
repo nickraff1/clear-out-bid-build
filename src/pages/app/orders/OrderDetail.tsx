@@ -253,7 +253,7 @@ export default function OrderDetail() {
           <h1 className="text-2xl font-bold">{order.lot?.title}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
             <Badge variant={paid ? 'success' : 'warning'}>
-              {order.status.replace(/_/g, ' ')}
+              {orderStatusLabel(order.status)}
             </Badge>
             <PickupStatusBadge status={order.pickup_status ?? 'awaiting_arrangement'} />
           </div>

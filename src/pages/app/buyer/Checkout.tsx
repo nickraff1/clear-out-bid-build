@@ -75,7 +75,7 @@ export default function Checkout() {
   }
 
   const total = Number(order.amount);
-  const basePrice = Math.round((total / 1.05) * 100) / 100;
+  const basePrice = Math.round((total / 1.10) * 100) / 100;
   const buyerFee = Math.round((total - basePrice) * 100) / 100;
 
   return (
@@ -115,7 +115,7 @@ export default function Checkout() {
               <Separator />
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Item price</span><span>${basePrice.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Buyer fee (5%)</span><span>${buyerFee.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Buyer fee (10%)</span><span>${buyerFee.toFixed(2)}</span></div>
                 <Separator className="my-2" />
                 <div className="flex justify-between font-semibold text-base"><span>Total</span><span>${total.toFixed(2)} AUD</span></div>
               </div>
