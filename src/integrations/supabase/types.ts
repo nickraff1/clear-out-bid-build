@@ -82,6 +82,7 @@ export type Database = {
       auction_deposit_settings: {
         Row: {
           auto_charge_winner: boolean
+          current_gateway_mode: string
           current_terms_version: string
           enabled: boolean
           id: string
@@ -94,6 +95,7 @@ export type Database = {
         }
         Insert: {
           auto_charge_winner?: boolean
+          current_gateway_mode?: string
           current_terms_version?: string
           enabled?: boolean
           id?: string
@@ -106,6 +108,7 @@ export type Database = {
         }
         Update: {
           auto_charge_winner?: boolean
+          current_gateway_mode?: string
           current_terms_version?: string
           enabled?: boolean
           id?: string
@@ -123,15 +126,21 @@ export type Database = {
           admin_notes: string | null
           amount: number
           bid_id: string | null
+          captured_at: string | null
           created_at: string
           expires_at: string | null
+          failure_reason: string | null
+          gateway_mode: string
           id: string
           lot_id: string
           order_id: string | null
           payment_method_id: string | null
+          purpose: string
+          released_at: string | null
           status: string
           stripe_payment_intent_id: string | null
           stripe_setup_intent_id: string | null
+          tier_band: string | null
           updated_at: string
           user_id: string
         }
@@ -139,15 +148,21 @@ export type Database = {
           admin_notes?: string | null
           amount: number
           bid_id?: string | null
+          captured_at?: string | null
           created_at?: string
           expires_at?: string | null
+          failure_reason?: string | null
+          gateway_mode?: string
           id?: string
           lot_id: string
           order_id?: string | null
           payment_method_id?: string | null
+          purpose?: string
+          released_at?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
           stripe_setup_intent_id?: string | null
+          tier_band?: string | null
           updated_at?: string
           user_id: string
         }
@@ -155,15 +170,21 @@ export type Database = {
           admin_notes?: string | null
           amount?: number
           bid_id?: string | null
+          captured_at?: string | null
           created_at?: string
           expires_at?: string | null
+          failure_reason?: string | null
+          gateway_mode?: string
           id?: string
           lot_id?: string
           order_id?: string | null
           payment_method_id?: string | null
+          purpose?: string
+          released_at?: string | null
           status?: string
           stripe_payment_intent_id?: string | null
           stripe_setup_intent_id?: string | null
+          tier_band?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -2077,6 +2098,10 @@ export type Database = {
         Args: { _note?: string; _order_id: string }
         Returns: string
       }
+      admin_remove_bid: {
+        Args: { _bid_id: string; _reason?: string }
+        Returns: undefined
+      }
       admin_resolve_report: {
         Args: { _note?: string; _report_id: string; _status: string }
         Returns: undefined
@@ -2110,6 +2135,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      bidder_mark_payment_method_added: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
       can_user_bid: {
         Args: { _lot_id: string; _user_id: string }
         Returns: {
@@ -2126,12 +2155,14 @@ export type Database = {
         }[]
       }
       close_expired_auction: { Args: { _lot_id: string }; Returns: string }
+      deposit_tier_band: { Args: { _amount: number }; Returns: string }
       generate_pickup_code: { Args: never; Returns: string }
       get_bidder_status: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["bidder_status"]
       }
       get_event_org_id: { Args: { _event_id: string }; Returns: string }
+      handle_defaulted_winner: { Args: { _order_id: string }; Returns: string }
       has_order_for_event: {
         Args: { _event_id: string; _user_id: string }
         Returns: boolean
@@ -2153,6 +2184,10 @@ export type Database = {
         Returns: boolean
       }
       mark_all_notifications_read: { Args: never; Returns: number }
+      mark_deposit_outcome: {
+        Args: { _deposit_id: string; _note?: string; _outcome: string }
+        Returns: undefined
+      }
       notify_admins: {
         Args: {
           _link_url?: string
@@ -2196,11 +2231,23 @@ export type Database = {
         }
         Returns: string
       }
+      offer_to_next_bidder: { Args: { _lot_id: string }; Returns: string }
       release_expired_reservations: { Args: never; Returns: number }
       release_lot_reservation: { Args: { _lot_id: string }; Returns: undefined }
+      relist_auction: {
+        Args: { _lot_id: string; _new_end: string }
+        Returns: undefined
+      }
       required_deposit_for: {
         Args: { _amount: number; _user_id: string }
         Returns: number
+      }
+      sweep_defaulted_winners: {
+        Args: never
+        Returns: {
+          order_id: string
+          result: string
+        }[]
       }
     }
     Enums: {
@@ -2219,6 +2266,8 @@ export type Database = {
         | "trusted_bidder"
         | "restricted"
         | "banned"
+        | "payment_method_required"
+        | "auction_terms_accepted"
       event_status: "draft" | "active" | "completed" | "cancelled"
       lot_condition: "unused" | "like_new" | "good" | "fair"
       lot_status:
@@ -2393,6 +2442,8 @@ export const Constants = {
         "trusted_bidder",
         "restricted",
         "banned",
+        "payment_method_required",
+        "auction_terms_accepted",
       ],
       event_status: ["draft", "active", "completed", "cancelled"],
       lot_condition: ["unused", "like_new", "good", "fair"],
