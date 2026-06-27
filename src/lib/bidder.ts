@@ -35,6 +35,10 @@ const REASON_COPY: Record<string, { title: string; body: string }> = {
     title: 'Add a payment method',
     body: 'Save a card on file so we can charge it automatically if you win.',
   },
+  deposit_required: {
+    title: 'Authorize bid deposit',
+    body: 'This price tier requires a deposit hold on your card. The hold is released if you do not win.',
+  },
   ok: { title: 'Eligible to bid', body: '' },
 };
 
@@ -72,4 +76,8 @@ export function useBidEligibility(lotId: string | undefined) {
 
 export async function acceptAuctionTerms() {
   return supabase.rpc('accept_auction_terms');
+}
+
+export async function authorizeBidDeposit(lotId: string) {
+  return supabase.functions.invoke('authorize-bid-deposit', { body: { lot_id: lotId } });
 }
