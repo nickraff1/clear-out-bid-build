@@ -397,7 +397,7 @@ export default function CreateLot() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DEFAULT_CATEGORIES.map(cat => (
+                  {categories.map(cat => (
                     <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
