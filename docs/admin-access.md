@@ -91,6 +91,7 @@ If blocked, admin-only routes show a clear "You do not have admin access" state.
 - `/app/admin/auctions`
 - `/app/admin/fees`
 - `/app/admin/notifications`
+- `/app/admin/messages`
 
 ## Supported admin actions
 
@@ -112,6 +113,7 @@ If blocked, admin-only routes show a clear "You do not have admin access" state.
 - mark manual payout status with notes
 - close expired auctions
 - inspect messaging integrity via launch checklist
+- inspect marketplace conversations via `/app/admin/messages`
 
 ## Known limitations
 

@@ -7,6 +7,7 @@
 - `/app/admin/orders`: order control, pickup code regeneration, force-complete, cancel, admin notes
 - `/app/admin/payouts`: manual payout review and status changes
 - `/app/admin/reports`: listing/order report review and resolution
+- `/app/admin/messages`: admin conversation inspection using the shared inbox view
 - `/app/admin/listings`: listing moderation surface
 - `/app/admin/users`: user/profile/role visibility
 - `/app/admin/sellers`: seller organisation verification, founding badge, suspension

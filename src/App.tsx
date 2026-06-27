@@ -309,6 +309,9 @@ const App = () => (
               <Route path="/app/admin/notifications" element={
                 <RoleGuard allowedRoles={['admin']}><NotificationsPage /></RoleGuard>
               } />
+              <Route path="/app/admin/messages" element={
+                <RoleGuard allowedRoles={['admin']}><MessagesInbox /></RoleGuard>
+              } />
 
               {/* Notifications (any signed-in user) */}
               <Route path="/app/notifications" element={<NotificationsPage />} />

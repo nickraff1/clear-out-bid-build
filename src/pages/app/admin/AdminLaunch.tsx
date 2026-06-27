@@ -272,7 +272,7 @@ export default function AdminLaunch() {
       label: "Messaging integrity",
       status: stats.messagingIntegrityIssues === 0 && stats.paidOrdersNoConversation === 0 ? "pass" : stats.paidOrdersNoConversation > 0 ? "fail" : "warn",
       detail: `${stats.messagingIntegrityIssues} conversation integrity issue${stats.messagingIntegrityIssues === 1 ? "" : "s"}; ${stats.conversationsNoMessages} empty conversation${stats.conversationsNoMessages === 1 ? "" : "s"}; ${stats.paidOrdersNoConversation} paid order${stats.paidOrdersNoConversation === 1 ? "" : "s"} missing conversation.`,
-      href: "/app/messages",
+      href: "/app/admin/messages",
     },
     {
       label: "Active listings available",

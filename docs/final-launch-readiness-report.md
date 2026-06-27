@@ -12,6 +12,7 @@ The app is not public launch ready. It has enough structure for a controlled clo
 - Documented one-time founder admin bootstrap SQL.
 - Added admin access blocked state.
 - Added admin route aliases for expected admin URLs.
+- Added `/app/admin/messages` so admins have an explicit conversation inspection route.
 - Added admin messaging visibility through RLS-aware policies.
 - Added `ensure_conversation` RPC for buyer/seller/admin message creation.
 - Updated listing/order messaging flows to use the RPC.
