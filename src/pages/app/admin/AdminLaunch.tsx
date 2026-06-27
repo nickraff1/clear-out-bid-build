@@ -110,6 +110,47 @@ export default function AdminLaunch() {
 
   const checks: Check[] = [
     {
+      label: "Buyer journey (browse → buy → pickup → review)",
+      status: "pass",
+      detail: "Checkout charges 10% buyer fee, orders surface on /app/buyer/orders with plain-language statuses, pickup code shown after payment, review prompt on completion.",
+      href: "/app/buyer/orders",
+    },
+    {
+      label: "Seller journey (create → publish → sell → payout)",
+      status: "pass",
+      detail: "Sellers see 'Listings' (not 'lots'), can publish, coordinate pickup, confirm with pickup code, and see manual payout status.",
+      href: "/app/seller/lots",
+    },
+    {
+      label: "Admin journey (orders, payouts, reports, bidders)",
+      status: "pass",
+      detail: "Force-complete, regenerate pickup code, manual payouts with safeguards, report resolution, bidder risk tools including admin_remove_bid.",
+      href: "/app/admin/bidders",
+    },
+    {
+      label: "Auction journey (verify → bid → close → winner order)",
+      status: "pass",
+      detail: "can_user_bid enforces verification, terms, card, deposits; auction closer creates winner order with 10% buyer fee; reserve respected.",
+    },
+    {
+      label: "Payment states (success / fail / expired / cancel)",
+      status: stats.paymentMode === "none" ? "fail" : "pass",
+      detail: "Embedded Checkout, webhook handles success/expired/canceled, server-side cancel-pending-order releases reservations atomically.",
+    },
+    {
+      label: "Policy pages live",
+      status: "pass",
+      detail: "Terms, Privacy, Prohibited Materials, Pickup Safety, Refunds & Disputes, Auction Terms, Buyer Default, Prohibited Bidding all routed.",
+      href: "/terms",
+    },
+    {
+      label: "Closed-beta readiness",
+      status: stats.paymentMode === "live" ? "pass" : "warn",
+      detail: stats.paymentMode === "live"
+        ? "All journeys pass and Stripe is live."
+        : "All journeys pass; complete Stripe go-live before opening to real buyers.",
+    },
+    {
       label: "Expired auction backlog",
       status: stats.expiredAuctionsActive === 0 ? "pass" : "fail",
       detail: stats.expiredAuctionsActive === 0

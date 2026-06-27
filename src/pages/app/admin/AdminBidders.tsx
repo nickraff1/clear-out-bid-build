@@ -13,7 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
-import { Loader2, MoreVertical, ShieldCheck, Ban, Award, Search, AlertTriangle } from 'lucide-react';
+import { Loader2, MoreVertical, ShieldCheck, Ban, Award, Search, AlertTriangle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Bidder = {
@@ -52,6 +52,7 @@ export default function AdminBidders() {
   const [unpaidOrders, setUnpaidOrders] = useState<any[]>([]);
   const [auditLog, setAuditLog] = useState<any[]>([]);
   const [gatewayMode, setGatewayMode] = useState<string>('lovable_gateway_sandbox');
+  const [recentBids, setRecentBids] = useState<any[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -76,7 +77,7 @@ export default function AdminBidders() {
 
   const openDrawer = async (b: Bidder) => {
     setSelected(b);
-    const [{ data: deps }, { data: orders }, { data: log }] = await Promise.all([
+    const [{ data: deps }, { data: orders }, { data: log }, { data: bids }] = await Promise.all([
       supabase.from('auction_deposits').select('*').eq('user_id', b.user_id)
         .order('created_at', { ascending: false }),
       supabase.from('orders').select('id, status, amount, lot_id, created_at')
@@ -84,10 +85,16 @@ export default function AdminBidders() {
         .in('status', ['cancelled', 'pending_payment']),
       supabase.from('bidder_audit_log').select('*').eq('user_id', b.user_id)
         .order('created_at', { ascending: false }).limit(20),
+      supabase.from('bids')
+        .select('id, amount, created_at, lot_id, lot:lots(title)')
+        .eq('user_id', b.user_id)
+        .order('created_at', { ascending: false })
+        .limit(15),
     ]);
     setDeposits(deps ?? []);
     setUnpaidOrders(orders ?? []);
     setAuditLog(log ?? []);
+    setRecentBids(bids ?? []);
   };
 
   const act = async (rpc: string, args: any, ok: string) => {
@@ -311,6 +318,50 @@ export default function AdminBidders() {
                       </li>
                     ))}
                   </ul>
+                )}
+              </section>
+
+              <section>
+                <h3 className="text-sm font-semibold mb-2 mt-4">Recent bids</h3>
+                {recentBids.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No bids placed.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Listing</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>When</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentBids.map((b: any) => (
+                        <TableRow key={b.id}>
+                          <TableCell className="text-xs">{b.lot?.title ?? b.lot_id.slice(0, 8)}</TableCell>
+                          <TableCell className="text-right tabular-nums">${Number(b.amount).toFixed(0)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(b.created_at).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Remove bid"
+                              onClick={() => {
+                                const reason = prompt('Reason for removing this bid?');
+                                if (!reason) return;
+                                if (!confirm('Remove this bid? This cannot be undone.')) return;
+                                act('admin_remove_bid', { _bid_id: b.id, _reason: reason }, 'Bid removed');
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </section>
             </>
