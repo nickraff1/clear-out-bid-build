@@ -123,6 +123,38 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
     })
   }
 
+  // 0. Server-side eligibility gate — single source of truth.
+  const { data: eligibility, error: eligErr } = await supabase
+    .rpc('can_user_bid', { _user_id: userId, _lot_id: lot_id })
+    .maybeSingle()
+
+  if (eligErr) {
+    console.error('[AUCTION] can_user_bid error', eligErr)
+    return new Response(JSON.stringify({ error: 'Eligibility check failed' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+  if (!eligibility?.allowed) {
+    const map: Record<string, string> = {
+      lot_not_found: 'Lot not found.',
+      not_an_auction: 'This lot is not an auction.',
+      auction_not_active: 'This auction is not active.',
+      auction_ended: 'This auction has ended.',
+      verification_required: 'Please complete bidder verification before bidding.',
+      terms_acceptance_required: 'Please accept the auction terms before bidding.',
+      account_restricted: 'Your bidding privileges are currently restricted. Contact support.',
+      account_banned: 'This account is not permitted to bid.',
+      unpaid_previous_auction: 'You have an unpaid auction win. Resolve it before bidding again.',
+    }
+    return new Response(JSON.stringify({
+      error: map[eligibility?.reason as string] || 'You are not eligible to bid right now.',
+      reason: eligibility?.reason,
+      verification_required: true,
+    }), {
+      status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
   // 1. Check rate limiting
   const oneMinuteAgo = new Date(Date.now() - 60000).toISOString()
   const { count: recentBidsCount } = await supabase
