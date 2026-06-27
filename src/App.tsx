@@ -92,14 +92,14 @@ import {
   MetalOffcutsSydney,
 } from "./pages/seo/pages";
 
-// Legacy Dashboard (keep for now)
+// Legacy Dashboard redirect target
 import Dashboard from "./pages/Dashboard";
-import DashboardOverview from "./pages/dashboard/Overview";
-import WatchlistPage from "./pages/dashboard/Watchlist";
-import OrdersPage from "./pages/dashboard/Orders";
-import EventsPage from "./pages/dashboard/Events";
-import NewEventPage from "./pages/dashboard/NewEvent";
-import OrganizationPage from "./pages/dashboard/Organization";
+
+// Beta-ready public pages
+import Pricing from "./pages/Pricing";
+import Contact from "./pages/Contact";
+import Help from "./pages/Help";
+import ForSellers from "./pages/ForSellers";
 
 const queryClient = new QueryClient();
 
@@ -130,6 +130,12 @@ const App = () => (
             <Route path="/auction-terms" element={<AuctionTerms />} />
             <Route path="/buyer-default-policy" element={<BuyerDefaultPolicy />} />
             <Route path="/prohibited-bidding-policy" element={<ProhibitedBiddingPolicy />} />
+
+            {/* Marketing / support */}
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/help" element={<Help />} />
+            <Route path="/for-sellers" element={<ForSellers />} />
 
             {/* SEO Landing Pages */}
             <Route path="/sell-surplus-building-materials-sydney" element={<SellSurplusSydney />} />
@@ -304,15 +310,8 @@ const App = () => (
               <Route path="/app/orders/:orderId" element={<OrderDetail />} />
             </Route>
 
-            {/* Legacy Dashboard Routes */}
-            <Route path="/dashboard" element={<Dashboard />}>
-              <Route index element={<DashboardOverview />} />
-              <Route path="watchlist" element={<WatchlistPage />} />
-              <Route path="orders" element={<OrdersPage />} />
-              <Route path="events" element={<EventsPage />} />
-              <Route path="events/new" element={<NewEventPage />} />
-              <Route path="organization" element={<OrganizationPage />} />
-            </Route>
+            {/* Legacy /dashboard/* — redirect everything to /app */}
+            <Route path="/dashboard/*" element={<Dashboard />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
