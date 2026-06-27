@@ -139,7 +139,7 @@ BEGIN
       SELECT 1
       FROM public.orders o
       WHERE o.id = _order_id
-        AND o.status IN ('paid', 'ready_for_pickup', 'collected', 'completed')
+        AND o.status IN ('paid', 'ready_for_pickup', 'collected')
     )
     INTO should_seed_order_message;
 
