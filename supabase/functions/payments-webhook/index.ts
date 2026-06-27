@@ -4,6 +4,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
 
 let _supabase: ReturnType<typeof createClient> | null = null;
+const ORDER_CONFIRMED_MESSAGE =
+  "Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.";
+
 function getSupabase() {
   if (!_supabase) {
     _supabase = createClient(
@@ -50,39 +53,45 @@ async function handleSessionCompleted(session: any, env: StripeEnv) {
     reserved_until: null,
   }).eq("id", (updatedOrder as any).lot_id);
 
-  // Find or create conversation between buyer and seller org for this lot
+  // Create or reuse the conversation between buyer and seller org for this lot.
   const buyerId = (updatedOrder as any).buyer_id as string;
   const lotId = (updatedOrder as any).lot_id as string;
   const sellerOrgId = (updatedOrder as any).event?.org_id as string | undefined;
   let conversationId: string | null = null;
 
   if (sellerOrgId) {
-    const { data: existing } = await sb
+    const { data: conversation, error: conversationError } = await sb
       .from("conversations")
+      .upsert(
+        { buyer_id: buyerId, seller_org_id: sellerOrgId, lot_id: lotId, order_id: orderId },
+        { onConflict: "buyer_id,seller_org_id,lot_id" },
+      )
       .select("id")
-      .eq("buyer_id", buyerId)
-      .eq("seller_org_id", sellerOrgId)
-      .eq("lot_id", lotId)
-      .maybeSingle();
+      .single();
 
-    if (existing) {
-      conversationId = (existing as any).id;
-      await sb.from("conversations").update({ order_id: orderId }).eq("id", conversationId);
+    if (conversationError) {
+      console.error("Failed to create order conversation", conversationError);
     } else {
-      const { data: created } = await sb
-        .from("conversations")
-        .insert({ buyer_id: buyerId, seller_org_id: sellerOrgId, lot_id: lotId, order_id: orderId })
-        .select("id").single();
-      conversationId = (created as any)?.id ?? null;
+      conversationId = (conversation as any)?.id ?? null;
     }
 
     if (conversationId) {
-      await sb.from("messages").insert({
-        conversation_id: conversationId,
-        sender_id: buyerId,
-        is_system: true,
-        body: `✅ Order confirmed. Please arrange pickup through this chat. The exact pickup address is now available to the buyer on the order page.`,
-      });
+      const { data: existingSystemMessage } = await sb
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", conversationId)
+        .eq("is_system", true)
+        .eq("body", ORDER_CONFIRMED_MESSAGE)
+        .maybeSingle();
+
+      if (!existingSystemMessage) {
+        await sb.from("messages").insert({
+          conversation_id: conversationId,
+          sender_id: buyerId,
+          is_system: true,
+          body: ORDER_CONFIRMED_MESSAGE,
+        });
+      }
     }
   }
 

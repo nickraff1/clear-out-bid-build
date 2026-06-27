@@ -39,3 +39,16 @@ describe("final launch migration", () => {
     expect(seedStatuses.every((status) => validStatuses.has(status))).toBe(true);
   });
 });
+
+describe("payment webhook messaging", () => {
+  it("creates order conversations idempotently and keeps pickup address out of chat", () => {
+    const webhook = readMigration("supabase/functions/payments-webhook/index.ts");
+
+    expect(webhook).toContain('onConflict: "buyer_id,seller_org_id,lot_id"');
+    expect(webhook).toContain(".upsert(");
+    expect(webhook).toContain("ORDER_CONFIRMED_MESSAGE");
+    expect(webhook).toContain('.eq("body", ORDER_CONFIRMED_MESSAGE)');
+    expect(webhook).toContain("Pickup details are available on the order page once payment is confirmed.");
+    expect(webhook).not.toContain("exact pickup address");
+  });
+});

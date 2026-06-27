@@ -18,6 +18,7 @@ The app is not public launch ready. It has enough structure for a controlled clo
 - Added transaction locking to conversation creation to reduce duplicate thread races.
 - Added server-side reseeding of the order-confirmed system message when a paid-order conversation is created later from the order page.
 - Updated message send flows to append the saved message immediately instead of waiting only for realtime.
+- Hardened the payment webhook to upsert the order conversation, avoid duplicate order-confirmed system messages, and keep pickup-address wording out of chat.
 - Improved inbox, thread and order-message loading/error/empty states.
 - Added messaging integrity diagnostics view.
 - Added launch checklist admin status and messaging integrity checks.
@@ -27,7 +28,7 @@ The app is not public launch ready. It has enough structure for a controlled clo
 ## Tests run
 
 - Production build: passed.
-- Vitest: passed, including a final-launch migration regression test for valid `order_status` enum usage.
+- Vitest: passed, including final-launch regression coverage for migration `order_status` enum usage and payment-webhook order conversation messaging.
 - TypeScript check: passed.
 - Targeted lint on touched files: passed with warnings only.
 - Full repo lint: failed on pre-existing lint debt outside this pass, mostly `@typescript-eslint/no-explicit-any`, shadcn empty-interface warnings, hook dependency warnings, and one Tailwind `require()` import.
