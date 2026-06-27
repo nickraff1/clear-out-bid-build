@@ -82,6 +82,9 @@ Deno.serve(async (req) => {
       }, { onConflict: "user_id" });
     if (upErr) throw upErr;
 
+    // Auto-progress bidder status now that a card is on file.
+    await admin.rpc("bidder_mark_payment_method_added", { _user_id: userId });
+
     return new Response(JSON.stringify({
       ok: true,
       brand: pm.card?.brand ?? null,
