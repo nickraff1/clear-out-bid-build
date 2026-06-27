@@ -27,7 +27,7 @@ The app is not public launch ready. It has enough structure for a controlled clo
 ## Tests run
 
 - Production build: passed.
-- Vitest: passed.
+- Vitest: passed, including a final-launch migration regression test for valid `order_status` enum usage.
 - TypeScript check: passed.
 - Targeted lint on touched files: passed with warnings only.
 - Full repo lint: failed on pre-existing lint debt outside this pass, mostly `@typescript-eslint/no-explicit-any`, shadcn empty-interface warnings, hook dependency warnings, and one Tailwind `require()` import.

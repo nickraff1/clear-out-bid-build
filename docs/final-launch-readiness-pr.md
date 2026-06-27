@@ -25,6 +25,7 @@ This branch hardens the launch-critical admin access and messaging paths for Off
 ## Tests Run
 
 - `npm run test` - passed.
+- Added final-launch migration regression test for valid `order_status` enum usage.
 - `npm run build` - passed.
 - `./node_modules/.bin/tsc --noEmit` - passed.
 - Targeted ESLint on changed source files - passed with warnings only.
