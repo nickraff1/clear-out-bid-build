@@ -17,8 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ArrowLeft, Camera, Check, Gavel, Loader2, Tag, Trash2, X } from 'lucide-react';
-import { DEFAULT_CATEGORIES, LOT_CONDITIONS } from '@/lib/constants';
-import type { ClearanceEvent, ComplianceTag } from '@/types/database';
+import { LOT_CONDITIONS } from '@/lib/constants';
+import type { ClearanceEvent, ComplianceTag, Category } from '@/types/database';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Link } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
