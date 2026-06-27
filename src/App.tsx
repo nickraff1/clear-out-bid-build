@@ -22,6 +22,9 @@ import Privacy from "./pages/legal/Privacy";
 import ProhibitedMaterials from "./pages/legal/ProhibitedMaterials";
 import PickupSafety from "./pages/legal/PickupSafety";
 import RefundsAndDisputes from "./pages/legal/RefundsAndDisputes";
+import AuctionTerms from "./pages/legal/AuctionTerms";
+import BuyerDefaultPolicy from "./pages/legal/BuyerDefaultPolicy";
+import ProhibitedBiddingPolicy from "./pages/legal/ProhibitedBiddingPolicy";
 
 // App Portal
 import AppLayout from "./components/app/AppLayout";
@@ -64,6 +67,7 @@ import AdminReports from "./pages/app/admin/AdminReports";
 import AdminPayouts from "./pages/app/admin/AdminPayouts";
 import AdminLaunch from "./pages/app/admin/AdminLaunch";
 import AdminSellers from "./pages/app/admin/AdminSellers";
+import AdminBidders from "./pages/app/admin/AdminBidders";
 import SellerPayouts from "./pages/app/seller/SellerPayouts";
 
 // Seller bulk
@@ -123,6 +127,9 @@ const App = () => (
             <Route path="/prohibited-materials" element={<ProhibitedMaterials />} />
             <Route path="/pickup-safety" element={<PickupSafety />} />
             <Route path="/refunds-and-disputes" element={<RefundsAndDisputes />} />
+            <Route path="/auction-terms" element={<AuctionTerms />} />
+            <Route path="/buyer-default-policy" element={<BuyerDefaultPolicy />} />
+            <Route path="/prohibited-bidding-policy" element={<ProhibitedBiddingPolicy />} />
 
             {/* SEO Landing Pages */}
             <Route path="/sell-surplus-building-materials-sydney" element={<SellSurplusSydney />} />
@@ -272,6 +279,9 @@ const App = () => (
               } />
               <Route path="/app/admin/sellers" element={
                 <RoleGuard allowedRoles={['admin']}><AdminSellers /></RoleGuard>
+              } />
+              <Route path="/app/admin/bidders" element={
+                <RoleGuard allowedRoles={['admin']}><AdminBidders /></RoleGuard>
               } />
 
               {/* Notifications (any signed-in user) */}

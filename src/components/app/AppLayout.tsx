@@ -2,7 +2,7 @@ import { Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign, Rocket } from 'lucide-react';
+import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign, Rocket, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PortalSwitcher } from './PortalSwitcher';
 import { useActivePortal } from '@/hooks/useActivePortal';
@@ -55,6 +55,7 @@ export default function AppLayout() {
     { to: '/app/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/app/admin/users', label: 'Users', icon: Users },
     { to: '/app/admin/sellers', label: 'Sellers', icon: Building2 },
+    { to: '/app/admin/bidders', label: 'Bidders', icon: ShieldCheck },
     { to: '/app/admin/listings', label: 'Listings', icon: Package },
     { to: '/app/admin/orders', label: 'Orders', icon: ShoppingCart },
     { to: '/app/admin/payouts', label: 'Payouts', icon: DollarSign },
