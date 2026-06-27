@@ -35,6 +35,7 @@ import { ReportLotDialog } from '@/components/lots/ReportLotDialog';
 import { ListingSafetyNotice } from '@/components/safety/SafetyNotice';
 import { CountdownTimer } from '@/components/lots/CountdownTimer';
 import { useBidEligibility, reasonCopy, acceptAuctionTerms } from '@/lib/bidder';
+import { authorizeBidDeposit } from '@/lib/bidder';
 import { AddPaymentMethodDialog } from '@/components/bidder/AddPaymentMethodDialog';
 import { toast } from 'sonner';
 
@@ -68,6 +69,22 @@ export default function LotDetail() {
   const [acceptingTerms, setAcceptingTerms] = useState(false);
   const [settingUpAccount, setSettingUpAccount] = useState(false);
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [authorizingDeposit, setAuthorizingDeposit] = useState(false);
+
+  const handleAuthorizeDeposit = async () => {
+    if (!id) return;
+    setAuthorizingDeposit(true);
+    const { data, error } = await authorizeBidDeposit(id);
+    setAuthorizingDeposit(false);
+    if (error) { toast.error(error.message || 'Could not authorize deposit'); return; }
+    if (data?.scaffolded) {
+      toast.warning('Deposit could not be authorized by the sandbox gateway. Offcutt ops will follow up.');
+      return;
+    }
+    if (!data?.ok) { toast.error(data?.error || 'Deposit authorization failed'); return; }
+    toast.success(data?.reused ? 'Existing deposit covers this tier' : `Deposit of $${data.amount} authorized`);
+    refreshEligibility();
+  };
 
   const ensureBuyerAccount = async (): Promise<boolean> => {
     if (!user) { navigate('/login'); return false; }
@@ -601,6 +618,14 @@ export default function LotDetail() {
                                 <Button type="button" size="sm" variant="secondary"
                                   onClick={() => setShowAddPayment(true)}>
                                   Add payment method
+                                </Button>
+                              )}
+                              {eligibility.reason === 'deposit_required' && (
+                                <Button type="button" size="sm" variant="secondary"
+                                  onClick={handleAuthorizeDeposit} disabled={authorizingDeposit}>
+                                  {authorizingDeposit
+                                    ? 'Authorizing…'
+                                    : `Authorize $${eligibility.required_deposit} deposit`}
                                 </Button>
                               )}
                             </AlertDescription>
