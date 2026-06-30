@@ -51,11 +51,11 @@ type CountOnlyQuery = {
   };
 };
 
-const fromUntyped = supabase.from as unknown as (table: string) => CountOnlyQuery;
-const isAdminRpc = supabase.rpc as unknown as (
+const fromUntyped = (table: string) => supabase.from(table as never) as unknown as CountOnlyQuery;
+const isAdminRpc = (
   fn: "is_admin",
   args: { _user_id: string },
-) => Promise<{ data: boolean | null; error: { message?: string } | null }>;
+) => supabase.rpc(fn, args) as Promise<{ data: boolean | null; error: { message?: string } | null }>;
 
 const env = (import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined) ?? "";
 

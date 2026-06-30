@@ -80,7 +80,7 @@ type CountOnlyQuery = {
   };
 };
 
-const fromUntyped = supabase.from as unknown as (table: string) => CountOnlyQuery;
+const fromUntyped = (table: string) => supabase.from(table as never) as unknown as CountOnlyQuery;
 
 export default function AdminOverview() {
   const [k, setK] = useState<OverviewStats | null>(null);
