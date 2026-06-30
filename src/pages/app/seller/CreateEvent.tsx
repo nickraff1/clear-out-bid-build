@@ -25,6 +25,24 @@ const STEPS = [
   { id: 'review', title: 'Review', description: 'Confirm and create' },
 ];
 
+type EventFormData = {
+  title: string;
+  description: string;
+  site_address: string;
+  suburb: string;
+  state: string;
+  postcode: string;
+  pickup_start: string;
+  pickup_end: string;
+  access_notes: string;
+  has_forklift: boolean;
+  has_dock: boolean;
+  pickup_hours: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
+};
+
 export default function CreateEvent() {
   const navigate = useNavigate();
   const { user, primaryOrg } = useAuth();
@@ -33,7 +51,7 @@ export default function CreateEvent() {
   const [error, setError] = useState('');
 
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<EventFormData>({
     // Step 1: Basics
     title: '',
     description: '',
@@ -54,7 +72,7 @@ export default function CreateEvent() {
     contact_email: '',
   });
 
-  const updateFormData = (field: string, value: any) => {
+  const updateFormData = <K extends keyof EventFormData>(field: K, value: EventFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -140,8 +158,8 @@ export default function CreateEvent() {
 
       // Navigate to the event details to add lots
       navigate(`/app/seller/events/${data.id}?created=true`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create event');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create event');
     } finally {
       setLoading(false);
     }
@@ -285,6 +303,7 @@ export default function CreateEvent() {
                     type="datetime-local"
                     value={formData.pickup_start}
                     onChange={(e) => updateFormData('pickup_start', e.target.value)}
+                    onInput={(e) => updateFormData('pickup_start', e.currentTarget.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -294,6 +313,7 @@ export default function CreateEvent() {
                     type="datetime-local"
                     value={formData.pickup_end}
                     onChange={(e) => updateFormData('pickup_end', e.target.value)}
+                    onInput={(e) => updateFormData('pickup_end', e.currentTarget.value)}
                   />
                 </div>
               </div>
