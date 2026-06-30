@@ -11,3 +11,15 @@ verify_jwt = false
 
 [functions.payments-webhook]
 verify_jwt = false
+
+[functions.close-expired-auctions]
+verify_jwt = false
+
+[functions.charge-auction-winner]
+verify_jwt = false
+
+[functions.admin-refund-payment]
+verify_jwt = false
+
+[functions.admin-create-seller-transfer]
+verify_jwt = false

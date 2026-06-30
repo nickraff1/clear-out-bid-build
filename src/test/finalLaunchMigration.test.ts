@@ -70,13 +70,41 @@ describe("final launch migration", () => {
 describe("payment webhook messaging", () => {
   it("creates order conversations idempotently and keeps pickup address out of chat", () => {
     const webhook = readMigration("supabase/functions/payments-webhook/index.ts");
+    const paidOrderHelper = readMigration("supabase/functions/_shared/paid-order.ts");
 
-    expect(webhook).toContain('onConflict: "buyer_id,seller_org_id,lot_id"');
-    expect(webhook).toContain(".upsert(");
     expect(webhook).toContain("ORDER_CONFIRMED_MESSAGE");
-    expect(webhook).toContain('.eq("body", ORDER_CONFIRMED_MESSAGE)');
-    expect(webhook).toContain("Pickup details are available on the order page once payment is confirmed.");
-    expect(webhook).not.toContain("exact pickup address");
+    expect(webhook).toContain("completePaidOrder");
+    expect(paidOrderHelper).toContain('onConflict: "buyer_id,seller_org_id,lot_id"');
+    expect(paidOrderHelper).toContain(".upsert(");
+    expect(paidOrderHelper).toContain('.eq("body", ORDER_CONFIRMED_MESSAGE)');
+    expect(paidOrderHelper).toContain("Pickup details are available on the order page once payment is confirmed.");
+    expect(paidOrderHelper).not.toContain("exact pickup address");
+  });
+
+  it("records Stripe webhook events for idempotent processing", () => {
+    const migration = readMigration(
+      "supabase/migrations/20260701010000_payment_launch_hardening.sql",
+    );
+    const webhook = readMigration("supabase/functions/payments-webhook/index.ts");
+
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS public.stripe_webhook_events");
+    expect(migration).toContain("event_id text PRIMARY KEY");
+    expect(webhook).toContain('sb.from("stripe_webhook_events").insert');
+    expect(webhook).toContain('ledgerInsertError.code === "23505"');
+    expect(webhook).toContain("Duplicate webhook event ignored");
+  });
+
+  it("hard-requires bidder cards and blocks accidental live winner charges", () => {
+    const migration = readMigration(
+      "supabase/migrations/20260701010000_payment_launch_hardening.sql",
+    );
+    const auctionCharge = readMigration("supabase/functions/_shared/auction-winner-charge.ts");
+
+    expect(migration).toContain("v.stripe_customer_id IS NULL OR v.stripe_payment_method_id IS NULL");
+    expect(migration).toContain("RETURN QUERY SELECT false,'payment_method_required'");
+    expect(auctionCharge).toContain('ENABLE_LIVE_PAYMENTS") !== "true"');
+    expect(auctionCharge).toContain("chargeAuctionWinnerOrder");
+    expect(auctionCharge).toContain("off_session: true");
   });
 });
 

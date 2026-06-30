@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw, Send } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 const STATUSES = ["manual_payout_pending", "manual_payout_paid", "manual_payout_failed", "manual_payout_on_hold"] as const;
@@ -25,12 +25,49 @@ const VARIANT: Record<string, "warning" | "success" | "destructive" | "muted"> =
   manual_payout_on_hold: "muted",
 };
 
+type PayoutRow = {
+  id: string;
+  base_amount: number;
+  buyer_fee: number;
+  seller_fee: number;
+  seller_payout: number;
+  amount_charged: number;
+  status: string;
+  manual_payout_status: string;
+  manual_payout_paid_at: string | null;
+  manual_payout_reference: string | null;
+  admin_notes: string | null;
+  environment: string;
+  created_at: string;
+  stripe_transfer_id: string | null;
+  refunded_amount: number | null;
+  refund_status: string | null;
+  _has_issue: boolean;
+  order?: {
+    id: string;
+    status: string;
+    pickup_status: string | null;
+    buyer?: { full_name: string | null; email: string | null } | null;
+    lot?: {
+      title: string | null;
+      event?: { org_id: string; organization?: { name: string | null } | null } | null;
+    } | null;
+  } | null;
+};
+
+type ReportOrderRef = { order_id: string | null };
+
+const adminPayoutRpc = supabase.rpc as unknown as (
+  fn: "admin_set_payout_status",
+  args: { _payment_id: string; _status: string; _reference: string | null; _note: string | null },
+) => Promise<{ error: { message: string } | null }>;
+
 export default function AdminPayouts() {
   const { toast } = useToast();
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<PayoutRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<PayoutRow | null>(null);
   const [draft, setDraft] = useState({ status: "manual_payout_pending", reference: "", notes: "" });
 
   const load = async () => {
@@ -40,7 +77,7 @@ export default function AdminPayouts() {
       .select(`
         id, base_amount, buyer_fee, seller_fee, seller_payout, amount_charged,
         status, manual_payout_status, manual_payout_paid_at, manual_payout_reference,
-        admin_notes, environment, created_at,
+        admin_notes, environment, created_at, stripe_transfer_id, refunded_amount, refund_status,
         order:orders!payments_order_id_fkey(
           id, status, pickup_status,
           buyer:profiles!orders_buyer_id_fkey(full_name, email),
@@ -51,22 +88,23 @@ export default function AdminPayouts() {
       .order("created_at", { ascending: false })
       .limit(500);
     // attach open issue flag
-    const ordIds = (data ?? []).map((r:any)=>r.order?.id).filter(Boolean);
+    const payoutRows = (data ?? []) as unknown as Omit<PayoutRow, "_has_issue">[];
+    const ordIds = payoutRows.map((r) => r.order?.id).filter((id): id is string => Boolean(id));
     let issueSet = new Set<string>();
     if (ordIds.length) {
       const { data: rep } = await supabase.from('lot_reports')
         .select('order_id').in('order_id', ordIds)
         .in('status', ['open','investigating']);
-      issueSet = new Set((rep ?? []).map((r:any)=>r.order_id));
+      issueSet = new Set(((rep ?? []) as ReportOrderRef[]).map((r) => r.order_id).filter((id): id is string => Boolean(id)));
     }
-    setRows((data ?? []).map((r:any)=>({ ...r, _has_issue: issueSet.has(r.order?.id) })));
+    setRows(payoutRows.map((r) => ({ ...r, _has_issue: issueSet.has(r.order?.id ?? "") })));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
   const filtered = filter === "all" ? rows : rows.filter(r => r.manual_payout_status === filter);
 
-  const openEdit = (row: any) => {
+  const openEdit = (row: PayoutRow) => {
     setEditing(row);
     setDraft({
       status: row.manual_payout_status ?? "manual_payout_pending",
@@ -92,7 +130,7 @@ export default function AdminPayouts() {
         if (!window.confirm('Pickup is NOT confirmed as collected. Continue marking payout paid?')) return;
       }
     }
-    const { error } = await (supabase.rpc as any)('admin_set_payout_status', {
+    const { error } = await adminPayoutRpc('admin_set_payout_status', {
       _payment_id: editing.id,
       _status: draft.status,
       _reference: draft.reference || null,
@@ -103,6 +141,47 @@ export default function AdminPayouts() {
     } else {
       toast({ title: "Payout updated" });
       setEditing(null);
+      load();
+    }
+  };
+
+  const autoTransfer = async (row: PayoutRow) => {
+    if (!window.confirm("Attempt automatic Stripe seller transfer for this payout? Only proceed in sandbox/staging unless live payouts are explicitly approved.")) return;
+    const { data, error } = await supabase.functions.invoke("admin-create-seller-transfer", {
+      body: { payment_id: row.id, note: "Admin-triggered seller transfer" },
+    });
+    if (error || data?.error) {
+      toast({
+        title: "Transfer blocked",
+        description: error?.message || data?.error || "Could not create seller transfer",
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: "Seller transfer created", description: data?.transfer_id });
+      load();
+    }
+  };
+
+  const refundPayment = async (row: PayoutRow) => {
+    const remaining = Number(row.amount_charged) - Number(row.refunded_amount ?? 0);
+    const amountText = window.prompt(`Refund amount up to $${remaining.toFixed(2)} AUD`, remaining.toFixed(2));
+    if (!amountText) return;
+    const amount = Number(amountText);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > remaining) {
+      return toast({ title: "Invalid refund amount", variant: "destructive" });
+    }
+    const notes = window.prompt("Refund reason / admin note") || "Admin refund";
+    const { data, error } = await supabase.functions.invoke("admin-refund-payment", {
+      body: { payment_id: row.id, amount, reason: "requested_by_customer", notes },
+    });
+    if (error || data?.error) {
+      toast({
+        title: "Refund failed",
+        description: error?.message || data?.error || "Could not refund payment",
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: "Refund processed", description: data?.refund_id });
       load();
     }
   };
@@ -126,7 +205,7 @@ export default function AdminPayouts() {
       </div>
       <div className="rounded-md border border-warning/40 bg-warning/10 text-sm p-3 flex items-start gap-2">
         <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
-        <span><strong>Manual payout required.</strong> Pay the seller off-platform (bank transfer or other), then mark as paid here. Marking paid does NOT trigger an automatic transfer.</span>
+        <span><strong>Payout controls are guarded.</strong> Manual payouts remain the beta default. Automatic Stripe seller transfers only run when the backend has `ENABLE_AUTOMATED_PAYOUTS=true` and the order is collected with no open issue.</span>
       </div>
 
       <div className="border rounded-md overflow-x-auto">
@@ -142,6 +221,7 @@ export default function AdminPayouts() {
             <TableHead>Buyer paid</TableHead>
             <TableHead>Net payout</TableHead>
             <TableHead>Stripe</TableHead>
+            <TableHead>Refunded</TableHead>
             <TableHead>Payout</TableHead>
             <TableHead></TableHead>
           </TableRow></TableHeader>
@@ -162,8 +242,19 @@ export default function AdminPayouts() {
                 <TableCell>${Number(r.amount_charged).toFixed(2)}</TableCell>
                 <TableCell className="font-medium">${Number(r.seller_payout).toFixed(2)}</TableCell>
                 <TableCell><Badge variant="success">{r.status}</Badge></TableCell>
-                <TableCell><Badge variant={VARIANT[r.manual_payout_status]}>{LABEL[r.manual_payout_status]}</Badge></TableCell>
                 <TableCell>
+                  {Number(r.refunded_amount ?? 0) > 0
+                    ? <Badge variant={r.refund_status === "succeeded" ? "success" : "warning"}>${Number(r.refunded_amount).toFixed(2)}</Badge>
+                    : <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell><Badge variant={VARIANT[r.manual_payout_status]}>{LABEL[r.manual_payout_status]}</Badge></TableCell>
+                <TableCell className="space-x-2">
+                  <Button size="sm" variant="outline" onClick={() => autoTransfer(r)} disabled={!!r.stripe_transfer_id || r.manual_payout_status === "manual_payout_paid"}>
+                    <Send className="h-3.5 w-3.5 mr-1" />Transfer
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => refundPayment(r)} disabled={r.manual_payout_status === "manual_payout_paid"}>
+                    <RefreshCw className="h-3.5 w-3.5 mr-1" />Refund
+                  </Button>
                   <Dialog open={editing?.id === r.id} onOpenChange={(o) => !o && setEditing(null)}>
                     <DialogTrigger asChild>
                       <Button size="sm" variant="outline" onClick={() => openEdit(r)}>Update</Button>
@@ -191,7 +282,7 @@ export default function AdminPayouts() {
             ))}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={13} className="text-center py-10 text-muted-foreground">
                   No payouts match this filter yet.
                 </TableCell>
               </TableRow>

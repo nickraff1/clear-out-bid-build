@@ -2,6 +2,7 @@
 // SQL helper which atomically closes every active auction past its end time.
 // Public (no auth) so pg_cron + admins can both invoke it.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { chargeAuctionWinnerOrder } from "../_shared/auction-winner-charge.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,12 +19,37 @@ Deno.serve(async (req) => {
     const { data, error } = await sb.rpc("close_all_expired_auctions");
     if (error) throw error;
     const results = (data ?? []) as Array<{ lot_id: string; result: string }>;
+    const chargeResults: Array<Record<string, unknown>> = [];
+
+    for (const result of results) {
+      if (result.result !== "sold") continue;
+      const { data: lot } = await sb
+        .from("lots")
+        .select("reserved_order_id")
+        .eq("id", result.lot_id)
+        .maybeSingle();
+      const orderId = (lot as { reserved_order_id?: string | null } | null)?.reserved_order_id;
+      if (!orderId) {
+        chargeResults.push({ lot_id: result.lot_id, ok: false, skipped: "missing_reserved_order" });
+        continue;
+      }
+      const charge = await chargeAuctionWinnerOrder(sb, { orderId });
+      chargeResults.push({ lot_id: result.lot_id, order_id: orderId, ...charge });
+    }
+
+    const defaulted = chargeResults.filter((r) => r.ok === false).length;
     const summary = results.reduce<Record<string, number>>((acc, r) => {
       acc[r.result] = (acc[r.result] ?? 0) + 1;
       return acc;
     }, {});
-    console.log("[close-expired-auctions]", { count: results.length, summary });
-    return new Response(JSON.stringify({ closed: results.length, summary, results }), {
+    console.log("[close-expired-auctions]", { count: results.length, summary, chargeResults });
+    return new Response(JSON.stringify({
+      closed: results.length,
+      defaulted,
+      summary,
+      results,
+      charge_results: chargeResults,
+    }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

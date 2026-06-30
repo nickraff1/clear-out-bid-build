@@ -39,6 +39,9 @@ type Stats = {
   conversationsNoMessages: number;
   paidOrderMissingSystemMessages: number;
   paidOrdersNoConversation: number;
+  paymentIntegrityIssues: number;
+  failedWebhookEvents: number;
+  auctionAutoChargeFailures: number;
 };
 
 type CountOnlyQuery = {
@@ -78,6 +81,7 @@ export default function AdminLaunch() {
       pendingPayouts, unresolvedReports, stuckOrders, paidOrders, latestPayment,
       expiredAuctions, paidNoCode, expiredPickupLots, uncategorizedLots,
       adminRpcCheck, messagingIssues, conversationsNoMessages, paidOrderMissingSystemMessages, paidNoConversation,
+      paymentIntegrityIssues, failedWebhookEvents, auctionChargeFailures,
     ] = await Promise.all([
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active"),
       supabase.from("organizations").select("id", { count: "exact", head: true }).eq("org_type", "seller"),
@@ -97,6 +101,9 @@ export default function AdminLaunch() {
       fromUntyped("admin_messaging_integrity").select("conversation_id", { count: "exact", head: true }).eq("issue", "conversation_no_messages"),
       fromUntyped("admin_messaging_integrity").select("conversation_id", { count: "exact", head: true }).eq("issue", "paid_order_missing_system_message"),
       fromUntyped("admin_stuck_orders").select("order_id", { count: "exact", head: true }).eq("stuck_reason", "paid_no_conversation"),
+      fromUntyped("admin_payment_integrity").select("payment_id", { count: "exact", head: true }).not("issue", "is", null),
+      fromUntyped("stripe_webhook_events").select("event_id", { count: "exact", head: true }).eq("processing_status", "failed"),
+      fromUntyped("orders").select("id", { count: "exact", head: true }).not("auction_payment_error", "is", null),
     ]);
 
     const distinctSellerUsers = new Set(((sellerUsers.data ?? []) as Array<{ user_id: string }>).map(r => r.user_id)).size;
@@ -125,6 +132,9 @@ export default function AdminLaunch() {
       conversationsNoMessages: conversationsNoMessages.count ?? 0,
       paidOrderMissingSystemMessages: paidOrderMissingSystemMessages.count ?? 0,
       paidOrdersNoConversation: paidNoConversation.count ?? 0,
+      paymentIntegrityIssues: paymentIntegrityIssues.count ?? 0,
+      failedWebhookEvents: failedWebhookEvents.count ?? 0,
+      auctionAutoChargeFailures: auctionChargeFailures.count ?? 0,
     });
     setLoading(false);
   }, [isAdmin, roles, user]);
@@ -171,12 +181,36 @@ export default function AdminLaunch() {
     {
       label: "Auction journey (verify → bid → close → winner order)",
       status: "pass",
-      detail: "can_user_bid enforces verification, terms, card, deposits; auction closer creates winner order with 10% buyer fee; reserve respected.",
+      detail: "can_user_bid enforces terms, saved card, restrictions and deposits; auction closer creates winner order, then attempts off-session card charge before pickup.",
+    },
+    {
+      label: "Auction winner auto-charge failures",
+      status: stats.auctionAutoChargeFailures === 0 ? "pass" : "fail",
+      detail: stats.auctionAutoChargeFailures === 0
+        ? "No auction winner payment failures are currently flagged."
+        : `${stats.auctionAutoChargeFailures} auction order(s) have failed automatic winner charge attempts. Review bidders/orders before relisting.`,
+      href: "/app/admin/bidders",
     },
     {
       label: "Payment states (success / fail / expired / cancel)",
       status: stats.paymentMode === "none" ? "fail" : "pass",
-      detail: "Embedded Checkout, webhook handles success/expired/canceled, server-side cancel-pending-order releases reservations atomically.",
+      detail: "Embedded Checkout and webhook ledger handle success/expired/canceled/failure events; duplicate Stripe events are ignored safely.",
+    },
+    {
+      label: "Webhook processing health",
+      status: stats.failedWebhookEvents === 0 ? "pass" : "fail",
+      detail: stats.failedWebhookEvents === 0
+        ? "No failed Stripe webhook events are recorded."
+        : `${stats.failedWebhookEvents} Stripe webhook event(s) failed processing. Inspect backend logs and retry/reconcile before launch.`,
+      href: "/app/admin/payments",
+    },
+    {
+      label: "Payment / payout integrity",
+      status: stats.paymentIntegrityIssues === 0 ? "pass" : "fail",
+      detail: stats.paymentIntegrityIssues === 0
+        ? "Payment, refund and payout integrity checks are clear."
+        : `${stats.paymentIntegrityIssues} payment integrity issue(s) need admin review before launch.`,
+      href: "/app/admin/payouts",
     },
     {
       label: "Policy pages live",
@@ -195,7 +229,7 @@ export default function AdminLaunch() {
       label: "Expired auction backlog",
       status: stats.expiredAuctionsActive === 0 ? "pass" : "fail",
       detail: stats.expiredAuctionsActive === 0
-        ? "No expired auctions sitting in active status. Auction closer is running every 2 minutes."
+        ? "No expired auctions sitting in active status. Confirm the close-expired-auctions schedule in Lovable/Supabase before live auctions."
         : `${stats.expiredAuctionsActive} expired auction(s) still marked active. Use "Close expired auctions now".`,
     },
     {

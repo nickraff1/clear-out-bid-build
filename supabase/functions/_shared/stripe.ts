@@ -8,7 +8,7 @@ const getEnv = (key: string): string => {
 };
 
 export type StripeEnv = "sandbox" | "live";
-export type StripeWebhookEvent = { type: string; data: { object: unknown } };
+export type StripeWebhookEvent = { id?: string; type: string; data: { object: unknown } };
 
 const GATEWAY_STRIPE_BASE = "https://connector-gateway.lovable.dev/stripe";
 

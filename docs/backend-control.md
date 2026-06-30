@@ -38,9 +38,11 @@ Edge functions:
 - `close-expired-auctions`
 - `auction-engine`
 - `create-checkout`
-- `stripe-checkout`
-- `stripe-webhook`
 - `payments-webhook`
+- `charge-auction-winner`
+- `admin-refund-payment`
+- `admin-create-seller-transfer`
+- `stripe-checkout` / `stripe-webhook` legacy scaffolds, not the beta payment path
 - `cancel-pending-order`
 - bidder payment method functions
 

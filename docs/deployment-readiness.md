@@ -63,20 +63,24 @@ Do not switch to live payments without owner approval.
 
 Webhook functions:
 
-- `stripe-webhook`
-- `payments-webhook`
+- `payments-webhook`: canonical checkout/payment webhook for beta and launch
+- `stripe-webhook`: legacy scaffold; do not configure it for buyer checkout payments
 
 Scheduled/operational functions:
 
 - `close-expired-auctions`
 - `auction-engine`
+- `charge-auction-winner`
+- `admin-refund-payment`
+- `admin-create-seller-transfer`
 
 Before live beta:
 
-1. Confirm webhook endpoints are registered.
+1. Confirm only `payments-webhook?env=sandbox` is registered for buyer checkout payments.
 2. Confirm checkout success, failure, cancel and expiry events update orders/payments.
-3. Confirm expired auctions are closed on schedule.
-4. Confirm payment webhooks are idempotent enough for duplicate events.
+3. Confirm duplicate Stripe events are recorded once in `stripe_webhook_events`.
+4. Confirm expired auctions are closed on schedule and winner cards are charged in sandbox.
+5. Confirm refund and seller-transfer functions are blocked in live mode unless owner-approved flags are set.
 
 ## Domain/auth redirects
 
