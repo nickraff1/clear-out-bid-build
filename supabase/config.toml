@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.admin-create-seller-transfer]
 verify_jwt = false
+
+[functions.bootstrap-founder-admin]
+verify_jwt = false
