@@ -46,7 +46,7 @@ type PaymentRow = {
   seller_payout: number | null;
 };
 type ReportRow = { id: string; status: string | null };
-type MemberRow = { user_id: string | null; role: string | null };
+type MemberRow = { user_id: string | null };
 type BadgeRow = { id: string };
 
 type OverviewStats = {
@@ -96,7 +96,7 @@ export default function AdminOverview() {
       supabase.from('payments').select('id, status, manual_payout_status, base_amount, buyer_fee, seller_fee, seller_payout'),
       supabase.from('lot_reports').select('id, status'),
       fromUntyped('admin_stuck_orders').select('order_id', { count: 'exact', head: true }).not('stuck_reason', 'is', null),
-      supabase.from('org_members').select('user_id, role'),
+      supabase.from('org_members').select('user_id'),
       supabase.from('seller_badges').select('id'),
       fromUntyped('admin_messaging_integrity').select('conversation_id', { count: 'exact', head: true }).not('issue', 'is', null),
     ]);
@@ -117,8 +117,7 @@ export default function AdminOverview() {
     const M = (members.data ?? []) as MemberRow[];
 
     const sellerUserIds = new Set(
-      M.filter((m) => ['owner', 'admin', 'member'].includes(m.role ?? '') && m.user_id)
-        .map((m) => m.user_id),
+      M.map((m) => m.user_id).filter(Boolean),
     );
     const buyerUserIds = new Set(O.map((o) => o.buyer_id).filter(Boolean));
     const succeededPayments = P.filter((p) => p.status === 'succeeded');
