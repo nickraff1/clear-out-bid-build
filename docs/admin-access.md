@@ -75,6 +75,15 @@ where lower(email) = lower('anthony.younes24@gmail.com')
 on conflict (user_id, role) do nothing;
 ```
 
+### Option C: controlled launch QA migration
+
+Migration `20260701020000_bootstrap_founder_admin_roles.sql` grants admin to:
+
+- `nickraffmgmt@gmail.com`
+- `anthony.younes24@gmail.com`
+
+It is idempotent and only inserts roles for profiles that already exist. This is intended to unblock launch QA when edge function deployment is unavailable. Remove test-account admin after QA if it is no longer needed.
+
 ## Grant admin after bootstrap
 
 After one admin exists, use the restricted RPC:

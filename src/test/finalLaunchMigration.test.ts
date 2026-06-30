@@ -133,6 +133,9 @@ describe("admin bootstrap safety", () => {
   it("keeps founder admin bootstrap token-protected and allowlisted", () => {
     const bootstrap = readMigration("supabase/functions/bootstrap-founder-admin/index.ts");
     const docs = readMigration("docs/admin-access.md");
+    const migration = readMigration(
+      "supabase/migrations/20260701020000_bootstrap_founder_admin_roles.sql",
+    );
 
     expect(bootstrap).toContain('requiredEnv("ADMIN_BOOTSTRAP_TOKEN")');
     expect(bootstrap).toContain('requiredEnv("FOUNDER_ADMIN_EMAILS")');
@@ -141,5 +144,9 @@ describe("admin bootstrap safety", () => {
     expect(bootstrap).toContain("founder_admin_bootstrap");
     expect(docs).toContain("Disable or rotate `ADMIN_BOOTSTRAP_TOKEN`");
     expect(docs).toContain("No user can self-grant admin from the frontend.");
+    expect(migration).toContain("nickraffmgmt@gmail.com");
+    expect(migration).toContain("anthony.younes24@gmail.com");
+    expect(migration).toContain("on conflict (user_id, role) do nothing");
+    expect(migration).not.toContain("select id, 'admin'::public.app_role from public.profiles");
   });
 });
