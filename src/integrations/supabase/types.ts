@@ -1115,6 +1115,13 @@ export type Database = {
             foreignKeyName: "messages_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "admin_messaging_integrity"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
@@ -1179,6 +1186,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_related_conversation_id_fkey"
+            columns: ["related_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "admin_messaging_integrity"
+            referencedColumns: ["conversation_id"]
+          },
           {
             foreignKeyName: "notifications_related_conversation_id_fkey"
             columns: ["related_conversation_id"]
@@ -1964,6 +1978,79 @@ export type Database = {
       }
     }
     Views: {
+      admin_messaging_integrity: {
+        Row: {
+          buyer_id: string | null
+          conversation_id: string | null
+          created_at: string | null
+          has_buyer_profile: boolean | null
+          has_listing_context: boolean | null
+          has_messages: boolean | null
+          has_order_confirmed_message: boolean | null
+          has_order_context: boolean | null
+          has_seller_org: boolean | null
+          issue: string | null
+          last_message_at: string | null
+          lot_id: string | null
+          order_id: string | null
+          seller_org_id: string | null
+        }
+        Insert: {
+          buyer_id?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          has_buyer_profile?: never
+          has_listing_context?: never
+          has_messages?: never
+          has_order_confirmed_message?: never
+          has_order_context?: never
+          has_seller_org?: never
+          issue?: never
+          last_message_at?: string | null
+          lot_id?: string | null
+          order_id?: string | null
+          seller_org_id?: string | null
+        }
+        Update: {
+          buyer_id?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          has_buyer_profile?: never
+          has_listing_context?: never
+          has_messages?: never
+          has_order_confirmed_message?: never
+          has_order_context?: never
+          has_seller_org?: never
+          issue?: never
+          last_message_at?: string | null
+          lot_id?: string | null
+          order_id?: string | null
+          seller_org_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "conversations_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_seller_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_stuck_orders: {
         Row: {
           agreed_pickup_at: string | null
@@ -2156,6 +2243,15 @@ export type Database = {
       }
       close_expired_auction: { Args: { _lot_id: string }; Returns: string }
       deposit_tier_band: { Args: { _amount: number }; Returns: string }
+      ensure_conversation: {
+        Args: {
+          _buyer_id: string
+          _lot_id?: string
+          _order_id?: string
+          _seller_org_id: string
+        }
+        Returns: string
+      }
       generate_pickup_code: { Args: never; Returns: string }
       get_bidder_status: {
         Args: { _user_id: string }
