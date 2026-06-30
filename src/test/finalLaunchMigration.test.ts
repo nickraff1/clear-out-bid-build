@@ -74,11 +74,26 @@ describe("payment webhook messaging", () => {
 
     expect(webhook).toContain("ORDER_CONFIRMED_MESSAGE");
     expect(webhook).toContain("completePaidOrder");
-    expect(paidOrderHelper).toContain('onConflict: "buyer_id,seller_org_id,lot_id"');
+    expect(paidOrderHelper).toContain('onConflict: "order_id"');
     expect(paidOrderHelper).toContain(".upsert(");
     expect(paidOrderHelper).toContain('.eq("body", ORDER_CONFIRMED_MESSAGE)');
     expect(paidOrderHelper).toContain("Pickup details are available on the order page once payment is confirmed.");
     expect(paidOrderHelper).not.toContain("exact pickup address");
+  });
+
+  it("repairs paid orders with order-scoped conversations", () => {
+    const migration = readMigration(
+      "supabase/migrations/20260701030000_repair_paid_order_conversations.sql",
+    );
+
+    expect(migration).toContain("idx_conversations_order_id_unique");
+    expect(migration).toContain("DROP CONSTRAINT IF EXISTS conversations_buyer_id_seller_org_id_lot_id_key");
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION public.ensure_conversation");
+    expect(migration).toContain("auth.role() <> 'service_role'");
+    expect(migration).toContain("CREATE OR REPLACE VIEW public.admin_messaging_integrity");
+    expect(migration).toContain("missing_paid_order_conversations");
+    expect(migration).toContain("ON CONFLICT (order_id) DO UPDATE");
+    expect(migration).toContain("paid_order_missing_system_message");
   });
 
   it("records Stripe webhook events for idempotent processing", () => {

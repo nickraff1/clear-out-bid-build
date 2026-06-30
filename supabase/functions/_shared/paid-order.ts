@@ -52,7 +52,7 @@ export async function completePaidOrder(
       .from("conversations")
       .upsert(
         { buyer_id: buyerId, seller_org_id: sellerOrgId, lot_id: lotId, order_id: orderId },
-        { onConflict: "buyer_id,seller_org_id,lot_id" },
+        { onConflict: "order_id" },
       )
       .select("id")
       .single();
