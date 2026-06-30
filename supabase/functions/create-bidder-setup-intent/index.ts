@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createStripeClient, type StripeEnv } from "../_shared/stripe.ts";
+import { createStripeClient, resolveConfiguredPaymentEnvironment } from "../_shared/stripe.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -22,13 +22,12 @@ Deno.serve(async (req) => {
     const userId = claimsData.claims.sub as string;
     const userEmail = (claimsData.claims.email as string | undefined) ?? undefined;
 
-    const env: StripeEnv = Deno.env.get("STRIPE_LIVE_API_KEY") ? "live" : "sandbox";
-    const stripe = createStripeClient(env);
-
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+    const env = await resolveConfiguredPaymentEnvironment(admin);
+    const stripe = createStripeClient(env);
 
     const { data: bv } = await admin
       .from("bidder_verifications")

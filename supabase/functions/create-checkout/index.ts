@@ -2,7 +2,7 @@
 // Uses dynamic price_data (one-off charge built from the order amount).
 // Tracks platform fees (10% buyer + 10% seller) on the payments row.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
+import { type StripeEnv, createStripeClient, normalizeRequestedEnvironment } from "../_shared/stripe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const env: StripeEnv = environment === "live" ? "live" : "sandbox";
+    const env: StripeEnv = normalizeRequestedEnvironment(environment);
 
     // Load order with related lot/event
     const { data: order, error: orderErr } = await admin

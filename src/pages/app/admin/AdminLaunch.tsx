@@ -162,26 +162,28 @@ export default function AdminLaunch() {
   const checks: Check[] = [
     {
       label: "Buyer journey (browse → buy → pickup → review)",
-      status: "pass",
-      detail: "Checkout charges 10% buyer fee, orders surface on /app/buyer/orders with plain-language statuses, pickup code shown after payment, review prompt on completion.",
+      status: stats.latestTxnStatus === "succeeded" && stats.paidOrdersNoPickupCode === 0 ? "warn" : "fail",
+      detail: stats.latestTxnStatus === "succeeded"
+        ? "Code path is wired and the latest payment succeeded. Still run the full sandbox checklist before inviting real buyers."
+        : "Run a sandbox buy-now checkout and confirm payment, pickup code, conversation, pickup proposal and review unlock.",
       href: "/app/buyer/orders",
     },
     {
       label: "Seller journey (create → publish → sell → payout)",
-      status: "pass",
-      detail: "Sellers see 'Listings' (not 'lots'), can publish, coordinate pickup, confirm with pickup code, and see manual payout status.",
+      status: stats.sellers > 0 && stats.activeListings > 0 ? "warn" : "fail",
+      detail: "Listing, order, pickup and manual payout screens are available. Complete a real seller sandbox sale before closed beta.",
       href: "/app/seller/lots",
     },
     {
       label: "Admin journey (orders, payouts, reports, bidders)",
-      status: "pass",
-      detail: "Force-complete, regenerate pickup code, manual payouts with safeguards, report resolution, bidder risk tools including admin_remove_bid.",
+      status: stats.currentUserAdmin && stats.adminRpcAvailable ? "warn" : "fail",
+      detail: "Admin tools exist for orders, payouts, reports and bidders. Verify hold, paid, issue-resolution and refund actions against sandbox data.",
       href: "/app/admin/bidders",
     },
     {
       label: "Auction journey (verify → bid → close → winner order)",
-      status: "pass",
-      detail: "can_user_bid enforces terms, saved card, restrictions and deposits; auction closer creates winner order, then attempts off-session card charge before pickup.",
+      status: stats.expiredAuctionsActive === 0 && stats.auctionAutoChargeFailures === 0 ? "warn" : "fail",
+      detail: "Server-side bidding guards and winner charge flow are implemented. Prove saved-card setup, deposit hold, scheduled close and failed-card handling in sandbox before live auctions.",
     },
     {
       label: "Auction winner auto-charge failures",
@@ -193,8 +195,8 @@ export default function AdminLaunch() {
     },
     {
       label: "Payment states (success / fail / expired / cancel)",
-      status: stats.paymentMode === "none" ? "fail" : "pass",
-      detail: "Embedded Checkout and webhook ledger handle success/expired/canceled/failure events; duplicate Stripe events are ignored safely.",
+      status: stats.paymentMode === "none" ? "fail" : stats.latestTxnStatus === "succeeded" ? "warn" : "fail",
+      detail: "Embedded Checkout and webhook ledger are implemented. Sandbox QA must still prove success, failed payment, cancelled checkout and expired checkout handling.",
     },
     {
       label: "Webhook processing health",
@@ -220,10 +222,10 @@ export default function AdminLaunch() {
     },
     {
       label: "Closed-beta readiness",
-      status: stats.paymentMode === "live" ? "pass" : "warn",
+      status: "warn",
       detail: stats.paymentMode === "live"
-        ? "All journeys pass and Stripe is live."
-        : "All journeys pass; complete Stripe go-live before opening to real buyers.",
+        ? "Live frontend key is present, but closed-beta readiness still depends on passing the sandbox and live-smoke checklist."
+        : "Sandbox mode is expected at this stage. Complete the sandbox checklist before switching on live buyer payments.",
     },
     {
       label: "Expired auction backlog",

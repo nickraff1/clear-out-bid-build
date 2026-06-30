@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getStripe } from '@/lib/stripe';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import type { Stripe, StripeElementsOptions } from '@stripe/stripe-js';
+import type { StripeEnv } from '@/lib/stripe';
 
 interface Props {
   open: boolean;
@@ -14,7 +15,15 @@ interface Props {
   onSaved?: () => void;
 }
 
-function PaymentForm({ onSaved, onClose }: { onSaved?: () => void; onClose: () => void }) {
+function PaymentForm({
+  environment,
+  onSaved,
+  onClose,
+}: {
+  environment: StripeEnv;
+  onSaved?: () => void;
+  onClose: () => void;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +48,7 @@ function PaymentForm({ onSaved, onClose }: { onSaved?: () => void; onClose: () =
       }
 
       const { data, error: fnErr } = await supabase.functions.invoke('confirm-bidder-payment-method', {
-        body: { setup_intent_id: setupIntent.id },
+        body: { setup_intent_id: setupIntent.id, environment },
       });
       if (fnErr || data?.error) throw new Error(fnErr?.message || data?.error || 'Could not save card');
 
@@ -78,6 +87,7 @@ function PaymentForm({ onSaved, onClose }: { onSaved?: () => void; onClose: () =
 
 export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
   const [clientSecret, setClientSecret] = useState<string>('');
+  const [paymentEnvironment, setPaymentEnvironment] = useState<StripeEnv>('sandbox');
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -85,6 +95,7 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
   useEffect(() => {
     if (!open) {
       setClientSecret('');
+      setPaymentEnvironment('sandbox');
       setError('');
       return;
     }
@@ -98,7 +109,10 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
           body: {},
         });
         if (fnErr || data?.error) throw new Error(fnErr?.message || data?.error || 'Could not start card setup');
-        if (!cancelled) setClientSecret(data.client_secret);
+        if (!cancelled) {
+          setClientSecret(data.client_secret);
+          setPaymentEnvironment(data.environment === 'live' ? 'live' : 'sandbox');
+        }
       } catch (err) {
         if (!cancelled) setError((err as Error).message);
       } finally {
@@ -133,7 +147,11 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
         )}
         {!loading && clientSecret && stripePromise && options && (
           <Elements stripe={stripePromise} options={options}>
-            <PaymentForm onSaved={onSaved} onClose={() => onOpenChange(false)} />
+            <PaymentForm
+              environment={paymentEnvironment}
+              onSaved={onSaved}
+              onClose={() => onOpenChange(false)}
+            />
           </Elements>
         )}
       </DialogContent>

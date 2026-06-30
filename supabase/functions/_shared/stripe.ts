@@ -9,6 +9,8 @@ const getEnv = (key: string): string => {
 
 export type StripeEnv = "sandbox" | "live";
 export type StripeWebhookEvent = { id?: string; type: string; data: { object: unknown } };
+type SupabaseLike = { from: (table: string) => any };
+type GatewaySettings = { current_gateway_mode?: string | null };
 
 const GATEWAY_STRIPE_BASE = "https://connector-gateway.lovable.dev/stripe";
 
@@ -39,6 +41,30 @@ export function createStripeClient(env: StripeEnv): Stripe {
       });
     }),
   });
+}
+
+export function assertLivePaymentsEnabled(env: StripeEnv) {
+  if (env === "live" && Deno.env.get("ENABLE_LIVE_PAYMENTS") !== "true") {
+    throw new Error("Live payments are blocked because ENABLE_LIVE_PAYMENTS is not true");
+  }
+}
+
+export function normalizeRequestedEnvironment(environment?: string | null): StripeEnv {
+  const env: StripeEnv = environment === "live" ? "live" : "sandbox";
+  assertLivePaymentsEnabled(env);
+  return env;
+}
+
+export async function resolveConfiguredPaymentEnvironment(sb: SupabaseLike): Promise<StripeEnv> {
+  const { data } = await sb
+    .from("auction_deposit_settings")
+    .select("current_gateway_mode")
+    .eq("singleton", true)
+    .maybeSingle();
+  const mode = ((data as GatewaySettings | null)?.current_gateway_mode) ?? "lovable_gateway_sandbox";
+  const env: StripeEnv = mode === "lovable_gateway_live" ? "live" : "sandbox";
+  assertLivePaymentsEnabled(env);
+  return env;
 }
 
 export async function verifyWebhook(req: Request, env: StripeEnv): Promise<StripeWebhookEvent> {

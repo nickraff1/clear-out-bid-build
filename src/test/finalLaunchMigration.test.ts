@@ -99,10 +99,20 @@ describe("payment webhook messaging", () => {
       "supabase/migrations/20260701010000_payment_launch_hardening.sql",
     );
     const auctionCharge = readMigration("supabase/functions/_shared/auction-winner-charge.ts");
+    const stripeHelper = readMigration("supabase/functions/_shared/stripe.ts");
+    const createCheckout = readMigration("supabase/functions/create-checkout/index.ts");
+    const setupIntent = readMigration("supabase/functions/create-bidder-setup-intent/index.ts");
+    const depositHold = readMigration("supabase/functions/authorize-bid-deposit/index.ts");
 
     expect(migration).toContain("v.stripe_customer_id IS NULL OR v.stripe_payment_method_id IS NULL");
     expect(migration).toContain("RETURN QUERY SELECT false,'payment_method_required'");
-    expect(auctionCharge).toContain('ENABLE_LIVE_PAYMENTS") !== "true"');
+    expect(stripeHelper).toContain('ENABLE_LIVE_PAYMENTS") !== "true"');
+    expect(stripeHelper).toContain("resolveConfiguredPaymentEnvironment");
+    expect(createCheckout).toContain("normalizeRequestedEnvironment(environment)");
+    expect(setupIntent).toContain("resolveConfiguredPaymentEnvironment(admin)");
+    expect(depositHold).toContain("resolveConfiguredPaymentEnvironment(admin)");
+    expect(setupIntent).not.toContain('Deno.env.get("STRIPE_LIVE_API_KEY") ? "live" : "sandbox"');
+    expect(depositHold).not.toContain('Deno.env.get("STRIPE_LIVE_API_KEY") ? "live" : "sandbox"');
     expect(auctionCharge).toContain("chargeAuctionWinnerOrder");
     expect(auctionCharge).toContain("off_session: true");
   });

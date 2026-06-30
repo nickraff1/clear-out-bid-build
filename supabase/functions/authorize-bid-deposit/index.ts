@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createStripeClient, type StripeEnv } from "../_shared/stripe.ts";
+import { createStripeClient, resolveConfiguredPaymentEnvironment } from "../_shared/stripe.ts";
 
 // Creates (or reuses) a manual-capture PaymentIntent that authorizes the
 // required deposit on the bidder's saved card for a given lot.
@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
     const { data: settings } = await admin
       .from("auction_deposit_settings").select("current_gateway_mode").eq("singleton", true).maybeSingle();
     const gatewayMode = (settings?.current_gateway_mode as string) ?? "lovable_gateway_sandbox";
+    const env = await resolveConfiguredPaymentEnvironment(admin);
 
     // Reuse an existing authorized hold that already covers the required amount.
     const { data: existing } = await admin
@@ -94,7 +95,6 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
     }
 
-    const env: StripeEnv = Deno.env.get("STRIPE_LIVE_API_KEY") ? "live" : "sandbox";
     const stripe = createStripeClient(env);
 
     const { data: depRow, error: insErr } = await admin.from("auction_deposits").insert({

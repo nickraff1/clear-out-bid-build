@@ -1,6 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createStripeClient, type StripeEnv } from "../_shared/stripe.ts";
+import {
+  createStripeClient,
+  normalizeRequestedEnvironment,
+  resolveConfiguredPaymentEnvironment,
+} from "../_shared/stripe.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -23,13 +27,20 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const setupIntentId = body?.setup_intent_id as string | undefined;
+    const requestedEnvironment = body?.environment as string | undefined;
     if (!setupIntentId) {
       return new Response(JSON.stringify({ error: "setup_intent_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const env: StripeEnv = Deno.env.get("STRIPE_LIVE_API_KEY") ? "live" : "sandbox";
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const env = requestedEnvironment
+      ? normalizeRequestedEnvironment(requestedEnvironment)
+      : await resolveConfiguredPaymentEnvironment(admin);
     const stripe = createStripeClient(env);
 
     const intent = await stripe.setupIntents.retrieve(setupIntentId);
@@ -66,10 +77,6 @@ Deno.serve(async (req) => {
       console.warn("customer.update default PM failed", e);
     }
 
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
     const { error: upErr } = await admin
       .from("bidder_verifications")
       .upsert({

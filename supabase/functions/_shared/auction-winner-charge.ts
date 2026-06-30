@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { createStripeClient, type StripeEnv } from "./stripe.ts";
+import { createStripeClient, resolveConfiguredPaymentEnvironment, type StripeEnv } from "./stripe.ts";
 import { completePaidOrder } from "./paid-order.ts";
 
 type SupabaseAdmin = ReturnType<typeof createClient>;
@@ -18,22 +18,6 @@ type BidderVerification = {
 };
 
 type PaymentRow = { id: string };
-
-export async function resolvePaymentEnvironment(sb: SupabaseAdmin): Promise<StripeEnv> {
-  const { data: settings } = await sb
-    .from("auction_deposit_settings")
-    .select("current_gateway_mode")
-    .eq("singleton", true)
-    .maybeSingle();
-  const mode = (settings?.current_gateway_mode as string | undefined) ?? "lovable_gateway_sandbox";
-  if (mode === "lovable_gateway_live") {
-    if (Deno.env.get("ENABLE_LIVE_PAYMENTS") !== "true") {
-      throw new Error("Live payment mode is configured but ENABLE_LIVE_PAYMENTS is not true");
-    }
-    return "live";
-  }
-  return "sandbox";
-}
 
 export async function chargeAuctionWinnerOrder(
   sb: SupabaseAdmin,
@@ -77,7 +61,7 @@ export async function chargeAuctionWinnerOrder(
     return { ok: false, error: "payment_method_required" };
   }
 
-  const env = args.env ?? await resolvePaymentEnvironment(sb);
+  const env = args.env ?? await resolveConfiguredPaymentEnvironment(sb);
   const stripe = createStripeClient(env);
   const total = Number(order.amount);
   const basePrice = Math.round((total / 1.10) * 100) / 100;
