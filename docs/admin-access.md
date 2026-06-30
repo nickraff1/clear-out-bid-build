@@ -18,6 +18,43 @@ There is no `admin_users` table and no hardcoded admin email in the app.
 
 The first admin must be granted by a trusted database operator using the Supabase SQL editor or service-role context. Do not run this from the frontend.
 
+### Option A: token-protected edge function
+
+Deploy `bootstrap-founder-admin`, then configure these Lovable/Supabase function secrets:
+
+```text
+ADMIN_BOOTSTRAP_TOKEN=<long random one-time token>
+FOUNDER_ADMIN_EMAILS=nickraffmgmt@gmail.com,anthony.younes24@gmail.com
+```
+
+Call the function with:
+
+```json
+{
+  "email": "nickraffmgmt@gmail.com",
+  "token": "<ADMIN_BOOTSTRAP_TOKEN>"
+}
+```
+
+For QA, call it again with:
+
+```json
+{
+  "email": "anthony.younes24@gmail.com",
+  "token": "<ADMIN_BOOTSTRAP_TOKEN>"
+}
+```
+
+Security rules:
+
+- The function uses the service-role key server-side.
+- The requested email must be present in `FOUNDER_ADMIN_EMAILS`.
+- The submitted token must match `ADMIN_BOOTSTRAP_TOKEN`.
+- No user can self-grant admin from the frontend.
+- Disable or rotate `ADMIN_BOOTSTRAP_TOKEN` immediately after admin access is verified.
+
+### Option B: one-time SQL
+
 Replace the email with the founder account:
 
 ```sql

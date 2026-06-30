@@ -45,6 +45,7 @@ Deploy these edge functions:
 - `charge-auction-winner`
 - `admin-refund-payment`
 - `admin-create-seller-transfer`
+- `bootstrap-founder-admin`
 - `create-bidder-setup-intent`
 - `confirm-bidder-payment-method`
 - `authorize-bid-deposit`
@@ -56,8 +57,12 @@ Sandbox secrets:
 - `LOVABLE_API_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `VITE_PAYMENTS_CLIENT_TOKEN` using a Stripe test publishable key
+- `ADMIN_BOOTSTRAP_TOKEN` temporarily, only until founder/admin QA access is confirmed
+- `FOUNDER_ADMIN_EMAILS` with comma-separated founder/admin QA emails
 
 Do not configure `STRIPE_LIVE_API_KEY`, `PAYMENTS_LIVE_WEBHOOK_SECRET` or `ENABLE_LIVE_PAYMENTS=true` until sandbox QA passes.
+
+After admin access is confirmed, disable or rotate `ADMIN_BOOTSTRAP_TOKEN`.
 
 ## Sandbox QA Checklist
 

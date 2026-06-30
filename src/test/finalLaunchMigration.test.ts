@@ -128,3 +128,18 @@ describe("message thread recovery UX", () => {
     expect(thread).toContain("Back to messages");
   });
 });
+
+describe("admin bootstrap safety", () => {
+  it("keeps founder admin bootstrap token-protected and allowlisted", () => {
+    const bootstrap = readMigration("supabase/functions/bootstrap-founder-admin/index.ts");
+    const docs = readMigration("docs/admin-access.md");
+
+    expect(bootstrap).toContain('requiredEnv("ADMIN_BOOTSTRAP_TOKEN")');
+    expect(bootstrap).toContain('requiredEnv("FOUNDER_ADMIN_EMAILS")');
+    expect(bootstrap).toContain("Email is not in FOUNDER_ADMIN_EMAILS");
+    expect(bootstrap).toContain('role: "admin"');
+    expect(bootstrap).toContain("founder_admin_bootstrap");
+    expect(docs).toContain("Disable or rotate `ADMIN_BOOTSTRAP_TOKEN`");
+    expect(docs).toContain("No user can self-grant admin from the frontend.");
+  });
+});
