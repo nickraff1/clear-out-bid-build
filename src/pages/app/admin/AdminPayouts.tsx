@@ -77,6 +77,8 @@ export default function AdminPayouts() {
   const [editing, setEditing] = useState<PayoutRow | null>(null);
   const [draft, setDraft] = useState({ status: "manual_payout_pending", reference: "", notes: "" });
   const [confirmPaid, setConfirmPaid] = useState<{ open: boolean; warnings: string[] }>({ open: false, warnings: [] });
+  const [confirmTransfer, setConfirmTransfer] = useState<PayoutRow | null>(null);
+  const [refundDialog, setRefundDialog] = useState<{ row: PayoutRow | null; amount: string; notes: string }>({ row: null, amount: "", notes: "" });
 
   const load = async () => {
     setLoading(true);
@@ -160,7 +162,6 @@ export default function AdminPayouts() {
   };
 
   const autoTransfer = async (row: PayoutRow) => {
-    if (!window.confirm("Attempt automatic Stripe seller transfer for this payout? Only proceed in sandbox/staging unless live payouts are explicitly approved.")) return;
     const { data, error } = await supabase.functions.invoke("admin-create-seller-transfer", {
       body: { payment_id: row.id, note: "Admin-triggered seller transfer" },
     });
@@ -174,17 +175,18 @@ export default function AdminPayouts() {
       toast({ title: "Seller transfer created", description: data?.transfer_id });
       load();
     }
+    setConfirmTransfer(null);
   };
 
-  const refundPayment = async (row: PayoutRow) => {
+  const submitRefund = async () => {
+    const row = refundDialog.row;
+    if (!row) return;
     const remaining = Number(row.amount_charged) - Number(row.refunded_amount ?? 0);
-    const amountText = window.prompt(`Refund amount up to $${remaining.toFixed(2)} AUD`, remaining.toFixed(2));
-    if (!amountText) return;
-    const amount = Number(amountText);
+    const amount = Number(refundDialog.amount);
     if (!Number.isFinite(amount) || amount <= 0 || amount > remaining) {
       return toast({ title: "Invalid refund amount", variant: "destructive" });
     }
-    const notes = window.prompt("Refund reason / admin note") || "Admin refund";
+    const notes = refundDialog.notes || "Admin refund";
     const { data, error } = await supabase.functions.invoke("admin-refund-payment", {
       body: { payment_id: row.id, amount, reason: "requested_by_customer", notes },
     });
@@ -196,8 +198,14 @@ export default function AdminPayouts() {
       });
     } else {
       toast({ title: "Refund processed", description: data?.refund_id });
+      setRefundDialog({ row: null, amount: "", notes: "" });
       load();
     }
+  };
+
+  const openRefund = (row: PayoutRow) => {
+    const remaining = Number(row.amount_charged) - Number(row.refunded_amount ?? 0);
+    setRefundDialog({ row, amount: remaining.toFixed(2), notes: "" });
   };
 
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -221,6 +229,44 @@ export default function AdminPayouts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!confirmTransfer} onOpenChange={(o) => !o && setConfirmTransfer(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Trigger automatic Stripe transfer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Only proceed in sandbox/staging unless live payouts are explicitly approved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmTransfer && autoTransfer(confirmTransfer)}>Send transfer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!refundDialog.row} onOpenChange={(o) => !o && setRefundDialog({ row: null, amount: "", notes: "" })}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Refund payment</DialogTitle></DialogHeader>
+          {refundDialog.row && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Max refundable: ${(Number(refundDialog.row.amount_charged) - Number(refundDialog.row.refunded_amount ?? 0)).toFixed(2)} AUD
+              </p>
+              <Input type="number" step="0.01" placeholder="Refund amount (AUD)"
+                value={refundDialog.amount}
+                onChange={(e) => setRefundDialog(d => ({ ...d, amount: e.target.value }))} />
+              <Textarea placeholder="Refund reason / admin note"
+                value={refundDialog.notes}
+                onChange={(e) => setRefundDialog(d => ({ ...d, notes: e.target.value }))} />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundDialog({ row: null, amount: "", notes: "" })}>Cancel</Button>
+            <Button onClick={submitRefund}>Process refund</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex items-end justify-between gap-3">
         <div>
@@ -281,10 +327,10 @@ export default function AdminPayouts() {
                 </TableCell>
                 <TableCell><Badge variant={VARIANT[r.manual_payout_status]}>{LABEL[r.manual_payout_status]}</Badge></TableCell>
                 <TableCell className="space-x-2">
-                  <Button size="sm" variant="outline" onClick={() => autoTransfer(r)} disabled={!!r.stripe_transfer_id || r.manual_payout_status === "manual_payout_paid"}>
+                  <Button size="sm" variant="outline" onClick={() => setConfirmTransfer(r)} disabled={!!r.stripe_transfer_id || r.manual_payout_status === "manual_payout_paid"}>
                     <Send className="h-3.5 w-3.5 mr-1" />Transfer
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => refundPayment(r)} disabled={r.manual_payout_status === "manual_payout_paid"}>
+                  <Button size="sm" variant="outline" onClick={() => openRefund(r)} disabled={r.manual_payout_status === "manual_payout_paid"}>
                     <RefreshCw className="h-3.5 w-3.5 mr-1" />Refund
                   </Button>
                   <Dialog open={editing?.id === r.id} onOpenChange={(o) => !o && setEditing(null)}>
