@@ -1,0 +1,1 @@
+UPDATE public.auction_deposit_settings SET current_gateway_mode = 'lovable_gateway_live' WHERE singleton = true;
