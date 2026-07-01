@@ -88,8 +88,8 @@ export default function Checkout() {
 
         <div className="grid lg:grid-cols-2 gap-6">
           <Card className="h-fit">
-            <CardHeader><CardTitle>Order summary</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
+          <CardHeader><CardTitle>Order summary</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
               <div className="flex gap-3">
                 <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                   <Package className="h-7 w-7 text-muted-foreground" />
@@ -105,9 +105,12 @@ export default function Checkout() {
                 <div className="text-sm bg-muted/40 rounded-lg p-3 flex items-start gap-2">
                   <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
                   <div>
-                    <p>{order.event.site_address}</p>
+                    <p>Pickup suburb</p>
                     <p className="text-muted-foreground">
                       {order.event.suburb}, {order.event.state} {order.event.postcode}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Exact pickup address is shown after payment is confirmed.
                     </p>
                   </div>
                 </div>

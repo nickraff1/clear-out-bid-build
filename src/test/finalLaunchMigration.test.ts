@@ -100,9 +100,13 @@ describe("payment webhook messaging", () => {
     const migration = readMigration(
       "supabase/migrations/20260701010000_payment_launch_hardening.sql",
     );
+    const deployedRepairMigration = readMigration(
+      "supabase/migrations/20260701040000_ensure_stripe_webhook_events.sql",
+    );
     const webhook = readMigration("supabase/functions/payments-webhook/index.ts");
 
     expect(migration).toContain("CREATE TABLE IF NOT EXISTS public.stripe_webhook_events");
+    expect(deployedRepairMigration).toContain("CREATE TABLE IF NOT EXISTS public.stripe_webhook_events");
     expect(migration).toContain("event_id text PRIMARY KEY");
     expect(webhook).toContain('sb.from("stripe_webhook_events").insert');
     expect(webhook).toContain('ledgerInsertError.code === "23505"');
@@ -134,6 +138,13 @@ describe("payment webhook messaging", () => {
 });
 
 describe("message thread recovery UX", () => {
+  it("keeps the Supabase RPC client binding when creating conversations", () => {
+    const conversations = readMigration("src/lib/conversations.ts");
+
+    expect(conversations).toContain("await supabase.rpc('ensure_conversation'");
+    expect(conversations).not.toContain("const ensureConversationRpc = supabase.rpc");
+  });
+
   it("guides users when a conversation cannot be loaded", () => {
     const thread = readMigration("src/pages/app/messages/MessageThread.tsx");
 
