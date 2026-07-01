@@ -44,9 +44,14 @@ export default function Marketplace() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from('categories').select('*').order('name').then(({ data }) => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from('categories').select('*').order('name');
+      if (cancelled) return;
       if (data) setCategories(data as Category[]);
-    }).finally(() => setCategoriesLoaded(true));
+      setCategoriesLoaded(true);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {

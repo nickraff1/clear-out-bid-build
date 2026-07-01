@@ -1474,6 +1474,73 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_refunds: {
+        Row: {
+          admin_id: string | null
+          admin_notes: string | null
+          amount: number
+          created_at: string
+          error_message: string | null
+          id: string
+          order_id: string
+          payment_id: string
+          reason: string | null
+          status: string
+          stripe_refund_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_id?: string | null
+          admin_notes?: string | null
+          amount: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          order_id: string
+          payment_id: string
+          reason?: string | null
+          status?: string
+          stripe_refund_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string | null
+          admin_notes?: string | null
+          amount?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          order_id?: string
+          payment_id?: string
+          reason?: string | null
+          status?: string
+          stripe_refund_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           admin_notes: string | null
@@ -1491,11 +1558,14 @@ export type Database = {
           order_id: string
           payment_method: string | null
           payment_mode: Database["public"]["Enums"]["payment_mode"]
+          refund_status: string | null
+          refunded_amount: number
           seller_fee: number
           seller_payout: number
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id: string | null
           stripe_payment_intent_id: string | null
+          stripe_refund_id: string | null
           stripe_session_id: string | null
           stripe_transfer_id: string | null
           updated_at: string
@@ -1516,11 +1586,14 @@ export type Database = {
           order_id: string
           payment_method?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode"]
+          refund_status?: string | null
+          refunded_amount?: number
           seller_fee?: number
           seller_payout?: number
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_refund_id?: string | null
           stripe_session_id?: string | null
           stripe_transfer_id?: string | null
           updated_at?: string
@@ -1541,11 +1614,14 @@ export type Database = {
           order_id?: string
           payment_method?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode"]
+          refund_status?: string | null
+          refunded_amount?: number
           seller_fee?: number
           seller_payout?: number
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_refund_id?: string | null
           stripe_session_id?: string | null
           stripe_transfer_id?: string | null
           updated_at?: string
@@ -1914,6 +1990,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      stripe_webhook_events: {
+        Row: {
+          created_at: string
+          environment: string
+          error_message: string | null
+          event_id: string
+          event_type: string
+          payload: Json | null
+          processed_at: string | null
+          processing_status: string
+          received_at: string
+        }
+        Insert: {
+          created_at?: string
+          environment: string
+          error_message?: string | null
+          event_id: string
+          event_type: string
+          payload?: Json | null
+          processed_at?: string | null
+          processing_status?: string
+          received_at?: string
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          error_message?: string | null
+          event_id?: string
+          event_type?: string
+          payload?: Json | null
+          processed_at?: string | null
+          processing_status?: string
+          received_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

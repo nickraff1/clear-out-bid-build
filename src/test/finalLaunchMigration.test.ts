@@ -23,7 +23,7 @@ describe("final launch migration", () => {
     const validStatuses = new Set(
       enumMatch![1]
         .split(",")
-        .map((status) => status.trim().replaceAll("'", "")),
+        .map((status) => status.trim().split("'").join("")),
     );
 
     const seedStatusMatch = finalLaunchMigration.match(
@@ -33,7 +33,7 @@ describe("final launch migration", () => {
 
     const seedStatuses = seedStatusMatch![1]
       .split(",")
-      .map((status) => status.trim().replaceAll("'", ""));
+      .map((status) => status.trim().split("'").join(""));
 
     expect(seedStatuses).toEqual(["paid", "ready_for_pickup", "collected"]);
     expect(seedStatuses.every((status) => validStatuses.has(status))).toBe(true);

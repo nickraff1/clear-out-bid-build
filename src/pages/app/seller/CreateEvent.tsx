@@ -341,7 +341,7 @@ export default function CreateEvent() {
                     <Checkbox
                       id="has_forklift"
                       checked={formData.has_forklift}
-                      onCheckedChange={(checked) => updateFormData('has_forklift', checked)}
+                      onCheckedChange={(checked) => updateFormData('has_forklift', checked === true)}
                     />
                     <Label htmlFor="has_forklift" className="font-normal">Forklift available</Label>
                   </div>
@@ -349,7 +349,7 @@ export default function CreateEvent() {
                     <Checkbox
                       id="has_dock"
                       checked={formData.has_dock}
-                      onCheckedChange={(checked) => updateFormData('has_dock', checked)}
+                      onCheckedChange={(checked) => updateFormData('has_dock', checked === true)}
                     />
                     <Label htmlFor="has_dock" className="font-normal">Loading dock access</Label>
                   </div>
