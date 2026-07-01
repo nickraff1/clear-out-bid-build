@@ -9,6 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, Loader2, RefreshCw, Send } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format, parseISO } from "date-fns";
 
 const STATUSES = ["manual_payout_pending", "manual_payout_paid", "manual_payout_failed", "manual_payout_on_hold"] as const;
@@ -57,10 +61,13 @@ type PayoutRow = {
 
 type ReportOrderRef = { order_id: string | null };
 
-const adminPayoutRpc = supabase.rpc as unknown as (
-  fn: "admin_set_payout_status",
-  args: { _payment_id: string; _status: string; _reference: string | null; _note: string | null },
-) => Promise<{ error: { message: string } | null }>;
+// NOTE: do NOT destructure supabase.rpc — it loses `this` binding and throws
+// "Cannot read properties of undefined (reading 'rest')" from supabase-js.
+// Always call `supabase.rpc(...)` inline.
+type SetPayoutArgs = { _payment_id: string; _status: string; _reference: string | null; _note: string | null };
+const callSetPayoutStatus = (args: SetPayoutArgs) =>
+  (supabase.rpc as unknown as (fn: string, args: SetPayoutArgs) => Promise<{ error: { message: string } | null }>)
+    .call(supabase, "admin_set_payout_status", args);
 
 export default function AdminPayouts() {
   const { toast } = useToast();
@@ -69,6 +76,7 @@ export default function AdminPayouts() {
   const [filter, setFilter] = useState<string>("all");
   const [editing, setEditing] = useState<PayoutRow | null>(null);
   const [draft, setDraft] = useState({ status: "manual_payout_pending", reference: "", notes: "" });
+  const [confirmPaid, setConfirmPaid] = useState<{ open: boolean; warnings: string[] }>({ open: false, warnings: [] });
 
   const load = async () => {
     setLoading(true);
@@ -113,24 +121,9 @@ export default function AdminPayouts() {
     });
   };
 
-  const save = async () => {
+  const performSave = async () => {
     if (!editing) return;
-    // Safeguards
-    if (draft.status === 'manual_payout_paid') {
-      if (editing.status !== 'succeeded') {
-        return toast({ title: 'Blocked', description: 'Payment is not in succeeded state.', variant: 'destructive' });
-      }
-      if (['cancelled','refunded'].includes(editing.order?.status)) {
-        return toast({ title: 'Blocked', description: `Order is ${editing.order.status}.`, variant: 'destructive' });
-      }
-      if (editing._has_issue) {
-        if (!window.confirm('There is an OPEN ISSUE on this order. Continue marking payout paid?')) return;
-      }
-      if (editing.order?.status !== 'collected') {
-        if (!window.confirm('Pickup is NOT confirmed as collected. Continue marking payout paid?')) return;
-      }
-    }
-    const { error } = await adminPayoutRpc('admin_set_payout_status', {
+    const { error } = await callSetPayoutStatus({
       _payment_id: editing.id,
       _status: draft.status,
       _reference: draft.reference || null,
@@ -141,8 +134,29 @@ export default function AdminPayouts() {
     } else {
       toast({ title: "Payout updated" });
       setEditing(null);
+      setConfirmPaid({ open: false, warnings: [] });
       load();
     }
+  };
+
+  const save = async () => {
+    if (!editing) return;
+    if (draft.status === 'manual_payout_paid') {
+      if (editing.status !== 'succeeded') {
+        return toast({ title: 'Blocked', description: 'Payment is not in succeeded state.', variant: 'destructive' });
+      }
+      if (editing.order?.status && ['cancelled','refunded'].includes(editing.order.status)) {
+        return toast({ title: 'Blocked', description: `Order is ${editing.order.status}.`, variant: 'destructive' });
+      }
+      const warnings: string[] = [];
+      if (editing._has_issue) warnings.push('This order has an OPEN ISSUE.');
+      if (editing.order?.status !== 'collected') warnings.push('Pickup is not yet confirmed as collected.');
+      if (warnings.length > 0) {
+        setConfirmPaid({ open: true, warnings });
+        return;
+      }
+    }
+    await performSave();
   };
 
   const autoTransfer = async (row: PayoutRow) => {
@@ -190,6 +204,24 @@ export default function AdminPayouts() {
 
   return (
     <div className="p-6 space-y-4">
+      <AlertDialog open={confirmPaid.open} onOpenChange={(o) => !o && setConfirmPaid({ open: false, warnings: [] })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark payout as paid?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <ul className="list-disc pl-5 space-y-1 mt-2">
+                {confirmPaid.warnings.map((w) => <li key={w}>{w}</li>)}
+              </ul>
+              <p className="mt-3">These are safeguards, not blockers. Continue only if you've verified the payout is genuinely due.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={performSave}>Mark paid anyway</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Payouts</h1>
