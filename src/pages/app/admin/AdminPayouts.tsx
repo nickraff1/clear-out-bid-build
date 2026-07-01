@@ -76,7 +76,6 @@ export default function AdminPayouts() {
   const [filter, setFilter] = useState<string>("all");
   const [editing, setEditing] = useState<PayoutRow | null>(null);
   const [draft, setDraft] = useState({ status: "manual_payout_pending", reference: "", notes: "" });
-  const [confirmPaid, setConfirmPaid] = useState<{ open: boolean; warnings: string[] }>({ open: false, warnings: [] });
   const [confirmTransfer, setConfirmTransfer] = useState<PayoutRow | null>(null);
   const [refundDialog, setRefundDialog] = useState<{ row: PayoutRow | null; amount: string; notes: string }>({ row: null, amount: "", notes: "" });
 
@@ -136,7 +135,6 @@ export default function AdminPayouts() {
     } else {
       toast({ title: "Payout updated" });
       setEditing(null);
-      setConfirmPaid({ open: false, warnings: [] });
       load();
     }
   };
@@ -149,13 +147,6 @@ export default function AdminPayouts() {
       }
       if (editing.order?.status && ['cancelled','refunded'].includes(editing.order.status)) {
         return toast({ title: 'Blocked', description: `Order is ${editing.order.status}.`, variant: 'destructive' });
-      }
-      const warnings: string[] = [];
-      if (editing._has_issue) warnings.push('This order has an OPEN ISSUE.');
-      if (editing.order?.status !== 'collected') warnings.push('Pickup is not yet confirmed as collected.');
-      if (warnings.length > 0) {
-        setConfirmPaid({ open: true, warnings });
-        return;
       }
     }
     await performSave();
@@ -212,24 +203,6 @@ export default function AdminPayouts() {
 
   return (
     <div className="p-6 space-y-4">
-      <AlertDialog open={confirmPaid.open} onOpenChange={(o) => !o && setConfirmPaid({ open: false, warnings: [] })}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Mark payout as paid?</AlertDialogTitle>
-            <AlertDialogDescription>
-              <ul className="list-disc pl-5 space-y-1 mt-2">
-                {confirmPaid.warnings.map((w) => <li key={w}>{w}</li>)}
-              </ul>
-              <p className="mt-3">These are safeguards, not blockers. Continue only if you've verified the payout is genuinely due.</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={performSave}>Mark paid anyway</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <AlertDialog open={!!confirmTransfer} onOpenChange={(o) => !o && setConfirmTransfer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -346,6 +319,15 @@ export default function AdminPayouts() {
                             {STATUSES.map(s => <SelectItem key={s} value={s}>{LABEL[s]}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                        {draft.status === "manual_payout_paid" && (r._has_issue || r.order?.status !== "collected") && (
+                          <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+                            <div className="font-medium">Review before marking paid</div>
+                            <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                              {r._has_issue && <li>This order has an open issue.</li>}
+                              {r.order?.status !== "collected" && <li>Pickup is not yet confirmed as collected.</li>}
+                            </ul>
+                          </div>
+                        )}
                         <Input placeholder="Payout reference (e.g. bank transfer ID)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} />
                         <Textarea placeholder="Admin notes" value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
                       </div>
