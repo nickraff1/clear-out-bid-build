@@ -55,7 +55,7 @@ const fromUntyped = (table: string) => supabase.from(table as never) as unknown 
 const isAdminRpc = (
   fn: "is_admin",
   args: { _user_id: string },
-) => supabase.rpc(fn, args) as Promise<{ data: boolean | null; error: { message?: string } | null }>;
+) => supabase.rpc(fn, args) as unknown as Promise<{ data: boolean | null; error: { message?: string } | null }>;
 
 const env = (import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined) ?? "";
 
