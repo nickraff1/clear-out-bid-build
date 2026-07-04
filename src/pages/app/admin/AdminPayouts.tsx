@@ -256,7 +256,7 @@ export default function AdminPayouts() {
       </div>
       <div className="rounded-md border border-warning/40 bg-warning/10 text-sm p-3 flex items-start gap-2">
         <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
-        <span><strong>Payout controls are guarded.</strong> Manual payouts remain the beta default. Automatic Stripe seller transfers only run when the backend has `ENABLE_AUTOMATED_PAYOUTS=true` and the order is collected with no open issue.</span>
+        <span><strong>Automated payouts are live.</strong> When an order is marked collected, the platform automatically transfers 90% of the sale to the seller's Stripe balance. Use the Transfer button below only to retry a payout that failed or was missed (e.g. seller onboarded late).</span>
       </div>
 
       <div className="border rounded-md overflow-x-auto">
