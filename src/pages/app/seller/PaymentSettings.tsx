@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getStripeEnvironment } from '@/lib/stripe';
 import {
   CreditCard,
   ExternalLink,
@@ -71,12 +70,10 @@ export default function PaymentSettings() {
     if (!primaryOrg?.id) return;
     setIsConnecting(true);
     try {
-      const environment = getStripeEnvironment();
       const { data, error } = await supabase.functions.invoke('stripe-connect-onboard', {
         body: {
           org_id: primaryOrg.id,
           return_url: window.location.href,
-          environment,
         },
       });
       if (error || !data?.url) {
