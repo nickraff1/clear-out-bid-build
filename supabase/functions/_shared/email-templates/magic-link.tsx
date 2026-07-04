@@ -33,7 +33,7 @@ export const MagicLinkEmail = ({
           shortly.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Log In
+          Sign in to Offcutt
         </Button>
         <Text style={footer}>
           If you didn't request this link, you can safely ignore this email.

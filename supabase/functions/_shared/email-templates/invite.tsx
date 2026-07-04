@@ -40,7 +40,7 @@ export const InviteEmail = ({
           account.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Accept Invitation
+          Join Offcutt
         </Button>
         <Text style={footer}>
           If you weren't expecting this invitation, you can safely ignore this

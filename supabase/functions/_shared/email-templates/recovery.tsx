@@ -33,7 +33,7 @@ export const RecoveryEmail = ({
           the button below to choose a new password.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Reset Password
+          Reset your password
         </Button>
         <Text style={footer}>
           If you didn't request a password reset, you can safely ignore this
