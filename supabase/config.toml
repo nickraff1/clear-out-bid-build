@@ -23,6 +23,8 @@ project_id = "uiusztanyjwmccdabtvs"
     verify_jwt = true
   [functions.stripe-connect-onboard]
     verify_jwt = false
+  [functions.stripe-connect-refresh]
+    verify_jwt = false
   [functions.auto-payout-on-collected]
     verify_jwt = false
   [functions.sweep-unpaid-payouts]
