@@ -241,7 +241,8 @@ export default function CreateLot() {
       } else {
         lotData.start_price = parseFloat(formData.start_price);
         lotData.reserve_price = formData.reserve_price ? parseFloat(formData.reserve_price) : null;
-        lotData.auction_end = formData.auction_end;
+        // datetime-local value is local time; convert to UTC ISO for storage
+        lotData.auction_end = new Date(formData.auction_end).toISOString();
       }
 
       const { data: lot, error: lotError } = await supabase

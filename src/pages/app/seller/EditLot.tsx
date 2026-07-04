@@ -48,7 +48,12 @@ export default function EditLot() {
     } else {
       payload.start_price = parseFloat(form.start_price) || null;
       payload.reserve_price = form.reserve_price ? parseFloat(form.reserve_price) : null;
-      payload.auction_end = form.auction_end;
+      // If the user edited the datetime-local field, form.auction_end is a
+      // local-time string like "2026-07-04T16:00". Convert to UTC ISO.
+      // If unchanged, it's already an ISO string from the DB — normalize both.
+      payload.auction_end = form.auction_end
+        ? new Date(form.auction_end).toISOString()
+        : null;
     }
     const { error } = await supabase.from('lots').update(payload).eq('id', id!);
     setSaving(false);
