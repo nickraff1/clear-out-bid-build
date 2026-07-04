@@ -48,6 +48,16 @@ export default function PaymentSettings() {
   const load = useCallback(async () => {
     if (!primaryOrg?.id) { setLoading(false); return; }
     setLoading(true);
+    // Pull fresh status from Stripe first so the UI reflects onboarding
+    // completion even before any webhook lands. Ignore errors — we still
+    // fall through to the DB read below.
+    try {
+      await supabase.functions.invoke('stripe-connect-refresh', {
+        body: { org_id: primaryOrg.id },
+      });
+    } catch (e) {
+      console.warn('stripe-connect-refresh failed', e);
+    }
     const { data } = await supabase
       .from('seller_stripe_accounts')
       .select('stripe_account_id, charges_enabled, payouts_enabled, details_submitted, account_status')
