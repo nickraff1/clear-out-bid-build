@@ -1,7 +1,7 @@
 // Stripe Connect Express onboarding link generator.
 // Routes all Stripe API calls through the Lovable gateway proxy.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { createStripeClient, normalizeRequestedEnvironment, type StripeEnv } from "../_shared/stripe.ts";
+import { createStripeClient, resolveConfiguredPaymentEnvironment, type StripeEnv } from "../_shared/stripe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +38,10 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const orgId = body?.org_id as string | undefined;
     const returnUrl = body?.return_url as string | undefined;
-    const env: StripeEnv = normalizeRequestedEnvironment(body?.environment as string | undefined);
+    // Always resolve environment server-side from the configured gateway mode.
+    // The client's publishable key prefix (pk_test_ in preview) must NOT decide
+    // whether we create a sandbox or live Connect account.
+    const env: StripeEnv = await resolveConfiguredPaymentEnvironment(admin);
     if (!orgId || !returnUrl) {
       return new Response(JSON.stringify({ error: "org_id and return_url required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -62,6 +65,20 @@ Deno.serve(async (req) => {
 
     const stripe = createStripeClient(env);
     let accountId = (existing as { stripe_account_id: string | null } | null)?.stripe_account_id ?? null;
+
+    // If we have an existing account id, verify it exists in the current
+    // environment. A sandbox acct_... will 404 against the live API (and vice
+    // versa) — in that case, forget it and create a fresh account for this env.
+    if (accountId) {
+      try {
+        await stripe.accounts.retrieve(accountId);
+      } catch (retrieveErr) {
+        console.warn("Existing stripe account not found in current env, recreating", {
+          accountId, env, error: (retrieveErr as Error).message,
+        });
+        accountId = null;
+      }
+    }
 
     if (!accountId) {
       // Load org for prefill.
