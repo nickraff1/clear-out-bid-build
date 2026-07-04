@@ -82,6 +82,7 @@ export type Database = {
       auction_deposit_settings: {
         Row: {
           auto_charge_winner: boolean
+          auto_payouts_enabled: boolean
           current_gateway_mode: string
           current_terms_version: string
           enabled: boolean
@@ -95,6 +96,7 @@ export type Database = {
         }
         Insert: {
           auto_charge_winner?: boolean
+          auto_payouts_enabled?: boolean
           current_gateway_mode?: string
           current_terms_version?: string
           enabled?: boolean
@@ -108,6 +110,7 @@ export type Database = {
         }
         Update: {
           auto_charge_winner?: boolean
+          auto_payouts_enabled?: boolean
           current_gateway_mode?: string
           current_terms_version?: string
           enabled?: boolean
