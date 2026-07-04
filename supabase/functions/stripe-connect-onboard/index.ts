@@ -66,6 +66,20 @@ Deno.serve(async (req) => {
     const stripe = createStripeClient(env);
     let accountId = (existing as { stripe_account_id: string | null } | null)?.stripe_account_id ?? null;
 
+    // If we have an existing account id, verify it exists in the current
+    // environment. A sandbox acct_... will 404 against the live API (and vice
+    // versa) — in that case, forget it and create a fresh account for this env.
+    if (accountId) {
+      try {
+        await stripe.accounts.retrieve(accountId);
+      } catch (retrieveErr) {
+        console.warn("Existing stripe account not found in current env, recreating", {
+          accountId, env, error: (retrieveErr as Error).message,
+        });
+        accountId = null;
+      }
+    }
+
     if (!accountId) {
       // Load org for prefill.
       const { data: org } = await admin
