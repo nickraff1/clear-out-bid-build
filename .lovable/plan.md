@@ -1,73 +1,58 @@
-# Phase 2B — Live Smoke Test with Two Real Accounts
+# Set Up Custom Domain + Branded Auth Emails
 
-Replaces the earlier "seed a QA listing" approach. We'll use two genuine accounts so the live-mode path is exercised end-to-end, including Stripe Connect onboarding.
+Goal: unblock signup emails (and every future transactional email) by moving off the shared default sender onto your own verified domain. Once done, `nickraff1@gmail.com` and every future user will reliably receive verification, password reset, order confirmation, and pickup emails from your brand.
 
-## Accounts to create
+---
 
-You will create both, using two email inboxes you control:
+## Phase 1 — Purchase your domain (you do this, ~5 min)
 
-1. **Seller account** — a real seller org that will list one low-value item (~$1–$5).
-2. **Buyer account** — a real buyer that will purchase it with your real card.
+1. Open **Project Settings → Project section → Domains** (or use the Publish dialog → Add custom domain).
+2. Click **Buy new domain**.
+3. Search for the domain you want (e.g. `offcutt.com`, `offcutt.co`, `offcutt.app`, etc.).
+4. Complete contact + payment details and purchase.
 
-Use different emails than your admin account (`nickraffmgmt@gmail.com` / `anthony.younes24@gmail.com`) so we don't muddy admin data.
+Once purchased, Lovable auto-connects it to this project — no DNS work required from you.
 
-## Step-by-step
+**Tell me the domain you bought** when you're done, then I move to Phase 2.
 
-### 1. Create the seller account
-- Sign up at `/signup` with seller email
-- Complete onboarding → choose **Seller** role
-- Give the org a real business name (not "QA" / "Test")
+---
 
-### 2. Complete Stripe Connect onboarding (seller side) — **required before the purchase**
-- Go to `/app/seller/payments` (Payment Settings)
-- Click **Connect Stripe account** → complete the Stripe-hosted KYC form (business type, ID, bank account)
-- Wait until Payment Settings shows `charges_enabled: true` and `payouts_enabled: true`
-- If either is false, the smoke test can't verify the payout leg — pause here
+## Phase 2 — Set up email sender domain (I do this)
 
-### 3. Create the buyer account
-- Sign up at `/signup` with buyer email
-- Complete onboarding → choose **Buyer** role
-- Add a real payment method when prompted (or defer until checkout)
+I will:
+1. Call the email setup flow to provision a sending subdomain (e.g. `notify.yourdomain.com`). Because you bought the domain through Lovable, DNS/NS records are added automatically — no manual copy-paste at a registrar.
+2. Provision the email infrastructure (queue, send log, suppression list, cron worker).
 
-### 4. Seller lists a $1–$5 item
-- From the seller account: create a **buy-now** listing (not auction — faster to verify)
-- Price: $1–$5
-- Real title/description/photo (not "TEST")
-- Publish
+You'll see a status of "verifying" for a few minutes while DNS propagates. Scaffolding in Phase 3 does NOT need to wait for verification.
 
-### 5. Buyer purchases with a real card
-- Sign in as buyer, find the listing, click **Buy now**
-- Complete Stripe Checkout with your real card
+---
 
-### 6. Backend verification (I run this)
-Once you tell me the purchase went through, I'll verify in live data:
-- `orders` row is `paid`, `stripe_payment_intent_id` populated
-- `payments` row is `succeeded`
-- `stripe_webhook_events` has the `checkout.session.completed` event, `processed = true`
-- Listing status flipped to `sold`
-- Pickup code generated on the order
-- Conversation thread auto-created for the order
-- Notifications fired to buyer + seller
-- Payout row created for seller with correct fee math (10% buyer fee already collected, 10% seller commission deducted)
+## Phase 3 — Scaffold + brand auth email templates (I do this)
 
-### 7. Refund
-- From admin console (`/app/admin/orders/:id`), issue a full refund
-- I verify: `payment_refunds` row created, order status flipped, seller payout reversed/cancelled, buyer notified
+I will:
+1. Scaffold the 6 auth email templates (signup confirmation, magic link, password reset, invite, email change, reauthentication) and the `auth-email-hook`.
+2. Style them to match Offcutt: dark ops-tool aesthetic, orange primary CTA, black/white contrast, brand voice ("Confirm your Offcutt account", not "Verify Email").
+3. Deploy the hook.
 
-### 8. Sign-off
-If all 7 checks pass, Phase 2B is complete and we move to **Phase 2C** (short live auction end-to-end with the same two accounts) and then **Phase 2D** (24h monitoring).
+Result: as soon as DNS verifies (usually <10 min), every auth email — starting with your `nickraff1@gmail.com` signup retry — will land from `notify.yourdomain.com` in the inbox, not spam.
 
-## What you need from me before you start
+---
 
-Nothing — you can begin creating the two accounts now. Ping me:
-- (a) once seller shows `charges_enabled: true` (before you list), and
-- (b) immediately after the buyer completes checkout,
-and I'll run the verification queries.
+## Phase 4 — Test the signup that failed (you do this)
 
-## Fallback if Stripe Connect KYC gets stuck
+1. Go to the live signup page.
+2. Sign up as `nickraff1@gmail.com` (already fully deleted from the previous attempts, so it counts as a first-time signup).
+3. Confirm the email arrives from your new domain.
+4. Ping me the moment it lands — then we move directly into the original Phase 2B plan (dual seller/buyer live-test accounts + Stripe Connect onboarding).
 
-If Stripe holds the seller account for manual review (can happen on brand-new accounts), we have two options:
-- Wait it out (usually <24h)
-- Use `nickraffmgmt@gmail.com` (already admin) to create a seller org on the side and complete Connect from an established identity — slightly less clean but unblocks the smoke test same-day
+---
 
-Tell me which you prefer if we hit that.
+## Optional Phase 5 (recommended, can defer)
+
+Scaffold transactional (app) emails for order confirmations, pickup codes, bid notifications, and payout notifications so the entire post-purchase flow sends from your brand too. Say the word and I'll add this after Phase 4 passes.
+
+---
+
+### What I need from you right now
+
+Just the domain name once you've purchased it. Everything after that I handle end to end.
