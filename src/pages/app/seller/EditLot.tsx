@@ -129,7 +129,7 @@ export default function EditLot() {
               </div>
               <div className="space-y-2"><Label>Auction Ends</Label>
                 <Input type="datetime-local"
-                  value={form.auction_end ? new Date(form.auction_end).toISOString().slice(0, 16) : ''}
+                  value={form.auction_end ? toLocalInputValue(form.auction_end) : ''}
                   onChange={e => update('auction_end', e.target.value)} />
               </div>
             </>
