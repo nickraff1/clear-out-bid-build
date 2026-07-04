@@ -1,36 +1,107 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
-  CreditCard, 
-  ExternalLink, 
-  Check, 
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { getStripeEnvironment } from '@/lib/stripe';
+import {
+  CreditCard,
+  ExternalLink,
+  Check,
   AlertCircle,
   DollarSign,
   Building2,
-  Clock,
-  ArrowRight
+  Loader2,
 } from 'lucide-react';
+
+type StripeAccountStatus = {
+  stripe_account_id: string | null;
+  charges_enabled: boolean | null;
+  payouts_enabled: boolean | null;
+  details_submitted: boolean | null;
+  account_status: string | null;
+};
+
+type ConnectionState =
+  | { kind: 'not_connected' }
+  | { kind: 'pending'; account: StripeAccountStatus }
+  | { kind: 'active'; account: StripeAccountStatus }
+  | { kind: 'restricted'; account: StripeAccountStatus };
+
+function classify(row: StripeAccountStatus | null): ConnectionState {
+  if (!row?.stripe_account_id) return { kind: 'not_connected' };
+  if (row.charges_enabled && row.payouts_enabled) return { kind: 'active', account: row };
+  if (row.details_submitted && !row.payouts_enabled) return { kind: 'restricted', account: row };
+  return { kind: 'pending', account: row };
+}
 
 export default function PaymentSettings() {
   const { primaryOrg } = useAuth();
+  const { toast } = useToast();
+  const [state, setState] = useState<ConnectionState>({ kind: 'not_connected' });
+  const [loading, setLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // Placeholder - will be replaced with actual Stripe Connect status
-  const stripeConnected = false;
-  const payoutsEnabled = false;
+  const load = useCallback(async () => {
+    if (!primaryOrg?.id) { setLoading(false); return; }
+    setLoading(true);
+    const { data } = await supabase
+      .from('seller_stripe_accounts')
+      .select('stripe_account_id, charges_enabled, payouts_enabled, details_submitted, account_status')
+      .eq('org_id', primaryOrg.id)
+      .maybeSingle();
+    setState(classify((data as StripeAccountStatus | null) ?? null));
+    setLoading(false);
+  }, [primaryOrg?.id]);
 
-  const handleConnectStripe = async () => {
+  useEffect(() => { load(); }, [load]);
+
+  // Refresh when the user returns from Stripe.
+  useEffect(() => {
+    const onFocus = () => { void load(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [load]);
+
+  const handleConnect = async () => {
+    if (!primaryOrg?.id) return;
     setIsConnecting(true);
-    // This will be implemented when Stripe is enabled
-    setTimeout(() => {
+    try {
+      const environment = getStripeEnvironment();
+      const { data, error } = await supabase.functions.invoke('stripe-connect-onboard', {
+        body: {
+          org_id: primaryOrg.id,
+          return_url: window.location.href,
+          environment,
+        },
+      });
+      if (error || !data?.url) {
+        throw new Error(error?.message ?? data?.error ?? 'Could not start Stripe onboarding');
+      }
+      window.location.assign(data.url as string);
+    } catch (e) {
+      toast({
+        title: 'Onboarding failed',
+        description: (e as Error).message,
+        variant: 'destructive',
+      });
       setIsConnecting(false);
-    }, 1000);
+    }
   };
+
+  const stripeConnected = state.kind !== 'not_connected';
+  const payoutsReady = state.kind === 'active';
+  const badgeVariant: 'default' | 'secondary' | 'destructive' = payoutsReady
+    ? 'default'
+    : state.kind === 'restricted' ? 'destructive' : 'secondary';
+  const badgeLabel = state.kind === 'not_connected' ? 'Not connected'
+    : state.kind === 'pending' ? 'Pending verification'
+    : state.kind === 'restricted' ? 'Action required'
+    : 'Ready';
 
   return (
     <div className="container max-w-3xl mx-auto py-8 px-4">
@@ -55,19 +126,23 @@ export default function PaymentSettings() {
                   Connect your account to receive payments
                 </CardDescription>
               </div>
-              <Badge variant={stripeConnected ? 'default' : 'secondary'}>
-                {stripeConnected ? 'Connected' : 'Not Connected'}
-              </Badge>
+              <Badge variant={badgeVariant}>{badgeLabel}</Badge>
             </div>
           </CardHeader>
           <CardContent>
-            {!stripeConnected ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !stripeConnected ? (
               <div className="space-y-4">
                 <Alert>
-                  <Clock className="h-4 w-4" />
-                  <AlertTitle>Payment Setup Coming Soon</AlertTitle>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Connect your Stripe account</AlertTitle>
                   <AlertDescription>
-                    We're setting up secure payment processing. You'll be able to connect your bank account and receive payments directly soon.
+                    Sellers on Offcutt receive payouts through Stripe Connect. You'll be asked for
+                    your business details, bank account, and ID. Payouts arrive automatically after
+                    each order is collected.
                   </AlertDescription>
                 </Alert>
 
@@ -93,31 +168,47 @@ export default function PaymentSettings() {
                   </ul>
                 </div>
 
-                <Button 
-                  className="w-full" 
-                  disabled={true}
+                <Button
+                  className="w-full"
+                  disabled={isConnecting || !primaryOrg?.id}
+                  onClick={handleConnect}
                 >
-                  <Building2 className="h-4 w-4 mr-2" />
-                  Connect Payment Account (Coming Soon)
+                  {isConnecting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Redirecting…</>
+                  ) : (
+                    <><Building2 className="h-4 w-4 mr-2" />Connect Payment Account</>
+                  )}
                 </Button>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Check className="h-6 w-6 text-primary" />
+                  <div className={`h-12 w-12 rounded-full flex items-center justify-center ${payoutsReady ? 'bg-primary/10' : 'bg-warning/10'}`}>
+                    {payoutsReady ? <Check className="h-6 w-6 text-primary" /> : <AlertCircle className="h-6 w-6 text-warning" />}
                   </div>
                   <div>
-                    <p className="font-medium">Account Connected</p>
+                    <p className="font-medium">
+                      {payoutsReady ? 'Ready to receive payouts' : state.kind === 'restricted' ? 'Additional information needed' : 'Verification in progress'}
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      Payouts will be sent to your connected bank account
+                      {payoutsReady
+                        ? 'Stripe will pay 90% of every completed sale into your connected bank account.'
+                        : 'Continue Stripe onboarding to finish verifying your account and enable payouts.'}
                     </p>
                   </div>
                 </div>
 
-                <Button variant="outline" className="w-full">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Manage Payment Account
+                <Button
+                  variant={payoutsReady ? 'outline' : 'default'}
+                  className="w-full"
+                  onClick={handleConnect}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Redirecting…</>
+                  ) : (
+                    <><ExternalLink className="h-4 w-4 mr-2" />{payoutsReady ? 'Manage Payment Account' : 'Continue Stripe Onboarding'}</>
+                  )}
                 </Button>
               </div>
             )}

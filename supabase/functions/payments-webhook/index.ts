@@ -19,6 +19,13 @@ type PaymentIntent = {
 
 type PaymentRow = { id: string; order_id?: string | null; status?: string | null };
 
+type StripeAccountEvent = {
+  id: string;
+  charges_enabled?: boolean | null;
+  payouts_enabled?: boolean | null;
+  details_submitted?: boolean | null;
+};
+
 function getSupabase() {
   if (!_supabase) {
     _supabase = createClient(
@@ -57,6 +64,19 @@ async function handlePaymentFailed(pi: PaymentIntent, env: StripeEnv) {
     environment: env,
     updated_at: new Date().toISOString(),
   }).eq("stripe_payment_intent_id", pi.id);
+}
+
+// Connect: keep seller_stripe_accounts in sync with Stripe.
+async function handleAccountUpdated(acct: StripeAccountEvent) {
+  const details = acct.details_submitted === true;
+  await getSupabase().from("seller_stripe_accounts").update({
+    charges_enabled: acct.charges_enabled ?? false,
+    payouts_enabled: acct.payouts_enabled ?? false,
+    details_submitted: details,
+    onboarding_complete: details,
+    account_status: details ? "active" : "pending",
+    updated_at: new Date().toISOString(),
+  }).eq("stripe_account_id", acct.id);
 }
 
 // Cancel the pending order tied to a session/payment-intent, but ONLY if it is
@@ -154,6 +174,9 @@ Deno.serve(async (req) => {
           break;
         case "payment_intent.canceled":
           await cancelPendingOrderForSession({ paymentIntentId: (eventObject as PaymentIntent).id }, env);
+          break;
+        case "account.updated":
+          await handleAccountUpdated(eventObject as StripeAccountEvent);
           break;
         default:
           console.log("Unhandled event:", event.type);

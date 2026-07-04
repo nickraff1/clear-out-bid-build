@@ -21,5 +21,9 @@ project_id = "uiusztanyjwmccdabtvs"
     verify_jwt = false
   [functions.process-email-queue]
     verify_jwt = true
-  [functions.stripe-webhook]
+  [functions.stripe-connect-onboard]
+    verify_jwt = false
+  [functions.auto-payout-on-collected]
+    verify_jwt = false
+  [functions.sweep-unpaid-payouts]
     verify_jwt = false
