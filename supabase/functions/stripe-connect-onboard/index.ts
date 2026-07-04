@@ -1,7 +1,7 @@
 // Stripe Connect Express onboarding link generator.
 // Routes all Stripe API calls through the Lovable gateway proxy.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { createStripeClient, normalizeRequestedEnvironment, type StripeEnv } from "../_shared/stripe.ts";
+import { createStripeClient, resolveConfiguredPaymentEnvironment, type StripeEnv } from "../_shared/stripe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +38,10 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const orgId = body?.org_id as string | undefined;
     const returnUrl = body?.return_url as string | undefined;
-    const env: StripeEnv = normalizeRequestedEnvironment(body?.environment as string | undefined);
+    // Always resolve environment server-side from the configured gateway mode.
+    // The client's publishable key prefix (pk_test_ in preview) must NOT decide
+    // whether we create a sandbox or live Connect account.
+    const env: StripeEnv = await resolveConfiguredPaymentEnvironment(admin);
     if (!orgId || !returnUrl) {
       return new Response(JSON.stringify({ error: "org_id and return_url required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
