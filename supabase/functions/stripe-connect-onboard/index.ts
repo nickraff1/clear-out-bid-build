@@ -1,72 +1,106 @@
 // Stripe Connect Express onboarding link generator.
-// TODO: Add STRIPE_SECRET_KEY in Backend → Secrets to activate.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// Routes all Stripe API calls through the Lovable gateway proxy.
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { createStripeClient, normalizeRequestedEnvironment, type StripeEnv } from "../_shared/stripe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+const admin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+  }
 
   try {
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) {
-      return new Response(JSON.stringify({ error: "Stripe not configured. Add STRIPE_SECRET_KEY in Backend → Secrets." }), {
-        status: 503,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authErr } = await admin.auth.getUser(token);
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    const body = await req.json().catch(() => ({}));
+    const orgId = body?.org_id as string | undefined;
+    const returnUrl = body?.return_url as string | undefined;
+    const env: StripeEnv = normalizeRequestedEnvironment(body?.environment as string | undefined);
+    if (!orgId || !returnUrl) {
+      return new Response(JSON.stringify({ error: "org_id and return_url required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    // Caller must be a member of the org (or an admin).
+    const { data: isMember } = await admin.rpc("is_org_member", { _user_id: user.id, _org_id: orgId });
+    const { data: isAdmin } = await admin.rpc("is_admin", { _user_id: user.id });
+    if (!isMember && !isAdmin) {
+      return new Response(JSON.stringify({ error: "Not a member of this organisation" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const { org_id, return_url } = await req.json();
-
-    // Look up existing account
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from("seller_stripe_accounts")
-      .select("*")
-      .eq("org_id", org_id)
+      .select("stripe_account_id")
+      .eq("org_id", orgId)
       .maybeSingle();
 
-    const Stripe = (await import("https://esm.sh/stripe@14.21.0?target=deno")).default;
-    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" });
+    const stripe = createStripeClient(env);
+    let accountId = (existing as { stripe_account_id: string | null } | null)?.stripe_account_id ?? null;
 
-    let accountId = existing?.stripe_account_id;
     if (!accountId) {
+      // Load org for prefill.
+      const { data: org } = await admin
+        .from("organizations")
+        .select("name")
+        .eq("id", orgId)
+        .maybeSingle();
+      const orgName = (org as { name?: string | null } | null)?.name ?? undefined;
+
       const account = await stripe.accounts.create({
         type: "express",
         country: "AU",
-        capabilities: { transfers: { requested: true }, card_payments: { requested: true } },
+        email: user.email ?? undefined,
+        capabilities: {
+          transfers: { requested: true },
+          card_payments: { requested: true },
+        },
+        business_profile: orgName ? { name: orgName } : undefined,
+        metadata: { org_id: orgId, created_by_user_id: user.id },
       });
       accountId = account.id;
-      await supabase.from("seller_stripe_accounts").upsert({
-        org_id,
+
+      await admin.from("seller_stripe_accounts").upsert({
+        org_id: orgId,
         stripe_account_id: accountId,
         account_status: "pending",
-      });
+        onboarding_complete: false,
+        payouts_enabled: false,
+        details_submitted: false,
+        charges_enabled: false,
+      }, { onConflict: "org_id" });
     }
 
+    // Account links are single-use — always mint a fresh one.
     const link = await stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: return_url,
-      return_url: return_url,
+      account: accountId!,
+      refresh_url: returnUrl,
+      return_url: returnUrl,
       type: "account_onboarding",
     });
 
@@ -74,9 +108,9 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    console.error("stripe-connect-onboard error", e);
+    return new Response(JSON.stringify({ error: (e as Error).message ?? String(e) }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
