@@ -14,6 +14,14 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { LOT_CONDITIONS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 
+// Convert an ISO/UTC timestamp to the "YYYY-MM-DDTHH:mm" format that
+// <input type="datetime-local"> expects, in the viewer's local timezone.
+function toLocalInputValue(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function EditLot() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
