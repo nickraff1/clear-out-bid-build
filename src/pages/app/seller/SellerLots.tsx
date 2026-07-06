@@ -26,11 +26,8 @@ import { RotateCw } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { RelistAuctionDialog } from '@/components/seller/RelistAuctionDialog';
 import type { Lot, ClearanceEvent } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 
@@ -45,10 +42,6 @@ export default function SellerLots() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [relistLot, setRelistLot] = useState<LotWithEvent | null>(null);
-  const [relistEnd, setRelistEnd] = useState('');
-  const [relistStart, setRelistStart] = useState('');
-  const [relistReserve, setRelistReserve] = useState('');
-  const [relistBusy, setRelistBusy] = useState(false);
 
   useEffect(() => {
     if (primaryOrg) {
@@ -95,45 +88,6 @@ export default function SellerLots() {
       toast({ title: 'Listing deleted' });
       fetchLots();
     }
-  };
-
-  const openRelist = (lot: LotWithEvent) => {
-    const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    // format for datetime-local input (local timezone)
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    setRelistEnd(local);
-    setRelistStart(lot.start_price != null ? String(lot.start_price) : '');
-    setRelistReserve(lot.reserve_price != null ? String(lot.reserve_price) : '');
-    setRelistLot(lot);
-  };
-
-  const submitRelist = async () => {
-    if (!relistLot) return;
-    if (!relistEnd) {
-      toast({ title: 'Choose an end date', variant: 'destructive' });
-      return;
-    }
-    const endIso = new Date(relistEnd).toISOString();
-    if (new Date(endIso).getTime() <= Date.now()) {
-      toast({ title: 'End date must be in the future', variant: 'destructive' });
-      return;
-    }
-    setRelistBusy(true);
-    const { error } = await supabase.rpc('relist_auction_lot', {
-      p_lot_id: relistLot.id,
-      p_auction_end: endIso,
-      p_start_price: relistStart ? Number(relistStart) : null,
-      p_reserve_price: relistReserve ? Number(relistReserve) : null,
-    });
-    setRelistBusy(false);
-    if (error) {
-      toast({ title: 'Relist failed', description: error.message, variant: 'destructive' });
-      return;
-    }
-    toast({ title: 'Listing relisted', description: 'A fresh auction has been created.' });
-    setRelistLot(null);
-    fetchLots();
   };
 
   const getStatusColor = (status: string) => {
@@ -294,7 +248,7 @@ export default function SellerLots() {
                           </DropdownMenuItem>
                         )}
                         {lot.pricing_type === 'auction' && (lot.status === 'unsold' || lot.status === 'cancelled') && (
-                          <DropdownMenuItem onClick={() => openRelist(lot)}>
+                          <DropdownMenuItem onClick={() => setRelistLot(lot)}>
                             <RotateCw className="h-4 w-4 mr-2" /> Relist auction
                           </DropdownMenuItem>
                         )}
@@ -319,59 +273,7 @@ export default function SellerLots() {
         </div>
       )}
 
-      <Dialog open={!!relistLot} onOpenChange={(o) => !o && setRelistLot(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Relist auction</DialogTitle>
-            <DialogDescription>
-              Create a fresh auction for "{relistLot?.title}". Photos and compliance tags are copied. Bidding starts from zero.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="relist-end">New auction end</Label>
-              <Input
-                id="relist-end"
-                type="datetime-local"
-                value={relistEnd}
-                onChange={(e) => setRelistEnd(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="relist-start">Start price ($)</Label>
-                <Input
-                  id="relist-start"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={relistStart}
-                  onChange={(e) => setRelistStart(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="relist-reserve">Reserve price ($)</Label>
-                <Input
-                  id="relist-reserve"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Optional"
-                  value={relistReserve}
-                  onChange={(e) => setRelistReserve(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRelistLot(null)} disabled={relistBusy}>Cancel</Button>
-            <Button onClick={submitRelist} disabled={relistBusy}>
-              {relistBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCw className="h-4 w-4 mr-2" />}
-              Relist
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RelistAuctionDialog lot={relistLot} onClose={() => setRelistLot(null)} onDone={fetchLots} />
     </div>
   );
 }
