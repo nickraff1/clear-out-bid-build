@@ -1,4 +1,4 @@
-# Fix Buyer Payment Methods & $1 Bid Increment
+# Fix Buyer Payment Methods, Card Verification & $1 Bid Increment
 
 ## Problem
 
@@ -42,6 +42,15 @@ Update the edge function to also persist `card_brand`, `card_last4`, `card_exp_m
 - Open a lot as a buyer with no saved card → click "Add payment method" → dialog loads Stripe Elements, card `4242 4242 4242 4242` saves, "Place bid" becomes enabled.
 - Buyer portal → "Payment Methods" shows the saved card and lets the buyer replace it.
 - Lot page shows "Increment $1" and Min next bid = current + $1.
+
+## Follow-up card setup repair
+
+- Root cause of `No such setupintent`: preview frontend was loading the sandbox publishable key while the backend setting created a live SetupIntent.
+- The card setup dialog now sends the frontend payment environment (`sandbox` in preview, `live` in production) to card setup and confirmation functions.
+- Saved cards are stored per payment environment in `bidder_payment_methods`, while `bidder_verifications` keeps the active card summary for existing bidder-status logic.
+- Bid eligibility and deposit authorization now check for a saved card in the same environment the frontend is using, so preview/test cards unlock preview bidding and live cards unlock production bidding.
+- Backend function JWT verification is disabled at the platform gateway for the card setup, card confirm, and bid-deposit functions, while each function still validates the user token itself.
+- The server-side auction engine now enforces the same $1 bid increment as the frontend.
 
 ## Files
 

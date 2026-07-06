@@ -1,6 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createStripeClient, resolveConfiguredPaymentEnvironment } from "../_shared/stripe.ts";
+import {
+  createStripeClient,
+  normalizeRequestedEnvironment,
+  resolveConfiguredPaymentEnvironment,
+} from "../_shared/stripe.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -21,21 +25,26 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
     const userEmail = (claimsData.claims.email as string | undefined) ?? undefined;
+    const body = await req.json().catch(() => ({}));
+    const requestedEnvironment = body?.environment as string | undefined;
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-    const env = await resolveConfiguredPaymentEnvironment(admin);
+    const env = requestedEnvironment
+      ? normalizeRequestedEnvironment(requestedEnvironment)
+      : await resolveConfiguredPaymentEnvironment(admin);
     const stripe = createStripeClient(env);
 
-    const { data: bv } = await admin
-      .from("bidder_verifications")
+    const { data: savedMethod } = await admin
+      .from("bidder_payment_methods")
       .select("stripe_customer_id")
       .eq("user_id", userId)
+      .eq("environment", env)
       .maybeSingle();
 
-    let customerId = bv?.stripe_customer_id as string | null;
+    let customerId = savedMethod?.stripe_customer_id as string | null;
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: userEmail,
@@ -43,8 +52,13 @@ Deno.serve(async (req) => {
       });
       customerId = customer.id;
       await admin
-        .from("bidder_verifications")
-        .upsert({ user_id: userId, stripe_customer_id: customerId }, { onConflict: "user_id" });
+        .from("bidder_payment_methods")
+        .upsert({
+          user_id: userId,
+          environment: env,
+          stripe_customer_id: customerId,
+          is_active: true,
+        }, { onConflict: "user_id,environment" });
     }
 
     const intent = await stripe.setupIntents.create({

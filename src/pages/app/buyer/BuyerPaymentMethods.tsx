@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CreditCard, Loader2, ShieldCheck, Plus } from 'lucide-react';
 import { AddPaymentMethodDialog } from '@/components/bidder/AddPaymentMethodDialog';
+import { getStripeEnvironment, type StripeEnv } from '@/lib/stripe';
 
 type SavedCard = {
   stripe_payment_method_id: string | null;
@@ -19,14 +20,29 @@ export default function BuyerPaymentMethods() {
   const [loading, setLoading] = useState(true);
   const [card, setCard] = useState<SavedCard | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [paymentEnvironment, setPaymentEnvironment] = useState<StripeEnv | null>(null);
+  const [configError, setConfigError] = useState('');
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    let env: StripeEnv;
+    try {
+      env = getStripeEnvironment();
+      setPaymentEnvironment(env);
+      setConfigError('');
+    } catch (err) {
+      setConfigError((err as Error).message);
+      setCard(null);
+      setLoading(false);
+      return;
+    }
     const { data } = await supabase
-      .from('bidder_verifications')
+      .from('bidder_payment_methods')
       .select('stripe_payment_method_id, payment_method_brand, payment_method_last4, payment_method_verified_at')
       .eq('user_id', user.id)
+      .eq('environment', env)
+      .eq('is_active', true)
       .maybeSingle();
     setCard((data as SavedCard | null) ?? null);
     setLoading(false);
@@ -43,6 +59,11 @@ export default function BuyerPaymentMethods() {
         <p className="text-muted-foreground mt-1">
           Add a card so we can automatically charge you if you win an auction. You won't be charged unless you win.
         </p>
+        {paymentEnvironment && (
+          <Badge variant="outline" className="mt-3 capitalize">
+            {paymentEnvironment} payments
+          </Badge>
+        )}
       </div>
 
       <Card>
@@ -56,7 +77,11 @@ export default function BuyerPaymentMethods() {
           </Button>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {configError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              {configError}
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>

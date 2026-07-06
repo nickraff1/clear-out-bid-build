@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getStripeEnvironment } from '@/lib/stripe';
 
 export type BidEligibility = {
   allowed: boolean;
@@ -57,8 +58,20 @@ export function useBidEligibility(lotId: string | undefined) {
       return;
     }
     setLoading(true);
+    let paymentEnvironment: 'sandbox' | 'live';
+    try {
+      paymentEnvironment = getStripeEnvironment();
+    } catch {
+      setEligibility({ allowed: false, reason: 'payment_method_required', required_deposit: 0 });
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
-      .rpc('can_user_bid', { _user_id: user.id, _lot_id: lotId })
+      .rpc('can_user_bid_for_environment', {
+        _user_id: user.id,
+        _lot_id: lotId,
+        _environment: paymentEnvironment,
+      })
       .maybeSingle();
     if (!error && data) {
       setEligibility({
@@ -79,5 +92,7 @@ export async function acceptAuctionTerms() {
 }
 
 export async function authorizeBidDeposit(lotId: string) {
-  return supabase.functions.invoke('authorize-bid-deposit', { body: { lot_id: lotId } });
+  return supabase.functions.invoke('authorize-bid-deposit', {
+    body: { lot_id: lotId, environment: getStripeEnvironment() },
+  });
 }

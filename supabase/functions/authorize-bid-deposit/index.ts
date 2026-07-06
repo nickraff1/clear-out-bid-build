@@ -1,6 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createStripeClient, resolveConfiguredPaymentEnvironment } from "../_shared/stripe.ts";
+import {
+  createStripeClient,
+  normalizeRequestedEnvironment,
+  resolveConfiguredPaymentEnvironment,
+} from "../_shared/stripe.ts";
 
 // Creates (or reuses) a manual-capture PaymentIntent that authorizes the
 // required deposit on the bidder's saved card for a given lot.
@@ -32,6 +36,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const lotId = body?.lot_id as string | undefined;
+    const requestedEnvironment = body?.environment as string | undefined;
     if (!lotId) {
       return new Response(JSON.stringify({ error: "lot_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -44,8 +49,15 @@ Deno.serve(async (req) => {
     );
 
     // Re-check eligibility / required deposit server-side.
+    const env = requestedEnvironment
+      ? normalizeRequestedEnvironment(requestedEnvironment)
+      : await resolveConfiguredPaymentEnvironment(admin);
     const { data: elig, error: eligErr } = await admin
-      .rpc("can_user_bid", { _user_id: userId, _lot_id: lotId })
+      .rpc("can_user_bid_for_environment", {
+        _user_id: userId,
+        _lot_id: lotId,
+        _environment: env,
+      })
       .maybeSingle();
     if (eligErr) throw eligErr;
 
@@ -67,11 +79,14 @@ Deno.serve(async (req) => {
       .select("id, title, current_bid, start_price").eq("id", lotId).single();
     const currentPrice = Number(lot?.current_bid ?? lot?.start_price ?? 0);
 
-    const { data: bv } = await admin
-      .from("bidder_verifications")
+    const { data: savedMethod } = await admin
+      .from("bidder_payment_methods")
       .select("stripe_customer_id, stripe_payment_method_id")
-      .eq("user_id", userId).maybeSingle();
-    if (!bv?.stripe_customer_id || !bv?.stripe_payment_method_id) {
+      .eq("user_id", userId)
+      .eq("environment", env)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!savedMethod?.stripe_customer_id || !savedMethod?.stripe_payment_method_id) {
       return new Response(JSON.stringify({ error: "payment_method_required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -79,8 +94,10 @@ Deno.serve(async (req) => {
 
     const { data: settings } = await admin
       .from("auction_deposit_settings").select("current_gateway_mode").eq("singleton", true).maybeSingle();
-    const gatewayMode = (settings?.current_gateway_mode as string) ?? "lovable_gateway_sandbox";
-    const env = await resolveConfiguredPaymentEnvironment(admin);
+    const fallbackGatewayMode = env === "live" ? "lovable_gateway_live" : "lovable_gateway_sandbox";
+    const gatewayMode = (settings?.current_gateway_mode as string) === fallbackGatewayMode
+      ? (settings?.current_gateway_mode as string)
+      : fallbackGatewayMode;
 
     // Reuse an existing authorized hold that already covers the required amount.
     const { data: existing } = await admin
@@ -103,7 +120,7 @@ Deno.serve(async (req) => {
       tier_band: null,
       gateway_mode: gatewayMode,
       status: "required",
-      payment_method_id: bv.stripe_payment_method_id,
+      payment_method_id: savedMethod.stripe_payment_method_id,
     }).select("id").single();
     if (insErr) throw insErr;
 
@@ -112,8 +129,8 @@ Deno.serve(async (req) => {
         amount: Math.round(required * 100),
         currency: "aud",
         capture_method: "manual",
-        customer: bv.stripe_customer_id,
-        payment_method: bv.stripe_payment_method_id,
+        customer: savedMethod.stripe_customer_id,
+        payment_method: savedMethod.stripe_payment_method_id,
         confirm: true,
         off_session: true,
         description: `Bid commitment hold for ${lot?.title ?? "lot"}`,

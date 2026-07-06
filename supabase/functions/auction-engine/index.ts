@@ -10,20 +10,12 @@ const corsHeaders = {
 const AUCTION_CONFIG = {
   SOFT_CLOSE_THRESHOLD_SECONDS: 60, // If bid within last 60 seconds
   SOFT_CLOSE_EXTENSION_SECONDS: 120, // Extend by 2 minutes
-  MIN_BID_INCREMENT_PERCENT: 5, // 5% minimum increment
   RATE_LIMIT_PER_MINUTE: 10, // Max bids per user per minute per lot
 }
 
 // Bid increment tiers
 const BID_INCREMENTS = [
-  { maxPrice: 10, increment: 1 },
-  { maxPrice: 50, increment: 2 },
-  { maxPrice: 100, increment: 5 },
-  { maxPrice: 500, increment: 10 },
-  { maxPrice: 1000, increment: 25 },
-  { maxPrice: 5000, increment: 50 },
-  { maxPrice: 10000, increment: 100 },
-  { maxPrice: Infinity, increment: 250 },
+  { maxPrice: Infinity, increment: 1 },
 ]
 
 function getMinimumIncrement(currentBid: number): number {
@@ -32,7 +24,7 @@ function getMinimumIncrement(currentBid: number): number {
       return tier.increment
     }
   }
-  return 250
+  return 1
 }
 
 interface BidRequest {

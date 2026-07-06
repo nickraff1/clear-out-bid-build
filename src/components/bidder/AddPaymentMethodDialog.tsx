@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CreditCard, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { getStripe } from '@/lib/stripe';
+import { getStripe, getStripeEnvironment } from '@/lib/stripe';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import type { StripeElementsOptions } from '@stripe/stripe-js';
 import type { StripeEnv } from '@/lib/stripe';
@@ -129,13 +129,17 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
       setLoading(true);
       setError('');
       try {
+        const requestedEnvironment = getStripeEnvironment();
         const { data, error: fnErr } = await supabase.functions.invoke('create-bidder-setup-intent', {
-          body: {},
+          body: { environment: requestedEnvironment },
         });
         if (fnErr || data?.error) throw new Error(fnErr?.message || data?.error || 'Could not start card setup');
         if (!data?.client_secret) throw new Error('Card setup did not return a client secret');
+        if (data.environment && data.environment !== requestedEnvironment) {
+          throw new Error('Payment setup returned the wrong environment. Please try again.');
+        }
         if (!cancelled) {
-          setPaymentEnvironment(data.environment === 'live' ? 'live' : 'sandbox');
+          setPaymentEnvironment(requestedEnvironment);
           setClientSecret(data.client_secret);
         }
       } catch (err) {
