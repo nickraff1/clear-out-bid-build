@@ -14,6 +14,7 @@ import HowItWorks from "./pages/HowItWorks";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import ResetPassword from "./pages/auth/ResetPassword";
+import UpdatePassword from "./pages/auth/UpdatePassword";
 import NotFound from "./pages/NotFound";
 
 // Legal / policy pages
@@ -121,6 +122,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
 
             {/* Legal / Policy */}
             <Route path="/terms" element={<Terms />} />
