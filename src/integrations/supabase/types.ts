@@ -484,6 +484,7 @@ export type Database = {
           is_winning: boolean | null
           lot_id: string
           org_id: string
+          payment_environment: string
           user_id: string
         }
         Insert: {
@@ -493,6 +494,7 @@ export type Database = {
           is_winning?: boolean | null
           lot_id: string
           org_id: string
+          payment_environment?: string
           user_id: string
         }
         Update: {
@@ -502,6 +504,7 @@ export type Database = {
           is_winning?: boolean | null
           lot_id?: string
           org_id?: string
+          payment_environment?: string
           user_id?: string
         }
         Relationships: [
@@ -1384,6 +1387,7 @@ export type Database = {
           admin_notes: string | null
           agreed_pickup_at: string | null
           amount: number
+          auction_payment_environment: string | null
           buyer_collected_at: string | null
           buyer_id: string
           buyer_org_id: string
@@ -1406,6 +1410,7 @@ export type Database = {
           admin_notes?: string | null
           agreed_pickup_at?: string | null
           amount: number
+          auction_payment_environment?: string | null
           buyer_collected_at?: string | null
           buyer_id: string
           buyer_org_id: string
@@ -1428,6 +1433,7 @@ export type Database = {
           admin_notes?: string | null
           agreed_pickup_at?: string | null
           amount?: number
+          auction_payment_environment?: string | null
           buyer_collected_at?: string | null
           buyer_id?: string
           buyer_org_id?: string
