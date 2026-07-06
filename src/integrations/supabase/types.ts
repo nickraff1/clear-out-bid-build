@@ -362,6 +362,48 @@ export type Database = {
           },
         ]
       }
+      bidder_payment_methods: {
+        Row: {
+          created_at: string
+          environment: string
+          id: string
+          is_active: boolean
+          payment_method_brand: string | null
+          payment_method_last4: string | null
+          payment_method_verified_at: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          environment: string
+          id?: string
+          is_active?: boolean
+          payment_method_brand?: string | null
+          payment_method_last4?: string | null
+          payment_method_verified_at?: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          id?: string
+          is_active?: boolean
+          payment_method_brand?: string | null
+          payment_method_last4?: string | null
+          payment_method_verified_at?: string | null
+          stripe_customer_id?: string
+          stripe_payment_method_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bidder_verifications: {
         Row: {
           admin_notes: string | null
@@ -371,6 +413,7 @@ export type Database = {
           email_verified_at: string | null
           failed_payment_count: number
           payment_method_brand: string | null
+          payment_method_environment: string | null
           payment_method_last4: string | null
           payment_method_verified_at: string | null
           phone_verified_at: string | null
@@ -393,6 +436,7 @@ export type Database = {
           email_verified_at?: string | null
           failed_payment_count?: number
           payment_method_brand?: string | null
+          payment_method_environment?: string | null
           payment_method_last4?: string | null
           payment_method_verified_at?: string | null
           phone_verified_at?: string | null
@@ -415,6 +459,7 @@ export type Database = {
           email_verified_at?: string | null
           failed_payment_count?: number
           payment_method_brand?: string | null
+          payment_method_environment?: string | null
           payment_method_last4?: string | null
           payment_method_verified_at?: string | null
           phone_verified_at?: string | null
@@ -2454,6 +2499,14 @@ export type Database = {
       }
       can_user_bid: {
         Args: { _lot_id: string; _user_id: string }
+        Returns: {
+          allowed: boolean
+          reason: string
+          required_deposit: number
+        }[]
+      }
+      can_user_bid_for_environment: {
+        Args: { _environment: string; _lot_id: string; _user_id: string }
         Returns: {
           allowed: boolean
           reason: string
