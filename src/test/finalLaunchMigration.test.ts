@@ -185,6 +185,9 @@ describe("duplicate seller organisation cleanup", () => {
     const compatMigration = readMigration(
       "supabase/migrations/20260706062500_duplicate_seller_merge_rpc_compat.sql",
     );
+    const dropCompatMigration = readMigration(
+      "supabase/migrations/20260706063000_drop_duplicate_seller_merge_compat_overload.sql",
+    );
 
     expect(migration).toContain("This migration does not auto-delete data");
     expect(migration).toContain("CREATE OR REPLACE VIEW public.admin_duplicate_seller_org_candidates");
@@ -198,5 +201,8 @@ describe("duplicate seller organisation cleanup", () => {
     expect(compatMigration).toContain("_admin_note text");
     expect(compatMigration).toContain("_source_org_id uuid");
     expect(compatMigration).toContain("_target_org_id uuid");
+    expect(dropCompatMigration).toContain(
+      "DROP FUNCTION IF EXISTS public.admin_merge_duplicate_seller_org(text, uuid, uuid)",
+    );
   });
 });
