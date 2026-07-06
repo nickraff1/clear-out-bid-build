@@ -37,6 +37,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { ClearanceEvent, Lot, Order } from '@/types/database';
 import { format, parseISO } from 'date-fns';
+import { RotateCw } from 'lucide-react';
+import { RelistAuctionDialog, type RelistTarget } from '@/components/seller/RelistAuctionDialog';
 
 type EventWithDetails = ClearanceEvent & {
   lots: Lot[];
@@ -52,6 +54,7 @@ export default function EventDetail() {
   const [orders, setOrders] = useState<(Order & { lot: Lot; buyer: { full_name: string } })[]>([]);
   const [loading, setLoading] = useState(true);
   const [justCreated] = useState(searchParams.get('created') === 'true');
+  const [relistLot, setRelistLot] = useState<RelistTarget | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -335,6 +338,11 @@ export default function EventDetail() {
                                 Cancel listing
                               </DropdownMenuItem>
                             )}
+                            {lot.pricing_type === 'auction' && (lot.status === 'unsold' || lot.status === 'cancelled') && (
+                              <DropdownMenuItem onClick={() => setRelistLot({ id: lot.id, title: lot.title, start_price: lot.start_price, reserve_price: lot.reserve_price })}>
+                                <RotateCw className="h-4 w-4 mr-2" /> Relist auction
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -437,6 +445,11 @@ export default function EventDetail() {
           </div>
         </TabsContent>
       </Tabs>
+      <RelistAuctionDialog
+        lot={relistLot}
+        onClose={() => setRelistLot(null)}
+        onDone={() => { fetchEvent(); }}
+      />
     </div>
   );
 }
