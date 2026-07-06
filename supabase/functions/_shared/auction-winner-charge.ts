@@ -9,6 +9,7 @@ type OrderForCharge = {
   buyer_id: string;
   amount: number;
   status: string;
+  auction_payment_environment?: StripeEnv | null;
   lot?: { id: string; title?: string | null; pricing_type?: string | null } | null;
 };
 
@@ -25,7 +26,7 @@ export async function chargeAuctionWinnerOrder(
 ) {
   const { data: orderData, error: orderError } = await sb
     .from("orders")
-    .select("id, buyer_id, amount, status, lot:lots(id, title, pricing_type)")
+    .select("id, buyer_id, amount, status, auction_payment_environment, lot:lots(id, title, pricing_type)")
     .eq("id", args.orderId)
     .maybeSingle();
   if (orderError) throw orderError;
@@ -41,12 +42,16 @@ export async function chargeAuctionWinnerOrder(
     .maybeSingle();
   if (succeeded) return { ok: true, skipped: "already_paid" };
 
-  const { data: bvData } = await sb
-    .from("bidder_verifications")
+  const env = args.env ?? order.auction_payment_environment ?? await resolveConfiguredPaymentEnvironment(sb);
+
+  const { data: savedMethodData } = await sb
+    .from("bidder_payment_methods")
     .select("stripe_customer_id, stripe_payment_method_id")
     .eq("user_id", order.buyer_id)
+    .eq("environment", env)
+    .eq("is_active", true)
     .maybeSingle();
-  const bidder = bvData as BidderVerification | null;
+  const bidder = savedMethodData as BidderVerification | null;
   if (!bidder?.stripe_customer_id || !bidder?.stripe_payment_method_id) {
     const message = "Winner has no verified card on file";
     await sb.from("orders").update({
@@ -61,7 +66,6 @@ export async function chargeAuctionWinnerOrder(
     return { ok: false, error: "payment_method_required" };
   }
 
-  const env = args.env ?? await resolveConfiguredPaymentEnvironment(sb);
   const stripe = createStripeClient(env);
   const total = Number(order.amount);
   const basePrice = Math.round((total / 1.10) * 100) / 100;

@@ -31,6 +31,7 @@ interface BidRequest {
   lot_id: string
   amount: number
   org_id: string
+  environment?: 'sandbox' | 'live'
 }
 
 interface CloseAuctionRequest {
@@ -104,6 +105,7 @@ serve(async (req) => {
 
 async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
   const { lot_id, amount, org_id } = body
+  const environment = body.environment === 'live' ? 'live' : 'sandbox'
 
   console.log(`[AUCTION] Bid request: user=${userId}, lot=${lot_id}, amount=${amount}`)
 
@@ -117,7 +119,11 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
 
   // 0. Server-side eligibility gate — single source of truth.
   const { data: eligibility, error: eligErr } = await supabase
-    .rpc('can_user_bid', { _user_id: userId, _lot_id: lot_id })
+    .rpc('can_user_bid_for_environment', {
+      _user_id: userId,
+      _lot_id: lot_id,
+      _environment: environment,
+    })
     .maybeSingle()
 
   if (eligErr) {
@@ -248,7 +254,8 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
       user_id: userId,
       org_id,
       amount,
-      is_winning: true
+      is_winning: true,
+      payment_environment: environment,
     })
     .select()
     .single()
@@ -289,7 +296,8 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
       metadata: {
         soft_close_extended: softCloseExtended,
         new_auction_end: softCloseExtended ? newAuctionEnd : null,
-        previous_bid: currentPrice
+        previous_bid: currentPrice,
+        payment_environment: environment,
       }
     })
 
@@ -419,6 +427,7 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
       buyer_org_id: winningBid.org_id,
       amount: totalAmount, // Total including 10% buyer fee
       status: 'pending_payment',
+      auction_payment_environment: winningBid.payment_environment ?? 'sandbox',
       notes: `Winning bid: $${baseAmount.toFixed(2)}, Buyer fee (10%): $${buyerFee.toFixed(2)}`
     })
     .select()

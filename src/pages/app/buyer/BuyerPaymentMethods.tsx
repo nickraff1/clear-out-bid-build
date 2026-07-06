@@ -9,7 +9,6 @@ import { AddPaymentMethodDialog } from '@/components/bidder/AddPaymentMethodDial
 import { getStripeEnvironment, type StripeEnv } from '@/lib/stripe';
 
 type SavedCard = {
-  stripe_payment_method_id: string | null;
   payment_method_brand: string | null;
   payment_method_last4: string | null;
   payment_method_verified_at: string | null;
@@ -38,8 +37,8 @@ export default function BuyerPaymentMethods() {
       return;
     }
     const { data } = await supabase
-      .from('bidder_payment_methods')
-      .select('stripe_payment_method_id, payment_method_brand, payment_method_last4, payment_method_verified_at')
+      .from('bidder_payment_method_summaries')
+      .select('payment_method_brand, payment_method_last4, payment_method_verified_at')
       .eq('user_id', user.id)
       .eq('environment', env)
       .eq('is_active', true)
@@ -50,7 +49,7 @@ export default function BuyerPaymentMethods() {
 
   useEffect(() => { load(); }, [load]);
 
-  const hasCard = !!card?.stripe_payment_method_id;
+  const hasCard = !!card?.payment_method_last4;
 
   return (
     <div className="p-6 max-w-3xl">
