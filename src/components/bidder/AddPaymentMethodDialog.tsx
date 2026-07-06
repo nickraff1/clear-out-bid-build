@@ -90,6 +90,7 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
   const [paymentEnvironment, setPaymentEnvironment] = useState<StripeEnv | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [setupAttempt, setSetupAttempt] = useState(0);
 
   useEffect(() => {
     if (!open) {
@@ -107,6 +108,7 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
           body: {},
         });
         if (fnErr || data?.error) throw new Error(fnErr?.message || data?.error || 'Could not start card setup');
+        if (!data?.client_secret) throw new Error('Card setup did not return a client secret');
         if (!cancelled) {
           setPaymentEnvironment(data.environment === 'live' ? 'live' : 'sandbox');
           setClientSecret(data.client_secret);
@@ -118,7 +120,7 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [open]);
+  }, [open, setupAttempt]);
 
   const stripePromise = useMemo(() => getStripe(), []);
   const options: StripeElementsOptions | undefined = useMemo(
@@ -146,9 +148,14 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
           </div>
         )}
         {error && !loading && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="space-y-3">
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <Button type="button" variant="outline" onClick={() => setSetupAttempt((n) => n + 1)}>
+              Try again
+            </Button>
+          </div>
         )}
         {!loading && clientSecret && paymentEnvironment && options && (
           <Elements key={clientSecret} stripe={stripePromise} options={options}>
