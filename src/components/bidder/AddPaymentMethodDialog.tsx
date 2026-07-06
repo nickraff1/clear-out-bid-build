@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -120,13 +120,20 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
     return () => { cancelled = true; };
   }, [open]);
 
-  const options: StripeElementsOptions | undefined = clientSecret
-    ? { clientSecret, appearance: { theme: 'stripe' } }
-    : undefined;
+  const stripePromise = useMemo(() => getStripe(), []);
+  const options: StripeElementsOptions | undefined = useMemo(
+    () => (clientSecret ? { clientSecret, appearance: { theme: 'stripe' as const } } : undefined),
+    [clientSecret],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Add a payment method</DialogTitle>
           <DialogDescription>
@@ -144,7 +151,7 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
           </Alert>
         )}
         {!loading && clientSecret && paymentEnvironment && options && (
-          <Elements stripe={getStripe()} options={options}>
+          <Elements key={clientSecret} stripe={stripePromise} options={options}>
             <PaymentForm
               environment={paymentEnvironment}
               onSaved={onSaved}
