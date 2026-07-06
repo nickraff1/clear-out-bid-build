@@ -445,6 +445,11 @@ export default function EventDetail() {
           </div>
         </TabsContent>
       </Tabs>
+      <RelistAuctionDialog
+        lot={relistLot}
+        onClose={() => setRelistLot(null)}
+        onDone={() => { fetchEvent(); }}
+      />
     </div>
   );
 }
