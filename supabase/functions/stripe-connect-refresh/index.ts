@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient, resolveConfiguredPaymentEnvironment, type StripeEnv } from "../_shared/stripe.ts";
 import { summarizeConnectAccount } from "../_shared/connect-status.ts";
+import { findConnectAccountForOrg } from "../_shared/connect-account-recovery.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,21 +19,25 @@ const admin = createClient(
 
 async function updateAccountStatus(orgId: string, account: any, env: StripeEnv) {
   const summary = summarizeConnectAccount(account);
-  const { error } = await admin.from("seller_stripe_accounts").update({
+  const { error } = await admin.from("seller_stripe_accounts").upsert({
+    org_id: orgId,
+    stripe_account_id: account.id,
     ...summary,
     stripe_environment: env,
-  }).eq("org_id", orgId);
+  }, { onConflict: "org_id" });
   if (!error) return summary;
 
-  console.warn("Rich seller_stripe_accounts update failed, falling back to legacy columns", error.message);
-  const { error: fallbackError } = await admin.from("seller_stripe_accounts").update({
+  console.warn("Rich seller_stripe_accounts upsert failed, falling back to legacy columns", error.message);
+  const { error: fallbackError } = await admin.from("seller_stripe_accounts").upsert({
+    org_id: orgId,
+    stripe_account_id: account.id,
     charges_enabled: summary.charges_enabled,
     payouts_enabled: summary.payouts_enabled,
     details_submitted: summary.details_submitted,
     onboarding_complete: summary.onboarding_complete,
     account_status: summary.account_status,
     updated_at: new Date().toISOString(),
-  }).eq("org_id", orgId);
+  }, { onConflict: "org_id" });
   if (fallbackError) throw fallbackError;
   return summary;
 }
@@ -79,24 +84,29 @@ Deno.serve(async (req) => {
       .eq("org_id", orgId)
       .maybeSingle();
 
-    const accountId = (existing as { stripe_account_id: string | null } | null)?.stripe_account_id;
-    if (!accountId) {
-      return new Response(JSON.stringify({ refreshed: false, reason: "no_account" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const env: StripeEnv = await resolveConfiguredPaymentEnvironment(admin);
     const stripe = createStripeClient(env);
+    let accountId = (existing as { stripe_account_id: string | null } | null)?.stripe_account_id ?? null;
+    let account = null;
 
-    let account;
-    try {
-      account = await stripe.accounts.retrieve(accountId);
-    } catch (e) {
-      console.warn("Could not retrieve stripe account in current env", {
-        accountId, env, error: (e as Error).message,
-      });
-      return new Response(JSON.stringify({ refreshed: false, reason: "not_found_in_env" }), {
+    if (accountId) {
+      try {
+        account = await stripe.accounts.retrieve(accountId);
+      } catch (e) {
+        console.warn("Could not retrieve stripe account in current env; attempting recovery", {
+          accountId, env, error: (e as Error).message,
+        });
+        accountId = null;
+      }
+    }
+
+    if (!accountId) {
+      account = await findConnectAccountForOrg(stripe, orgId, user.email);
+      accountId = account?.id ?? null;
+    }
+
+    if (!account) {
+      return new Response(JSON.stringify({ refreshed: false, reason: "no_account" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

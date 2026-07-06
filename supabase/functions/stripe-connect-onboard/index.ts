@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient, resolveConfiguredPaymentEnvironment, type StripeEnv } from "../_shared/stripe.ts";
 import { summarizeConnectAccount } from "../_shared/connect-status.ts";
+import { findConnectAccountForOrg } from "../_shared/connect-account-recovery.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -98,12 +99,21 @@ Deno.serve(async (req) => {
     // versa) — in that case, forget it and create a fresh account for this env.
     if (accountId) {
       try {
-        await stripe.accounts.retrieve(accountId);
+        const account = await stripe.accounts.retrieve(accountId);
+        await upsertAccountStatus(orgId, account, env);
       } catch (retrieveErr) {
         console.warn("Existing stripe account not found in current env, recreating", {
           accountId, env, error: (retrieveErr as Error).message,
         });
         accountId = null;
+      }
+    }
+
+    if (!accountId) {
+      const recoveredAccount = await findConnectAccountForOrg(stripe, orgId, user.email);
+      if (recoveredAccount) {
+        accountId = recoveredAccount.id;
+        await upsertAccountStatus(orgId, recoveredAccount, env);
       }
     }
 

@@ -74,19 +74,8 @@ export default function PaymentSettings() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!primaryOrg?.id) { setLoading(false); return; }
-    setLoading(true);
-    // Pull fresh status from Stripe first so the UI reflects onboarding
-    // completion even before any webhook lands. Ignore errors — we still
-    // fall through to the DB read below.
-    try {
-      await supabase.functions.invoke('stripe-connect-refresh', {
-        body: { org_id: primaryOrg.id },
-      });
-    } catch (e) {
-      console.warn('stripe-connect-refresh failed', e);
-    }
+  const readLocalAccount = useCallback(async () => {
+    if (!primaryOrg?.id) return null;
     const richResult = await supabase
       .from('seller_stripe_accounts')
       .select(`
@@ -112,9 +101,45 @@ export default function PaymentSettings() {
       row = normalizeStripeRow((legacyResult.data as Partial<StripeAccountStatus> | null) ?? null);
     }
 
-    setState(classify(row));
-    setLoading(false);
+    return row;
   }, [primaryOrg?.id]);
+
+  const load = useCallback(async () => {
+    if (!primaryOrg?.id) { setLoading(false); return; }
+    setLoading(true);
+    const localRow = await readLocalAccount();
+    setState(classify(localRow));
+    setLoading(false);
+
+    // Refresh Stripe after showing the local DB state. This prevents a slow or
+    // temporarily failing edge function from making a connected account look
+    // empty while the card is loading.
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-connect-refresh', {
+        body: { org_id: primaryOrg.id },
+      });
+      if (error || data?.error) {
+        console.warn('stripe-connect-refresh failed', error ?? data?.error);
+        return;
+      }
+      const refreshedRow = await readLocalAccount();
+      setState(classify(refreshedRow));
+    } catch (e) {
+      console.warn('stripe-connect-refresh failed', e);
+    }
+  }, [primaryOrg?.id, readLocalAccount]);
+
+  const refreshNow = useCallback(async () => {
+    if (!primaryOrg?.id) return;
+    const { data, error } = await supabase.functions.invoke('stripe-connect-refresh', {
+      body: { org_id: primaryOrg.id },
+    });
+    if (error || data?.error) {
+      throw new Error(error?.message ?? data?.error ?? 'Could not refresh Stripe status');
+    }
+    const row = await readLocalAccount();
+    setState(classify(row));
+  }, [primaryOrg?.id, readLocalAccount]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -153,10 +178,7 @@ export default function PaymentSettings() {
     if (!primaryOrg?.id) return;
     setIsRefreshing(true);
     try {
-      await supabase.functions.invoke('stripe-connect-refresh', {
-        body: { org_id: primaryOrg.id },
-      });
-      await load();
+      await refreshNow();
       toast({ title: 'Stripe status refreshed' });
     } catch (e) {
       toast({
