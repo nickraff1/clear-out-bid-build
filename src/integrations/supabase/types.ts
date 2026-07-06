@@ -2586,6 +2586,15 @@ export type Database = {
         Args: { _lot_id: string; _new_end: string }
         Returns: undefined
       }
+      relist_auction_lot: {
+        Args: {
+          p_auction_end: string
+          p_lot_id: string
+          p_reserve_price?: number
+          p_start_price?: number
+        }
+        Returns: string
+      }
       required_deposit_for: {
         Args: { _amount: number; _user_id: string }
         Returns: number
