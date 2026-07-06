@@ -203,9 +203,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       _entity_type: 'organization',
       _entity_id: orgId,
       _metadata: { source: 'admin_sellers_table' },
+      _target_user_id: null,
     });
     if (logError) {
-      return { error: new Error(logError.message) };
+      console.warn('Admin seller assist audit log failed:', logError.message);
     }
 
     localStorage.setItem(`admin_seller_assist_org_${user.id}`, orgId);
@@ -221,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         _entity_type: 'organization',
         _entity_id: adminAssistOrg.id,
         _metadata: { source: 'app_layout' },
+        _target_user_id: null,
       });
     }
     if (user) {

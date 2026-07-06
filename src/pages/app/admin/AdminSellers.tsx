@@ -11,6 +11,48 @@ import { Loader2, MoreVertical, Award, BadgeCheck, Ban, ShieldCheck, Search, Bui
 import { EmptyState } from '@/components/app/EmptyState';
 import { toast } from 'sonner';
 
+const normalizeSellerName = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/\b(pty|ltd|limited|business|account|company|co)\b/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const sellerRowScore = (org: any) =>
+  (org.active_lots ?? 0) * 20 +
+  (org.sold_lots ?? 0) * 30 +
+  (org.open_reports ?? 0) * 10 +
+  (org.pending_payout ?? 0) +
+  (org.connect?.stripe_account_id ? 25 : 0) +
+  (org.is_verified ? 10 : 0) +
+  (org.is_founding ? 5 : 0) -
+  (org.is_disabled ? 100 : 0);
+
+const dedupeSellerOrgs = (orgs: any[]) => {
+  const grouped = new Map<string, any[]>();
+
+  for (const org of orgs) {
+    const key = normalizeSellerName(org.name) || org.id;
+    grouped.set(key, [...(grouped.get(key) ?? []), org]);
+  }
+
+  return Array.from(grouped.values())
+    .map(group => {
+      const sorted = [...group].sort((a, b) => {
+        const scoreDiff = sellerRowScore(b) - sellerRowScore(a);
+        if (scoreDiff !== 0) return scoreDiff;
+        return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+      });
+      return {
+        ...sorted[0],
+        _duplicateCount: group.length,
+        _duplicateOrgIds: sorted.slice(1).map(org => org.id),
+      };
+    })
+    .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
+};
+
 export default function AdminSellers() {
   const navigate = useNavigate();
   const { startAdminSellerAssist } = useAuth();
@@ -52,7 +94,7 @@ export default function AdminSellers() {
         connect: connectByOrg.get(o.id) ?? null,
       };
     });
-    setOrgs(enriched);
+    setOrgs(dedupeSellerOrgs(enriched));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -82,6 +124,7 @@ export default function AdminSellers() {
       _entity_type: 'seller_stripe_account',
       _entity_id: null,
       _metadata: { source: 'admin_sellers_table' },
+      _target_user_id: null,
     });
     toast.success('Stripe status refreshed');
     load();
@@ -103,6 +146,7 @@ export default function AdminSellers() {
       _entity_type: 'seller_stripe_account',
       _entity_id: null,
       _metadata: { source: 'admin_sellers_table', account_id: data.account_id ?? null },
+      _target_user_id: null,
     });
     window.open(data.url as string, '_blank', 'noopener,noreferrer');
     toast.success('Stripe onboarding link opened and copied');
@@ -192,6 +236,11 @@ export default function AdminSellers() {
                   >
                     {o.name}
                   </button>
+                  {o._duplicateCount > 1 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {o._duplicateCount - 1} duplicate seller org{o._duplicateCount === 2 ? '' : 's'} hidden
+                    </p>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{o.org_type}</TableCell>
                 <TableCell>{o.active_lots}</TableCell>
