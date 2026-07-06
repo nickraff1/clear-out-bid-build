@@ -37,6 +37,7 @@ import { CountdownTimer } from '@/components/lots/CountdownTimer';
 import { useBidEligibility, reasonCopy, acceptAuctionTerms } from '@/lib/bidder';
 import { authorizeBidDeposit } from '@/lib/bidder';
 import { AddPaymentMethodDialog } from '@/components/bidder/AddPaymentMethodDialog';
+import { getStripeEnvironment } from '@/lib/stripe';
 import { toast } from 'sonner';
 
 type LotWithDetails = Lot & {
@@ -193,7 +194,7 @@ export default function LotDetail() {
       .limit(10);
     
     if (data) {
-      setBids(data as (Bid & { profile?: { full_name: string } })[]);
+      setBids(data as unknown as (Bid & { profile?: { full_name: string } })[]);
     }
   };
 
@@ -268,7 +269,8 @@ export default function LotDetail() {
           action: 'place-bid',
           lot_id: lot.id,
           amount,
-          org_id: primaryOrg.id
+          org_id: primaryOrg.id,
+          environment: getStripeEnvironment(),
         }
       });
 

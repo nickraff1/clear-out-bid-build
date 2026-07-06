@@ -77,6 +77,22 @@ Deno.serve(async (req) => {
       console.warn("customer.update default PM failed", e);
     }
 
+    const verifiedAt = new Date().toISOString();
+
+    const { error: methodErr } = await admin
+      .from("bidder_payment_methods")
+      .upsert({
+        user_id: userId,
+        environment: env,
+        stripe_customer_id: customerId,
+        stripe_payment_method_id: pmId,
+        payment_method_brand: pm.card?.brand ?? null,
+        payment_method_last4: pm.card?.last4 ?? null,
+        payment_method_verified_at: verifiedAt,
+        is_active: true,
+      }, { onConflict: "user_id,environment" });
+    if (methodErr) throw methodErr;
+
     const { error: upErr } = await admin
       .from("bidder_verifications")
       .upsert({
@@ -85,7 +101,8 @@ Deno.serve(async (req) => {
         stripe_payment_method_id: pmId,
         payment_method_brand: pm.card?.brand ?? null,
         payment_method_last4: pm.card?.last4 ?? null,
-        payment_method_verified_at: new Date().toISOString(),
+        payment_method_verified_at: verifiedAt,
+        payment_method_environment: env,
       }, { onConflict: "user_id" });
     if (upErr) throw upErr;
 

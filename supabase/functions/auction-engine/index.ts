@@ -10,20 +10,12 @@ const corsHeaders = {
 const AUCTION_CONFIG = {
   SOFT_CLOSE_THRESHOLD_SECONDS: 60, // If bid within last 60 seconds
   SOFT_CLOSE_EXTENSION_SECONDS: 120, // Extend by 2 minutes
-  MIN_BID_INCREMENT_PERCENT: 5, // 5% minimum increment
   RATE_LIMIT_PER_MINUTE: 10, // Max bids per user per minute per lot
 }
 
 // Bid increment tiers
 const BID_INCREMENTS = [
-  { maxPrice: 10, increment: 1 },
-  { maxPrice: 50, increment: 2 },
-  { maxPrice: 100, increment: 5 },
-  { maxPrice: 500, increment: 10 },
-  { maxPrice: 1000, increment: 25 },
-  { maxPrice: 5000, increment: 50 },
-  { maxPrice: 10000, increment: 100 },
-  { maxPrice: Infinity, increment: 250 },
+  { maxPrice: Infinity, increment: 1 },
 ]
 
 function getMinimumIncrement(currentBid: number): number {
@@ -32,13 +24,14 @@ function getMinimumIncrement(currentBid: number): number {
       return tier.increment
     }
   }
-  return 250
+  return 1
 }
 
 interface BidRequest {
   lot_id: string
   amount: number
   org_id: string
+  environment?: 'sandbox' | 'live'
 }
 
 interface CloseAuctionRequest {
@@ -112,6 +105,7 @@ serve(async (req) => {
 
 async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
   const { lot_id, amount, org_id } = body
+  const environment = body.environment === 'live' ? 'live' : 'sandbox'
 
   console.log(`[AUCTION] Bid request: user=${userId}, lot=${lot_id}, amount=${amount}`)
 
@@ -125,7 +119,11 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
 
   // 0. Server-side eligibility gate — single source of truth.
   const { data: eligibility, error: eligErr } = await supabase
-    .rpc('can_user_bid', { _user_id: userId, _lot_id: lot_id })
+    .rpc('can_user_bid_for_environment', {
+      _user_id: userId,
+      _lot_id: lot_id,
+      _environment: environment,
+    })
     .maybeSingle()
 
   if (eligErr) {
@@ -256,7 +254,8 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
       user_id: userId,
       org_id,
       amount,
-      is_winning: true
+      is_winning: true,
+      payment_environment: environment,
     })
     .select()
     .single()
@@ -297,7 +296,8 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
       metadata: {
         soft_close_extended: softCloseExtended,
         new_auction_end: softCloseExtended ? newAuctionEnd : null,
-        previous_bid: currentPrice
+        previous_bid: currentPrice,
+        payment_environment: environment,
       }
     })
 
@@ -427,6 +427,7 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
       buyer_org_id: winningBid.org_id,
       amount: totalAmount, // Total including 10% buyer fee
       status: 'pending_payment',
+      auction_payment_environment: winningBid.payment_environment ?? 'sandbox',
       notes: `Winning bid: $${baseAmount.toFixed(2)}, Buyer fee (10%): $${buyerFee.toFixed(2)}`
     })
     .select()
