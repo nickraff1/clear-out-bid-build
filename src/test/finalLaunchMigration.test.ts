@@ -182,6 +182,9 @@ describe("duplicate seller organisation cleanup", () => {
     const migration = readMigration(
       "supabase/migrations/20260706062000_admin_duplicate_seller_org_merge.sql",
     );
+    const compatMigration = readMigration(
+      "supabase/migrations/20260706062500_duplicate_seller_merge_rpc_compat.sql",
+    );
 
     expect(migration).toContain("This migration does not auto-delete data");
     expect(migration).toContain("CREATE OR REPLACE VIEW public.admin_duplicate_seller_org_candidates");
@@ -191,5 +194,9 @@ describe("duplicate seller organisation cleanup", () => {
     expect(migration).toContain("Both organisations have different Stripe Connect accounts");
     expect(migration).toContain("Conversation conflicts found");
     expect(migration).not.toContain("SELECT public.admin_merge_duplicate_seller_org");
+    expect(compatMigration).toContain("admin_merge_duplicate_seller_org(");
+    expect(compatMigration).toContain("_admin_note text");
+    expect(compatMigration).toContain("_source_org_id uuid");
+    expect(compatMigration).toContain("_target_org_id uuid");
   });
 });

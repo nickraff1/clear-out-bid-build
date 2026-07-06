@@ -175,7 +175,10 @@ export default function AdminSellers() {
         _admin_note: 'Merged from admin sellers duplicate cleanup',
       });
       if (error) {
-        toast.error(`Merge stopped: ${error.message}`);
+        const message = error.message?.includes('schema cache') || error.message?.includes('Could not find the function')
+          ? 'Merge unavailable: Lovable has not applied the duplicate-seller merge migration yet. Sync latest GitHub migrations, then hard refresh.'
+          : `Merge stopped: ${error.message}`;
+        toast.error(message);
         await load();
         return;
       }
