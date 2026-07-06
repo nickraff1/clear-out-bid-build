@@ -161,6 +161,30 @@ export default function AdminSellers() {
     load();
   };
 
+  const mergeHiddenDuplicates = async (targetOrgId: string, sourceOrgIds: string[]) => {
+    if (sourceOrgIds.length === 0) return;
+    const ok = window.confirm(
+      `Merge ${sourceOrgIds.length} hidden duplicate seller organisation${sourceOrgIds.length === 1 ? '' : 's'} into this seller?\n\nThis moves listings, events, conversations, reviews, badges, members and Stripe status where safe, then deletes the empty duplicate org rows.`
+    );
+    if (!ok) return;
+
+    for (const sourceOrgId of sourceOrgIds) {
+      const { error } = await (supabase.rpc as any)('admin_merge_duplicate_seller_org', {
+        _target_org_id: targetOrgId,
+        _source_org_id: sourceOrgId,
+        _admin_note: 'Merged from admin sellers duplicate cleanup',
+      });
+      if (error) {
+        toast.error(`Merge stopped: ${error.message}`);
+        await load();
+        return;
+      }
+    }
+
+    toast.success('Duplicate seller organisations merged');
+    load();
+  };
+
   const readinessLabel: Record<string, string> = {
     ready: 'Ready',
     payout_setup_incomplete: 'Setup incomplete',
@@ -296,6 +320,11 @@ export default function AdminSellers() {
                       <DropdownMenuItem onClick={() => sendOnboarding(o.id, Boolean(o.connect?.stripe_account_id))}>
                         <ExternalLink className="h-4 w-4 mr-2" />Open onboarding link
                       </DropdownMenuItem>
+                      {o._duplicateOrgIds?.length > 0 && (
+                        <DropdownMenuItem onClick={() => mergeHiddenDuplicates(o.id, o._duplicateOrgIds)}>
+                          <Building2 className="h-4 w-4 mr-2" />Merge hidden duplicates
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

@@ -176,3 +176,20 @@ describe("admin bootstrap safety", () => {
     expect(migration).not.toContain("select id, 'admin'::public.app_role from public.profiles");
   });
 });
+
+describe("duplicate seller organisation cleanup", () => {
+  it("keeps duplicate seller cleanup explicit, admin-only, and guarded", () => {
+    const migration = readMigration(
+      "supabase/migrations/20260706062000_admin_duplicate_seller_org_merge.sql",
+    );
+
+    expect(migration).toContain("This migration does not auto-delete data");
+    expect(migration).toContain("CREATE OR REPLACE VIEW public.admin_duplicate_seller_org_candidates");
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION public.admin_merge_duplicate_seller_org");
+    expect(migration).toContain("IF NOT public.is_admin(auth.uid())");
+    expect(migration).toContain("Refusing to merge organisations without a shared owner");
+    expect(migration).toContain("Both organisations have different Stripe Connect accounts");
+    expect(migration).toContain("Conversation conflicts found");
+    expect(migration).not.toContain("SELECT public.admin_merge_duplicate_seller_org");
+  });
+});
