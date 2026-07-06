@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Loader2, MoreVertical, Award, BadgeCheck, Ban, ShieldCheck, Search, Building2, RefreshCw, ExternalLink } from 'lucide-react';
+import { Loader2, MoreVertical, Award, BadgeCheck, Ban, ShieldCheck, Search, Building2, RefreshCw, ExternalLink, UserCog } from 'lucide-react';
 import { EmptyState } from '@/components/app/EmptyState';
 import { toast } from 'sonner';
 
@@ -66,6 +66,13 @@ export default function AdminSellers() {
       body: { org_id: orgId },
     });
     if (error || data?.error) return toast.error(error?.message || data?.error || 'Could not refresh Stripe status');
+    await (supabase.rpc as any)('admin_log_seller_assist', {
+      _seller_org_id: orgId,
+      _action: 'refresh_stripe_connect',
+      _entity_type: 'seller_stripe_account',
+      _entity_id: null,
+      _metadata: { source: 'admin_sellers_table' },
+    });
     toast.success('Stripe status refreshed');
     load();
   };
@@ -80,6 +87,13 @@ export default function AdminSellers() {
     });
     if (error || data?.error || !data?.url) return toast.error(error?.message || data?.error || 'Could not create onboarding link');
     await navigator.clipboard?.writeText(data.url as string).catch(() => undefined);
+    await (supabase.rpc as any)('admin_log_seller_assist', {
+      _seller_org_id: orgId,
+      _action: 'generate_stripe_onboarding_link',
+      _entity_type: 'seller_stripe_account',
+      _entity_id: null,
+      _metadata: { source: 'admin_sellers_table', account_id: data.account_id ?? null },
+    });
     window.open(data.url as string, '_blank', 'noopener,noreferrer');
     toast.success('Stripe onboarding link opened and copied');
     load();
@@ -179,6 +193,11 @@ export default function AdminSellers() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => act('admin_set_org_verified', { _org_id: o.id, _verified: !o.is_verified }, o.is_verified ? 'Unverified' : 'Verified')}>
                         <BadgeCheck className="h-4 w-4 mr-2" />{o.is_verified ? 'Remove verification' : 'Verify seller'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to={`/app/admin/sellers/${o.id}/assist`}>
+                          <UserCog className="h-4 w-4 mr-2" />Assist seller
+                        </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => act('admin_set_org_founding', { _org_id: o.id, _founding: !o.is_founding }, o.is_founding ? 'Badge removed' : 'Founding badge added')}>
                         <Award className="h-4 w-4 mr-2" />{o.is_founding ? 'Remove founding badge' : 'Add founding badge'}

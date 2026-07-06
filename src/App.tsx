@@ -69,6 +69,7 @@ import AdminReports from "./pages/app/admin/AdminReports";
 import AdminPayouts from "./pages/app/admin/AdminPayouts";
 import AdminLaunch from "./pages/app/admin/AdminLaunch";
 import AdminSellers from "./pages/app/admin/AdminSellers";
+import AdminSellerAssist from "./pages/app/admin/AdminSellerAssist";
 import AdminBidders from "./pages/app/admin/AdminBidders";
 import SellerPayouts from "./pages/app/seller/SellerPayouts";
 
@@ -307,6 +308,9 @@ const App = () => (
               } />
               <Route path="/app/admin/sellers" element={
                 <RoleGuard allowedRoles={['admin']}><AdminSellers /></RoleGuard>
+              } />
+              <Route path="/app/admin/sellers/:sellerOrgId/assist" element={
+                <RoleGuard allowedRoles={['admin']}><AdminSellerAssist /></RoleGuard>
               } />
               <Route path="/app/admin/bidders" element={
                 <RoleGuard allowedRoles={['admin']}><AdminBidders /></RoleGuard>
