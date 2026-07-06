@@ -20,7 +20,10 @@ const hasRecoveryParams = () => {
   return (
     hash.get('type') === 'recovery' ||
     search.get('type') === 'recovery' ||
+    window.location.hash.length > 1 ||
     hash.has('access_token') ||
+    hash.has('refresh_token') ||
+    hash.has('token_hash') ||
     search.has('code') ||
     search.has('token_hash')
   );
