@@ -2,7 +2,7 @@ import { Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign, Rocket, ShieldCheck } from 'lucide-react';
+import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign, Rocket, ShieldCheck, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PortalSwitcher } from './PortalSwitcher';
 import { useActivePortal } from '@/hooks/useActivePortal';
@@ -32,6 +32,7 @@ export default function AppLayout() {
     { to: '/app/buyer/overview', label: 'Overview', icon: LayoutDashboard },
     { to: '/app/buyer/bids', label: 'My Bids', icon: Gavel },
     { to: '/app/buyer/orders', label: 'Orders', icon: ShoppingCart },
+    { to: '/app/buyer/payment-methods', label: 'Payment methods', icon: CreditCard },
     { to: '/app/buyer/watchlist', label: 'Watchlist', icon: Heart },
     { to: '/app/buyer/alerts', label: 'Alerts', icon: Bell },
     { to: '/app/messages', label: 'Messages', icon: MessageSquare },
