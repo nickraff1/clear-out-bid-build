@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CreditCard, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getStripe } from '@/lib/stripe';
-import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
+import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import type { StripeElementsOptions } from '@stripe/stripe-js';
 import type { StripeEnv } from '@/lib/stripe';
 
@@ -16,10 +16,12 @@ interface Props {
 }
 
 function PaymentForm({
+  clientSecret,
   environment,
   onSaved,
   onClose,
 }: {
+  clientSecret: string;
   environment: StripeEnv;
   onSaved?: () => void;
   onClose: () => void;
@@ -27,20 +29,23 @@ function PaymentForm({
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
+  const [cardReady, setCardReady] = useState(false);
+  const [cardComplete, setCardComplete] = useState(false);
   const [error, setError] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return;
+    const card = elements.getElement(CardElement);
+    if (!card) {
+      setError('Card form is still loading. Please try again.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
-      const { error: submitErr } = await elements.submit();
-      if (submitErr) throw new Error(submitErr.message || 'Card details invalid');
-
-      const { error: confirmErr, setupIntent } = await stripe.confirmSetup({
-        elements,
-        redirect: 'if_required',
+      const { error: confirmErr, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
+        payment_method: { card },
       });
       if (confirmErr) throw new Error(confirmErr.message || 'Could not save card');
       if (!setupIntent || setupIntent.status !== 'succeeded') {
@@ -63,7 +68,27 @@ function PaymentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement options={{ layout: 'tabs' }} />
+      <div className="rounded-md border border-input bg-background px-3 py-3">
+        <CardElement
+          onReady={() => setCardReady(true)}
+          onChange={(event) => {
+            setCardComplete(event.complete);
+            setError(event.error?.message ?? '');
+          }}
+          options={{
+            hidePostalCode: true,
+            style: {
+              base: {
+                color: 'hsl(222.2 84% 4.9%)',
+                fontFamily: 'Inter, system-ui, sans-serif',
+                fontSize: '16px',
+                '::placeholder': { color: 'hsl(215.4 16.3% 46.9%)' },
+              },
+              invalid: { color: 'hsl(0 84.2% 60.2%)' },
+            },
+          }}
+        />
+      </div>
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -77,7 +102,7 @@ function PaymentForm({
         <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
           Cancel
         </Button>
-        <Button type="submit" disabled={!stripe || submitting}>
+        <Button type="submit" disabled={!stripe || !cardReady || !cardComplete || submitting}>
           {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><CreditCard className="h-4 w-4 mr-2" />Save card</>}
         </Button>
       </div>
@@ -124,8 +149,8 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
 
   const stripePromise = useMemo(() => getStripe(), []);
   const options: StripeElementsOptions | undefined = useMemo(
-    () => (clientSecret ? { clientSecret, appearance: { theme: 'stripe' as const } } : undefined),
-    [clientSecret],
+    () => ({ appearance: { theme: 'stripe' as const } }),
+    [],
   );
 
   return (
@@ -160,6 +185,7 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
         {!loading && clientSecret && paymentEnvironment && options && (
           <Elements key={clientSecret} stripe={stripePromise} options={options}>
             <PaymentForm
+              clientSecret={clientSecret}
               environment={paymentEnvironment}
               onSaved={onSaved}
               onClose={() => onOpenChange(false)}
