@@ -2352,42 +2352,6 @@ export type Database = {
         }
         Relationships: []
       }
-      bidder_payment_method_summaries: {
-        Row: {
-          created_at: string | null
-          environment: string | null
-          id: string | null
-          is_active: boolean | null
-          payment_method_brand: string | null
-          payment_method_last4: string | null
-          payment_method_verified_at: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          environment?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          payment_method_brand?: string | null
-          payment_method_last4?: string | null
-          payment_method_verified_at?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          environment?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          payment_method_brand?: string | null
-          payment_method_last4?: string | null
-          payment_method_verified_at?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       clearance_events_public: {
         Row: {
           created_at: string | null
