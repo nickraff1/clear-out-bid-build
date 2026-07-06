@@ -2,14 +2,14 @@ import { Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Clock, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign, Rocket, ShieldCheck, CreditCard } from 'lucide-react';
+import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign, Rocket, ShieldCheck, CreditCard, ShieldAlert, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PortalSwitcher } from './PortalSwitcher';
 import { useActivePortal } from '@/hooks/useActivePortal';
 import { NotificationsBell } from './NotificationsBell';
 
 export default function AppLayout() {
-  const { user, isLoading, isAdmin, isSeller, isBuyer, profile } = useAuth();
+  const { user, isLoading, isAdmin, isSeller, isBuyer, profile, adminAssistOrg, isAdminAssistMode, exitAdminSellerAssist } = useAuth();
   const location = useLocation();
   const [activePortal, setActivePortal] = useActivePortal();
 
@@ -74,7 +74,10 @@ export default function AppLayout() {
   let navItems = buyerNav;
   let portalTitle = 'Buyer Portal';
   
-  if (isAdmin) {
+  if (isAdminAssistMode) {
+    navItems = sellerNav;
+    portalTitle = 'Seller Portal';
+  } else if (isAdmin) {
     navItems = adminNav;
     portalTitle = 'Admin Portal';
   } else if (activePortal === 'seller' && isSeller) {
@@ -109,9 +112,35 @@ export default function AppLayout() {
                 onPortalChange={setActivePortal} 
               />
             )}
+
+            {isAdminAssistMode && (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-warning/15 flex items-center justify-center">
+                    <ShieldAlert className="h-5 w-5 text-warning" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="font-medium text-sidebar-foreground truncate">Admin assist</p>
+                    <p className="text-sm text-sidebar-foreground/60 truncate">{adminAssistOrg?.name ?? 'Seller organisation'}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    exitAdminSellerAssist();
+                    window.location.assign('/app/admin/sellers');
+                  }}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Exit assist mode
+                </Button>
+              </div>
+            )}
             
             {/* Admin header (no switcher for admins) */}
-            {isAdmin && (
+            {isAdmin && !isAdminAssistMode && (
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
                   <span className="text-lg font-bold text-primary-foreground">
@@ -162,7 +191,7 @@ export default function AppLayout() {
             </div>
 
             {/* Quick Actions */}
-            {activePortal === 'seller' && isSeller && (
+            {((activePortal === 'seller' && isSeller) || isAdminAssistMode) && (
               <div className="pt-4 mt-4 border-t border-sidebar-border">
                 <Button asChild className="w-full" size="sm">
                   <Link to="/app/seller/events/new">
@@ -201,6 +230,27 @@ export default function AppLayout() {
           <div className="sticky top-0 z-30 flex justify-end items-center gap-2 px-4 py-2 border-b border-border bg-background/95 backdrop-blur">
             <NotificationsBell />
           </div>
+          {isAdminAssistMode && (
+            <div className="border-b border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-warning" />
+                  <span className="font-medium">Admin assist mode:</span>
+                  <span>You are using the seller portal for {adminAssistOrg?.name ?? 'this seller organisation'}.</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    exitAdminSellerAssist();
+                    window.location.assign('/app/admin/sellers');
+                  }}
+                >
+                  Exit assist
+                </Button>
+              </div>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>

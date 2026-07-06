@@ -18,6 +18,10 @@ interface AuthContextType {
   isSeller: boolean;
   isBuyer: boolean;
   primaryOrg: Organization | null;
+  adminAssistOrg: Organization | null;
+  isAdminAssistMode: boolean;
+  startAdminSellerAssist: (orgId: string) => Promise<{ error: Error | null }>;
+  exitAdminSellerAssist: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [organizations, setOrganizations] = useState<OrgMember[]>([]);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [adminAssistOrg, setAdminAssistOrg] = useState<Organization | null>(null);
 
   const fetchUserData = async (userId: string) => {
     try {
@@ -85,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(null);
           setOrganizations([]);
           setRoles([]);
+          setAdminAssistOrg(null);
           setIsLoading(false);
         }
       }
@@ -138,9 +144,90 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = roles.includes('admin');
   const isSeller = roles.some(r => r === 'seller_admin' || r === 'seller_staff');
   const isBuyer = roles.some(r => r === 'buyer_admin' || r === 'buyer_staff');
+
+  useEffect(() => {
+    if (!user || !isAdmin) {
+      setAdminAssistOrg(null);
+      return;
+    }
+
+    const storedOrgId = localStorage.getItem(`admin_seller_assist_org_${user.id}`);
+    if (!storedOrgId) {
+      setAdminAssistOrg(null);
+      return;
+    }
+
+    supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', storedOrgId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          localStorage.removeItem(`admin_seller_assist_org_${user.id}`);
+          setAdminAssistOrg(null);
+          return;
+        }
+        setAdminAssistOrg(data as Organization);
+      });
+  }, [user, isAdmin]);
   
-  const primaryOrg = organizations.find(o => o.is_primary)?.organization as Organization ?? 
-                     organizations[0]?.organization as Organization ?? null;
+  const ownPrimaryOrg = organizations.find(o => o.is_primary)?.organization as Organization ?? 
+                        organizations[0]?.organization as Organization ?? null;
+  const primaryOrg = isAdmin && adminAssistOrg ? adminAssistOrg : ownPrimaryOrg;
+  const isAdminAssistMode = isAdmin && Boolean(adminAssistOrg);
+
+  const startAdminSellerAssist = async (orgId: string) => {
+    if (!user || !isAdmin) {
+      return { error: new Error('Admin access required') };
+    }
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', orgId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return { error: new Error(error?.message ?? 'Seller organisation not found') };
+    }
+
+    const org = data as Organization;
+    if (!['seller', 'fabricator'].includes(org.org_type)) {
+      return { error: new Error('Only seller organisations can be assisted from the seller portal') };
+    }
+
+    const { error: logError } = await (supabase.rpc as any)('admin_log_seller_assist', {
+      _seller_org_id: orgId,
+      _action: 'enter_full_seller_portal_assist',
+      _entity_type: 'organization',
+      _entity_id: orgId,
+      _metadata: { source: 'admin_sellers_table' },
+    });
+    if (logError) {
+      return { error: new Error(logError.message) };
+    }
+
+    localStorage.setItem(`admin_seller_assist_org_${user.id}`, orgId);
+    setAdminAssistOrg(org);
+    return { error: null };
+  };
+
+  const exitAdminSellerAssist = () => {
+    if (user && adminAssistOrg?.id) {
+      void (supabase.rpc as any)('admin_log_seller_assist', {
+        _seller_org_id: adminAssistOrg.id,
+        _action: 'exit_full_seller_portal_assist',
+        _entity_type: 'organization',
+        _entity_id: adminAssistOrg.id,
+        _metadata: { source: 'app_layout' },
+      });
+    }
+    if (user) {
+      localStorage.removeItem(`admin_seller_assist_org_${user.id}`);
+    }
+    setAdminAssistOrg(null);
+  };
 
   return (
     <AuthContext.Provider value={{
@@ -157,7 +244,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin,
       isSeller,
       isBuyer,
-      primaryOrg
+      primaryOrg,
+      adminAssistOrg,
+      isAdminAssistMode,
+      startAdminSellerAssist,
+      exitAdminSellerAssist
     }}>
       {children}
     </AuthContext.Provider>

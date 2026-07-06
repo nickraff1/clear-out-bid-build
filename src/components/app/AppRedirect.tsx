@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export default function AppRedirect() {
-  const { user, isLoading, isAdmin, isSeller, isBuyer } = useAuth();
+  const { user, isLoading, isAdmin, isSeller, isBuyer, isAdminAssistMode } = useAuth();
 
   if (isLoading) {
     return (
@@ -21,6 +21,10 @@ export default function AppRedirect() {
   const storedRole = localStorage.getItem(`user_role_${user.id}`);
 
   // Redirect based on role
+  if (isAdminAssistMode) {
+    return <Navigate to="/app/seller/overview" replace />;
+  }
+
   if (isAdmin) {
     return <Navigate to="/app/admin/overview" replace />;
   }

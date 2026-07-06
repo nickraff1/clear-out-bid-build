@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,8 @@ import { EmptyState } from '@/components/app/EmptyState';
 import { toast } from 'sonner';
 
 export default function AdminSellers() {
+  const navigate = useNavigate();
+  const { startAdminSellerAssist } = useAuth();
   const [orgs, setOrgs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -18,7 +21,7 @@ export default function AdminSellers() {
   const load = async () => {
     setLoading(true);
     const [{ data: orgList }, { data: events }, { data: lots }, { data: orders }, { data: payments }, { data: reports }, { data: connectAccounts }] = await Promise.all([
-      supabase.from('organizations').select('id, name, org_type, is_verified, is_founding, is_disabled, rating_avg, rating_count, created_at').order('created_at', { ascending: false }),
+      supabase.from('organizations').select('id, name, org_type, is_verified, is_founding, is_disabled, rating_avg, rating_count, created_at').in('org_type', ['seller', 'fabricator']).order('created_at', { ascending: false }),
       supabase.from('clearance_events').select('id, org_id'),
       supabase.from('lots').select('id, event_id, status'),
       supabase.from('orders').select('id, event_id, status, amount'),
@@ -59,6 +62,13 @@ export default function AdminSellers() {
     if (error) return toast.error(error.message);
     toast.success(label);
     load();
+  };
+
+  const assistSeller = async (orgId: string) => {
+    const { error } = await startAdminSellerAssist(orgId);
+    if (error) return toast.error(error.message);
+    toast.success('Admin assist mode started');
+    navigate('/app/seller/overview');
   };
 
   const refreshStripe = async (orgId: string) => {
@@ -166,8 +176,23 @@ export default function AdminSellers() {
           </TableRow></TableHeader>
           <TableBody>
             {filtered.map(o => (
-              <TableRow key={o.id} className={o.is_disabled ? 'opacity-60' : ''}>
-                <TableCell className="font-medium">{o.name}</TableCell>
+              <TableRow
+                key={o.id}
+                className={`${o.is_disabled ? 'opacity-60' : ''} cursor-pointer`}
+                onClick={() => assistSeller(o.id)}
+              >
+                <TableCell className="font-medium">
+                  <button
+                    type="button"
+                    className="text-left hover:text-primary transition-colors"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      assistSeller(o.id);
+                    }}
+                  >
+                    {o.name}
+                  </button>
+                </TableCell>
                 <TableCell className="text-muted-foreground">{o.org_type}</TableCell>
                 <TableCell>{o.active_lots}</TableCell>
                 <TableCell>{o.sold_lots}</TableCell>
@@ -187,17 +212,15 @@ export default function AdminSellers() {
                   {o.is_founding && <Badge variant="warning" className="text-[10px]"><Award className="h-3 w-3 mr-1" />founding</Badge>}
                   {o.is_disabled && <Badge variant="destructive" className="text-[10px]">suspended</Badge>}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => act('admin_set_org_verified', { _org_id: o.id, _verified: !o.is_verified }, o.is_verified ? 'Unverified' : 'Verified')}>
                         <BadgeCheck className="h-4 w-4 mr-2" />{o.is_verified ? 'Remove verification' : 'Verify seller'}
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to={`/app/admin/sellers/${o.id}/assist`}>
-                          <UserCog className="h-4 w-4 mr-2" />Assist seller
-                        </Link>
+                      <DropdownMenuItem onClick={() => assistSeller(o.id)}>
+                        <UserCog className="h-4 w-4 mr-2" />Assist seller
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => act('admin_set_org_founding', { _org_id: o.id, _founding: !o.is_founding }, o.is_founding ? 'Badge removed' : 'Founding badge added')}>
                         <Award className="h-4 w-4 mr-2" />{o.is_founding ? 'Remove founding badge' : 'Add founding badge'}
