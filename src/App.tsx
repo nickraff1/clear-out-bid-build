@@ -48,6 +48,7 @@ import BuyerBids from "./pages/app/buyer/BuyerBids";
 import BuyerOrders from "./pages/app/buyer/BuyerOrders";
 import BuyerWatchlist from "./pages/app/buyer/BuyerWatchlist";
 import BuyerAlerts from "./pages/app/buyer/BuyerAlerts";
+import BuyerPaymentMethods from "./pages/app/buyer/BuyerPaymentMethods";
 import Checkout from "./pages/app/buyer/Checkout";
 import CheckoutReturn from "./pages/app/buyer/CheckoutReturn";
 import CheckoutCancel from "./pages/app/buyer/CheckoutCancel";
@@ -225,6 +226,11 @@ const App = () => (
               <Route path="/app/buyer/alerts" element={
                 <RoleGuard allowedRoles={['buyer', 'admin']}>
                   <BuyerAlerts />
+                </RoleGuard>
+              } />
+              <Route path="/app/buyer/payment-methods" element={
+                <RoleGuard allowedRoles={['buyer', 'admin']}>
+                  <BuyerPaymentMethods />
                 </RoleGuard>
               } />
               <Route path="/app/buyer/checkout/:orderId" element={
