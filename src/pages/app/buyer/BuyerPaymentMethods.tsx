@@ -37,13 +37,13 @@ export default function BuyerPaymentMethods() {
       return;
     }
     const { data } = await supabase
-      .from('bidder_payment_method_summaries')
+      .from('bidder_payment_methods')
       .select('payment_method_brand, payment_method_last4, payment_method_verified_at')
       .eq('user_id', user.id)
       .eq('environment', env)
       .eq('is_active', true)
       .maybeSingle();
-    setCard((data as SavedCard | null) ?? null);
+    setCard((data as unknown as SavedCard | null) ?? null);
     setLoading(false);
   }, [user]);
 
