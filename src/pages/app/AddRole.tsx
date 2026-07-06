@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ensureUserRoleOrganization } from '@/lib/organizations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, ShoppingCart, Loader2, ArrowLeft, Check } from 'lucide-react';
@@ -30,69 +30,13 @@ export default function AddRole() {
     setIsLoading(true);
 
     try {
-      // Create organization for the new role
-      const orgName = profile?.full_name 
-        ? `${profile.full_name}'s ${roleToAdd === 'seller' ? 'Business' : 'Buyer Account'}` 
-        : `My ${roleToAdd === 'seller' ? 'Business' : 'Buyer Account'}`;
-      
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: orgName,
-          org_type: roleToAdd,
-          email: profile?.email || user.email,
-          is_approved: true,
-        })
-        .select()
-        .single();
-
-      if (orgError) {
-        console.error('[AddRole] Org creation error:', orgError);
-        toast({
-          title: 'Error creating organization',
-          description: orgError.message,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Add user as org member
-      const { error: memberError } = await supabase
-        .from('org_members')
-        .insert({
-          org_id: org.id,
-          user_id: user.id,
-          is_primary: false // Not primary since they already have a primary org
-        });
-
-      if (memberError) {
-        console.error('[AddRole] Member creation error:', memberError);
-        toast({
-          title: 'Error joining organization',
-          description: memberError.message,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Add user role
-      const roleValue = roleToAdd === 'seller' ? 'seller_admin' : 'buyer_admin';
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: user.id,
-          role: roleValue
-        });
-
-      if (roleError) {
-        console.error('[AddRole] Role creation error:', roleError);
-        toast({
-          title: 'Error assigning role',
-          description: roleError.message,
-          variant: 'destructive'
-        });
-        return;
-      }
+      await ensureUserRoleOrganization({
+        userId: user.id,
+        email: profile?.email || user.email,
+        fullName: profile?.full_name,
+        role: roleToAdd,
+        isPrimary: false,
+      });
 
       // Refresh auth context to get new roles
       await refreshProfile();

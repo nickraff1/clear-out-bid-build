@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Building2, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { AUSTRALIAN_STATES } from '@/lib/constants';
+import { ensureUserRoleOrganization } from '@/lib/organizations';
 import type { OrgType } from '@/types/database';
 
 export default function OrganizationPage() {
@@ -74,10 +75,35 @@ export default function OrganizationPage() {
 
         if (updateError) throw updateError;
       } else {
-        // Create new org
-        const { data: newOrg, error: insertError } = await supabase
-          .from('organizations')
-          .insert({
+        if (formData.org_type === 'seller' || formData.org_type === 'buyer') {
+          const newOrg = await ensureUserRoleOrganization({
+            userId: user!.id,
+            email: formData.email || user!.email,
+            fullName: formData.name,
+            role: formData.org_type,
+            isPrimary: true,
+          });
+
+          const { error: updateError } = await supabase
+            .from('organizations')
+            .update({
+              name: formData.name,
+              abn: formData.abn || null,
+              phone: formData.phone || null,
+              email: formData.email || null,
+              address: formData.address || null,
+              suburb: formData.suburb || null,
+              state: formData.state || null,
+              postcode: formData.postcode || null
+            })
+            .eq('id', newOrg.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Fabricator setup is kept as an explicit organisation type.
+          const { data: newOrg, error: insertError } = await supabase
+            .from('organizations')
+            .insert({
             name: formData.name,
             org_type: formData.org_type,
             abn: formData.abn || null,
@@ -88,28 +114,24 @@ export default function OrganizationPage() {
             state: formData.state || null,
             postcode: formData.postcode || null,
             is_approved: true // Auto-approve for now
-          })
-          .select()
-          .single();
+            })
+            .select()
+            .single();
 
-        if (insertError) throw insertError;
+          if (insertError) throw insertError;
 
-        // Add user as member
-        await supabase.from('org_members').insert({
-          user_id: user!.id,
-          org_id: newOrg.id,
-          is_primary: true
-        });
+          // Add user as member
+          await supabase.from('org_members').insert({
+            user_id: user!.id,
+            org_id: newOrg.id,
+            is_primary: true
+          });
 
-        // Add appropriate role
-        const role = formData.org_type === 'seller' || formData.org_type === 'fabricator' 
-          ? 'seller_admin' 
-          : 'buyer_admin';
-        
-        await supabase.from('user_roles').insert({
-          user_id: user!.id,
-          role
-        });
+          await supabase.from('user_roles').upsert({
+            user_id: user!.id,
+            role: 'seller_admin'
+          }, { onConflict: 'user_id,role' });
+        }
       }
 
       setSuccess(true);

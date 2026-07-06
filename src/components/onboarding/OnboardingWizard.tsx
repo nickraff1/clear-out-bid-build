@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ensureUserRoleOrganization } from '@/lib/organizations';
 import {
   Dialog,
   DialogContent,
@@ -97,77 +98,15 @@ export function OnboardingWizard() {
     try {
       console.log('[Onboarding] Starting role selection:', role);
       
-      // Create organization for the user
-      const orgName = profile?.full_name 
-        ? `${profile.full_name}'s ${role === 'seller' ? 'Business' : 'Account'}` 
-        : `My ${role === 'seller' ? 'Business' : 'Account'}`;
-      
-      console.log('[Onboarding] Creating organization:', orgName);
-      
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: orgName,
-          org_type: role,
-          email: profile?.email || user.email,
-          is_approved: true,
-        })
-        .select()
-        .single();
+      const org = await ensureUserRoleOrganization({
+        userId: user.id,
+        email: profile?.email || user.email,
+        fullName: profile?.full_name,
+        role,
+        isPrimary: true,
+      });
 
-      if (orgError) {
-        console.error('[Onboarding] Org creation error:', orgError);
-        toast({
-          title: 'Error creating organization',
-          description: orgError.message,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      console.log('[Onboarding] Organization created:', org.id);
-
-      // Add user as org member
-      const { error: memberError } = await supabase
-        .from('org_members')
-        .insert({
-          org_id: org.id,
-          user_id: user.id,
-          is_primary: true
-        });
-
-      if (memberError) {
-        console.error('[Onboarding] Member creation error:', memberError);
-        toast({
-          title: 'Error joining organization',
-          description: memberError.message,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      console.log('[Onboarding] Org member created');
-
-      // Add user role
-      const roleValue = role === 'seller' ? 'seller_admin' : 'buyer_admin';
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: user.id,
-          role: roleValue
-        });
-
-      if (roleError) {
-        console.error('[Onboarding] Role creation error:', roleError);
-        toast({
-          title: 'Error assigning role',
-          description: roleError.message,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      console.log('[Onboarding] User role created:', roleValue);
+      console.log('[Onboarding] Role organization ready:', org.id);
 
       // Store role selection in localStorage for immediate navigation
       localStorage.setItem(`user_role_${user.id}`, role);

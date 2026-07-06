@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ensureUserRoleOrganization } from '@/lib/organizations';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,45 +61,13 @@ export function PortalSwitcher({ activePortal, onPortalChange }: PortalSwitcherP
     setAddingRoleType(role);
 
     try {
-      // Create organization for the new role
-      const orgName = profile?.full_name 
-        ? `${profile.full_name}'s ${role === 'seller' ? 'Business' : 'Account'}` 
-        : `My ${role === 'seller' ? 'Business' : 'Account'}`;
-      
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: orgName,
-          org_type: role,
-          email: profile?.email || user.email,
-          is_approved: true,
-        })
-        .select()
-        .single();
-
-      if (orgError) throw orgError;
-
-      // Add user as org member
-      const { error: memberError } = await supabase
-        .from('org_members')
-        .insert({
-          org_id: org.id,
-          user_id: user.id,
-          is_primary: false // Not primary since they already have one
-        });
-
-      if (memberError) throw memberError;
-
-      // Add user role
-      const roleValue = role === 'seller' ? 'seller_admin' : 'buyer_admin';
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: user.id,
-          role: roleValue
-        });
-
-      if (roleError) throw roleError;
+      await ensureUserRoleOrganization({
+        userId: user.id,
+        email: profile?.email || user.email,
+        fullName: profile?.full_name,
+        role,
+        isPrimary: false,
+      });
 
       // Refresh auth context
       await refreshProfile();

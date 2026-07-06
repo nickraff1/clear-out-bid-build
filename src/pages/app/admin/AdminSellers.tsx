@@ -33,7 +33,10 @@ const dedupeSellerOrgs = (orgs: any[]) => {
   const grouped = new Map<string, any[]>();
 
   for (const org of orgs) {
-    const key = normalizeSellerName(org.name) || org.id;
+    const ownerKey = (org._ownerUserIds ?? []).length
+      ? `owners:${[...org._ownerUserIds].sort().join(',')}`
+      : null;
+    const key = ownerKey ?? `name:${normalizeSellerName(org.name) || org.id}`;
     grouped.set(key, [...(grouped.get(key) ?? []), org]);
   }
 
@@ -62,7 +65,7 @@ export default function AdminSellers() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: orgList }, { data: events }, { data: lots }, { data: orders }, { data: payments }, { data: reports }, { data: connectAccounts }] = await Promise.all([
+    const [{ data: orgList }, { data: events }, { data: lots }, { data: orders }, { data: payments }, { data: reports }, { data: connectAccounts }, { data: members }] = await Promise.all([
       supabase.from('organizations').select('id, name, org_type, is_verified, is_founding, is_disabled, rating_avg, rating_count, created_at').in('org_type', ['seller', 'fabricator']).order('created_at', { ascending: false }),
       supabase.from('clearance_events').select('id, org_id'),
       supabase.from('lots').select('id, event_id, status'),
@@ -74,6 +77,7 @@ export default function AdminSellers() {
         payouts_enabled, capability_transfers, disabled_reason,
         requirements_currently_due, requirements_past_due, last_synced_at
       `),
+      supabase.from('org_members').select('org_id, user_id, is_primary, profile:profiles(full_name, email)'),
     ]);
     const eventOrg = new Map((events ?? []).map((e:any) => [e.id, e.org_id]));
     const lotOrg = new Map((lots ?? []).map((l:any) => [l.id, eventOrg.get(l.event_id)]));
@@ -81,6 +85,7 @@ export default function AdminSellers() {
     const enriched = (orgList ?? []).map((o:any) => {
       const orgLots = (lots ?? []).filter((l:any) => eventOrg.get(l.event_id) === o.id);
       const orgOrders = (orders ?? []).filter((ord:any) => eventOrg.get(ord.event_id) === o.id);
+      const orgMembers = (members ?? []).filter((m:any) => m.org_id === o.id);
       const ordIds = new Set(orgOrders.map((x:any) => x.id));
       const orgPays = (payments ?? []).filter((p:any) => ordIds.has(p.order_id) && p.status === 'succeeded');
       const gmv = orgOrders.filter((x:any) => ['paid','ready_for_pickup','collected'].includes(x.status)).reduce((s:number,x:any) => s + Number(x.amount||0), 0);
@@ -92,6 +97,9 @@ export default function AdminSellers() {
         sold_lots: orgLots.filter((l:any) => l.status === 'sold').length,
         gmv, pending_payout: pendingPayout, open_reports: rep,
         connect: connectByOrg.get(o.id) ?? null,
+        _ownerUserIds: orgMembers.map((m:any) => m.user_id).filter(Boolean),
+        _ownerEmails: orgMembers.map((m:any) => m.profile?.email).filter(Boolean),
+        _ownerNames: orgMembers.map((m:any) => m.profile?.full_name).filter(Boolean),
       };
     });
     setOrgs(dedupeSellerOrgs(enriched));
@@ -239,6 +247,11 @@ export default function AdminSellers() {
                   {o._duplicateCount > 1 && (
                     <p className="text-xs text-muted-foreground mt-1">
                       {o._duplicateCount - 1} duplicate seller org{o._duplicateCount === 2 ? '' : 's'} hidden
+                    </p>
+                  )}
+                  {o._ownerEmails?.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Owner: {o._ownerEmails[0]}
                     </p>
                   )}
                 </TableCell>
