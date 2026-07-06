@@ -74,7 +74,7 @@ export default function SellerPayouts() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Payouts</h1>
-        <p className="text-muted-foreground">Track your sold items and net payouts. Payouts are sent manually by Offcutt during the beta.</p>
+        <p className="text-muted-foreground">Track your sold items and net payouts. Payouts are automatic and typically reflected within 24 hours of pickup confirmation.</p>
       </div>
 
       {error && (
