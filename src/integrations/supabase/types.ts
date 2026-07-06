@@ -2590,6 +2590,8 @@ export type Database = {
         Args: {
           p_auction_end: string
           p_lot_id: string
+          p_pickup_end: string
+          p_pickup_start: string
           p_reserve_price?: number
           p_start_price?: number
         }

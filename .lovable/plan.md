@@ -1,104 +1,76 @@
+## What's actually wrong
 
-# Enable Stripe Connect Seller Onboarding + Automated Payouts (Live)
+The relisted lot is `status='active'` on the seller side, but Marketplace filters lots by `clearance_events.pickup_end >= now()`. Your event's pickup window is:
 
-## Context
+- pickup_start: **2026-07-05 17:00 UTC**
+- pickup_end: **2026-07-05 18:55 UTC** (already in the past)
+- new auction_end: **2026-07-07 07:00 UTC**
 
-Stripe is already live through the Lovable-managed gateway. The active payment flow (`create-checkout` → `payments-webhook` → `admin-refund-payment` → `admin-create-seller-transfer`) is fully wired through the gateway helper. The platform collects 100% at checkout, then pushes `stripe.transfers.create` to each seller's Connect Express account.
+So the auction now ends **~2 days after the pickup window has already closed**. Marketplace hides it, and the `bids_check_pickup_window` trigger would block bids anyway. The original active lot is invisible for the exact same reason — this isn't specific to the relist.
 
-Two missing pieces:
-1. **Seller onboarding** — `stripe-connect-onboard` is legacy code referencing the non-existent `STRIPE_SECRET_KEY`, and `PaymentSettings.tsx` is a "Coming Soon" placeholder.
-2. **Automated payouts** — `admin-create-seller-transfer` already contains the correct transfer logic but is gated behind `ENABLE_AUTOMATED_PAYOUTS=true` AND must be triggered manually per payment by an admin. There is no automatic trigger when an order transitions to `collected`.
+Also: relisting a lot without adjusting the parent event's pickup window will always produce this broken state whenever the old event's pickup has passed. The current `relist_auction_lot` function only touches the lot, never the event, so every relist of an expired event silently ships a dead listing.
 
-No new secrets required. The `mk_…` value from earlier is unused and can be deleted.
+## Full fix (not a patch)
 
-## Changes
+### 1. Rework `relist_auction_lot` to guarantee a coherent, biddable state
 
-### 1. Refactor `stripe-connect-onboard` to use the gateway
-`supabase/functions/stripe-connect-onboard/index.ts`
-- Replace `Deno.env.get("STRIPE_SECRET_KEY")` + direct SDK with `createStripeClient(env)` from `_shared/stripe.ts`.
-- Accept `environment: "sandbox" | "live"` via `normalizeRequestedEnvironment`.
-- Add JWT check (`admin.auth.getUser(token)`) and org-membership check (caller must be a member of `org_id`).
-- Persist created `stripe_account_id` and `account_status: 'pending'` on `seller_stripe_accounts`.
-- Return `{ url, account_id }` — mint a fresh account link every call (single-use).
+New signature:
 
-Add `verify_jwt = false` for this function in `supabase/config.toml`.
-
-### 2. Add `account.updated` handling to `payments-webhook`
-`supabase/functions/payments-webhook/index.ts`
-- New `case "account.updated"` reading `id`, `charges_enabled`, `payouts_enabled`, `details_submitted` and updating `seller_stripe_accounts` keyed by `stripe_account_id`.
-- `account_status = details_submitted ? 'active' : 'pending'`.
-
-### 3. Replace `PaymentSettings.tsx` placeholder with real onboarding UI
-`src/pages/app/seller/PaymentSettings.tsx`
-- On mount, query `seller_stripe_accounts` for `primaryOrg.id` and reflect real state: `Not connected` / `Pending verification` / `Ready to receive payouts` / `Restricted`.
-- "Connect Payment Account" → invoke `stripe-connect-onboard` with `{ org_id, return_url: window.location.href, environment }` then `window.location.assign(url)`.
-- "Manage Payment Account" (when connected) → same invoke, opens fresh Express dashboard link.
-- Refetch status on window focus so returning from Stripe reflects new state.
-
-### 4. Automated payout trigger on order completion
-This is the new piece.
-
-**New edge function `auto-payout-on-collected`** (or fold into `_shared/paid-order.ts`):
-- Called when an order transitions to `collected`.
-- Reads the `payments` row for that order, verifies `status = 'succeeded'`, `stripe_transfer_id IS NULL`, no open `lot_reports`, and seller has `payouts_enabled = true`.
-- Invokes the same transfer logic currently in `admin-create-seller-transfer` (extracted to `_shared/seller-transfer.ts` so both call sites share it).
-- Writes `stripe_transfer_id`, `manual_payout_status='manual_payout_paid'`, `payment_mode='stripe_connect_mode'`.
-
-**Trigger mechanism** — pgnet call from a Postgres trigger on `orders` when `status` becomes `collected`:
-```sql
-CREATE OR REPLACE FUNCTION public.trigger_auto_payout()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  IF NEW.status = 'collected' AND OLD.status IS DISTINCT FROM 'collected' THEN
-    PERFORM net.http_post(
-      url := '<project>/functions/v1/auto-payout-on-collected',
-      headers := jsonb_build_object('Content-Type','application/json','apikey','<anon>'),
-      body := jsonb_build_object('order_id', NEW.id)
-    );
-  END IF;
-  RETURN NEW;
-END $$;
 ```
-Requires `pg_net` extension enabled. Trigger URL + anon key injected via `supabase--insert` (not migration) so remixes don't leak the project ref.
-
-**Retry / backstop cron** — a new `sweep-unpaid-payouts` scheduled function every 15 min that finds `payments` where `status='succeeded'`, `order.status='collected'`, `stripe_transfer_id IS NULL`, no open reports, and reruns the transfer helper. Guards against dropped `pg_net` calls, transient Stripe failures, or sellers who complete Connect after the order was collected.
-
-**Refactor** `admin-create-seller-transfer` to call the same shared helper — keeps admin-triggered manual retries working and drops the `ENABLE_AUTOMATED_PAYOUTS` env gate (payouts become the default path).
-
-### 5. Automated-payout kill switch
-Replace the boolean `ENABLE_AUTOMATED_PAYOUTS` env gate with a row on `auction_deposit_settings` (or a small new `platform_settings` row): `auto_payouts_enabled boolean default true`. Admin UI can flip it if needed. All three call sites (auto function, cron sweep, admin function) check this flag.
-
-### 6. Delete legacy dead files
-- `supabase/functions/stripe-checkout/index.ts` — superseded by `create-checkout`.
-- `supabase/functions/stripe-webhook/index.ts` — superseded by `payments-webhook`.
-
-Both reference `STRIPE_SECRET_KEY` and are not called from anywhere.
-
-### 7. Admin surfacing
-`AdminPayouts.tsx` (already exists) — add columns/badges showing `stripe_transfer_id` and auto-payout status so admins can see the automated flow, and expose a "Retry payout" button that hits `admin-create-seller-transfer` for anything the sweep couldn't process (e.g. seller not yet onboarded).
-
-## Fund flow after this ships
-
-```text
-Buyer pays $110 (base $100 + 10% buyer fee)
-  → Platform Stripe balance: +$110
-Order marked `collected` (buyer confirms pickup)
-  → pg_net trigger fires auto-payout-on-collected
-  → stripe.transfers.create $90 → seller Connect account
-  → Platform net revenue: $110 - $90 = $20 (10% buyer fee + 10% seller commission)
-Seller receives $90 in their Stripe balance
-  → Stripe pays out to their bank on their Express payout schedule (daily/weekly)
+relist_auction_lot(
+  p_lot_id           uuid,
+  p_auction_end      timestamptz,
+  p_pickup_start     timestamptz,   -- required
+  p_pickup_end       timestamptz,   -- required
+  p_start_price      numeric  = NULL,
+  p_reserve_price    numeric  = NULL
+)
 ```
 
-## Not in scope
+Behavior:
 
-- Refund reversal of transfers (Stripe holds this via `reversals` API; existing `admin-refund-payment` puts payout on hold — that's the correct interim behaviour and out of scope for this pass).
-- Changes to `create-checkout` or the auction-winner charging path — those already work.
-- Admin "force payout" for sellers whose Connect account isn't ready — sweep cron will pick them up automatically once they onboard.
+- Auth: caller must be a member of the lot's org (unchanged).
+- Validate: `p_auction_end > now()`, `p_pickup_start >= p_auction_end`, `p_pickup_end > p_pickup_start`.
+- Clone the lot (fresh bids/status='active', copy media using the correct `type, is_primary, sort_order` columns, copy compliance tags) — as today.
+- **Extend, never shrink, the parent event's pickup window**: set `pickup_start = LEAST(existing, p_pickup_start)` and `pickup_end = GREATEST(existing, p_pickup_end)`.
+- If the parent event's `status` is `draft` or `completed`, set it to `active` so the seller doesn't have to hunt for it.
+- Return the new lot id.
 
-## Rollout order
+### 2. Rework the relist dialog to collect a pickup window
 
-1. Ship refactor of `stripe-connect-onboard` + `payments-webhook` `account.updated` + new `PaymentSettings` UI + delete legacy files.
-2. Seller completes Connect onboarding via new UI.
-3. Ship shared transfer helper + `auto-payout-on-collected` function + pg_net trigger + sweep cron + kill switch + `AdminPayouts` retry button.
-4. Verify with a small manual smoke test (finish the marble auction, pay, mark collected, watch transfer land).
+`src/components/seller/RelistAuctionDialog.tsx` becomes:
+
+- Load the parent event's current `pickup_start / pickup_end` so we can show them.
+- Fields:
+  - **New auction end** (datetime-local) — default: now + 7 days.
+  - **Pickup window start** (datetime-local) — default: `auction_end` (auto-shifts when auction_end changes if the user hasn't manually edited it).
+  - **Pickup window end** (datetime-local) — default: `auction_end + 3 days` (same auto-shift rule).
+  - **Start price** and **Reserve price** — unchanged.
+- Inline helper text: "Current event pickup: {start} → {end}. Relisting will extend the event window if needed."
+- Client-side validation with clear errors: pickup start ≥ auction end, pickup end > pickup start.
+- Submit calls the new RPC signature.
+
+### 3. Regenerate types and confirm both entry points still work
+
+- Types regenerate automatically after the migration.
+- `SellerLots.tsx` and `EventDetail.tsx` already pass the lot into `RelistAuctionDialog`; no changes needed beyond passing the event's pickup window (fetch inside the dialog by `lot.event_id`, so nothing changes at the call sites).
+
+### 4. Verify end-to-end on the existing broken event
+
+After the migration + UI change, relist the Stone Benchtop lot with:
+
+- auction_end = now + 10 min (fast smoke test)
+- pickup_start = auction_end
+- pickup_end = auction_end + 2 days
+
+Then confirm:
+
+- Marketplace lists it (pickup_end is now in the future).
+- Placing a bid succeeds (the pickup-window trigger no longer rejects).
+- The event's `pickup_end` moved forward and its status flipped to `active`.
+
+## Files changed
+
+- `supabase/migrations/…` — replace `public.relist_auction_lot` with the new version above.
+- `src/components/seller/RelistAuctionDialog.tsx` — add pickup window fields, load parent event, new validation, new RPC args.
+- No changes required in `SellerLots.tsx` or `EventDetail.tsx`.
