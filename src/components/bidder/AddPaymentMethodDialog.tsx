@@ -79,12 +79,12 @@ function PaymentForm({
             hidePostalCode: true,
             style: {
               base: {
-                color: 'hsl(222.2 84% 4.9%)',
+                color: '#0f172a',
                 fontFamily: 'Inter, system-ui, sans-serif',
                 fontSize: '16px',
-                '::placeholder': { color: 'hsl(215.4 16.3% 46.9%)' },
+                '::placeholder': { color: '#64748b' },
               },
-              invalid: { color: 'hsl(0 84.2% 60.2%)' },
+              invalid: { color: '#ef4444' },
             },
           }}
         />
