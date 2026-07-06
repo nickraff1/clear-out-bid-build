@@ -526,6 +526,13 @@ export type Database = {
             foreignKeyName: "bids_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bids_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -646,6 +653,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "clearance_events_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_imports_seller_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
             referencedColumns: ["id"]
           },
           {
@@ -774,6 +788,13 @@ export type Database = {
             foreignKeyName: "clearance_events_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clearance_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -841,6 +862,13 @@ export type Database = {
             columns: ["lot_id"]
             isOneToOne: false
             referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_seller_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
             referencedColumns: ["id"]
           },
           {
@@ -1464,6 +1492,13 @@ export type Database = {
             foreignKeyName: "orders_buyer_org_id_fkey"
             columns: ["buyer_org_id"]
             isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_buyer_org_id_fkey"
+            columns: ["buyer_org_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -1527,6 +1562,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "org_members_org_id_fkey"
             columns: ["org_id"]
@@ -1964,6 +2006,13 @@ export type Database = {
             foreignKeyName: "reviews_reviewee_org_id_fkey"
             columns: ["reviewee_org_id"]
             isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewee_org_id_fkey"
+            columns: ["reviewee_org_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -2080,6 +2129,13 @@ export type Database = {
             foreignKeyName: "seller_badges_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_badges_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -2123,6 +2179,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "seller_stripe_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "seller_stripe_accounts_org_id_fkey"
             columns: ["org_id"]
@@ -2255,6 +2318,24 @@ export type Database = {
       }
     }
     Views: {
+      admin_duplicate_seller_org_candidates: {
+        Row: {
+          conversation_count: number | null
+          created_at: string | null
+          event_count: number | null
+          id: string | null
+          lot_count: number | null
+          name: string | null
+          normalized_name: string | null
+          order_count: number | null
+          org_type: Database["public"]["Enums"]["org_type"] | null
+          owner_user_ids: string[] | null
+          owners: Json | null
+          stripe_account_count: number | null
+          stripe_account_id: string | null
+        }
+        Relationships: []
+      }
       admin_messaging_integrity: {
         Row: {
           buyer_id: string | null
@@ -2317,6 +2398,13 @@ export type Database = {
             columns: ["lot_id"]
             isOneToOne: false
             referencedRelation: "lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_seller_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
             referencedColumns: ["id"]
           },
           {
@@ -2413,6 +2501,13 @@ export type Database = {
             foreignKeyName: "clearance_events_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clearance_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -2458,6 +2553,23 @@ export type Database = {
         Args: { _note?: string; _order_id: string }
         Returns: undefined
       }
+      admin_merge_duplicate_seller_org:
+        | {
+            Args: {
+              _admin_note: string
+              _source_org_id: string
+              _target_org_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _admin_note?: string
+              _source_org_id: string
+              _target_org_id: string
+            }
+            Returns: Json
+          }
       admin_regenerate_pickup_code: {
         Args: { _note?: string; _order_id: string }
         Returns: string
