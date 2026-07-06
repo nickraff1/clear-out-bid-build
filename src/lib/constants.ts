@@ -52,13 +52,7 @@ export const DEFAULT_CATEGORIES = [
 ] as const;
 
 export const BID_INCREMENTS = [
-  { upTo: 100, increment: 5 },
-  { upTo: 500, increment: 10 },
-  { upTo: 1000, increment: 25 },
-  { upTo: 5000, increment: 50 },
-  { upTo: 10000, increment: 100 },
-  { upTo: 50000, increment: 250 },
-  { upTo: Infinity, increment: 500 },
+  { upTo: Infinity, increment: 1 },
 ] as const;
 
 export const AUCTION_CONFIG = {
@@ -69,7 +63,7 @@ export const AUCTION_CONFIG = {
 
 export function getBidIncrement(currentBid: number): number {
   const rule = BID_INCREMENTS.find(r => currentBid < r.upTo);
-  return rule?.increment ?? 500;
+  return rule?.increment ?? 1;
 }
 
 export function getMinNextBid(currentBid: number): number {

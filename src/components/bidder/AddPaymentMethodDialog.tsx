@@ -6,7 +6,7 @@ import { Loader2, CreditCard, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getStripe } from '@/lib/stripe';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
-import type { Stripe, StripeElementsOptions } from '@stripe/stripe-js';
+import type { StripeElementsOptions } from '@stripe/stripe-js';
 import type { StripeEnv } from '@/lib/stripe';
 
 interface Props {
@@ -87,15 +87,14 @@ function PaymentForm({
 
 export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
   const [clientSecret, setClientSecret] = useState<string>('');
-  const [paymentEnvironment, setPaymentEnvironment] = useState<StripeEnv>('sandbox');
-  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [paymentEnvironment, setPaymentEnvironment] = useState<StripeEnv | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
     if (!open) {
       setClientSecret('');
-      setPaymentEnvironment('sandbox');
+      setPaymentEnvironment(null);
       setError('');
       return;
     }
@@ -104,14 +103,13 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
       setLoading(true);
       setError('');
       try {
-        setStripePromise(getStripe());
         const { data, error: fnErr } = await supabase.functions.invoke('create-bidder-setup-intent', {
           body: {},
         });
         if (fnErr || data?.error) throw new Error(fnErr?.message || data?.error || 'Could not start card setup');
         if (!cancelled) {
-          setClientSecret(data.client_secret);
           setPaymentEnvironment(data.environment === 'live' ? 'live' : 'sandbox');
+          setClientSecret(data.client_secret);
         }
       } catch (err) {
         if (!cancelled) setError((err as Error).message);
@@ -123,7 +121,7 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
   }, [open]);
 
   const options: StripeElementsOptions | undefined = clientSecret
-    ? { clientSecret, appearance: { theme: 'night' } }
+    ? { clientSecret, appearance: { theme: 'stripe' } }
     : undefined;
 
   return (
@@ -145,8 +143,8 @@ export function AddPaymentMethodDialog({ open, onOpenChange, onSaved }: Props) {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        {!loading && clientSecret && stripePromise && options && (
-          <Elements stripe={stripePromise} options={options}>
+        {!loading && clientSecret && paymentEnvironment && options && (
+          <Elements stripe={getStripe()} options={options}>
             <PaymentForm
               environment={paymentEnvironment}
               onSaved={onSaved}
