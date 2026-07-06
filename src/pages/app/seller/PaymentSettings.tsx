@@ -15,6 +15,7 @@ import {
   DollarSign,
   Building2,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 
 type StripeAccountStatus = {
@@ -23,6 +24,14 @@ type StripeAccountStatus = {
   payouts_enabled: boolean | null;
   details_submitted: boolean | null;
   account_status: string | null;
+  connect_readiness_status: string | null;
+  capability_card_payments: string | null;
+  capability_transfers: string | null;
+  disabled_reason: string | null;
+  requirements_currently_due: string[] | null;
+  requirements_past_due: string[] | null;
+  requirements_pending_verification: string[] | null;
+  last_synced_at: string | null;
 };
 
 type ConnectionState =
@@ -44,6 +53,7 @@ export default function PaymentSettings() {
   const [state, setState] = useState<ConnectionState>({ kind: 'not_connected' });
   const [loading, setLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!primaryOrg?.id) { setLoading(false); return; }
@@ -60,7 +70,12 @@ export default function PaymentSettings() {
     }
     const { data } = await supabase
       .from('seller_stripe_accounts')
-      .select('stripe_account_id, charges_enabled, payouts_enabled, details_submitted, account_status')
+      .select(`
+        stripe_account_id, charges_enabled, payouts_enabled, details_submitted,
+        account_status, connect_readiness_status, capability_card_payments,
+        capability_transfers, disabled_reason, requirements_currently_due,
+        requirements_past_due, requirements_pending_verification, last_synced_at
+      `)
       .eq('org_id', primaryOrg.id)
       .maybeSingle();
     setState(classify((data as StripeAccountStatus | null) ?? null));
@@ -100,15 +115,53 @@ export default function PaymentSettings() {
     }
   };
 
+  const handleRefresh = async () => {
+    if (!primaryOrg?.id) return;
+    setIsRefreshing(true);
+    try {
+      await supabase.functions.invoke('stripe-connect-refresh', {
+        body: { org_id: primaryOrg.id },
+      });
+      await load();
+      toast({ title: 'Stripe status refreshed' });
+    } catch (e) {
+      toast({
+        title: 'Could not refresh Stripe',
+        description: (e as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const stripeConnected = state.kind !== 'not_connected';
-  const payoutsReady = state.kind === 'active';
+  const account = state.kind === 'not_connected' ? null : state.account;
+  const readiness = account?.connect_readiness_status ?? (state.kind === 'active' ? 'ready' : state.kind);
+  const payoutsReady = readiness === 'ready';
+  const dueItems = [
+    ...(account?.requirements_past_due ?? []),
+    ...(account?.requirements_currently_due ?? []),
+  ];
+  const pendingItems = account?.requirements_pending_verification ?? [];
   const badgeVariant: 'default' | 'secondary' | 'destructive' = payoutsReady
     ? 'default'
-    : state.kind === 'restricted' ? 'destructive' : 'secondary';
+    : ['action_required', 'payments_paused', 'payouts_paused', 'restricted'].includes(readiness) ? 'destructive' : 'secondary';
   const badgeLabel = state.kind === 'not_connected' ? 'Not connected'
-    : state.kind === 'pending' ? 'Pending verification'
-    : state.kind === 'restricted' ? 'Action required'
-    : 'Ready';
+    : readiness === 'ready' ? 'Ready for payouts'
+    : readiness === 'review_pending' ? 'Stripe review pending'
+    : readiness === 'payments_paused' ? 'Payments paused'
+    : readiness === 'payouts_paused' ? 'Payouts paused'
+    : readiness === 'action_required' ? 'Action required'
+    : 'Payout setup incomplete';
+
+  const readinessCopy = payoutsReady
+    ? 'Stripe has enabled payments and payouts for this seller account.'
+    : readiness === 'review_pending'
+      ? 'Stripe is reviewing your submitted information. We will refresh this status automatically, and you can check again here.'
+      : dueItems.length > 0
+        ? 'Stripe needs more information before Offcutt can send automatic payouts.'
+        : 'Continue Stripe onboarding to finish verifying your account and enable payouts.';
 
   return (
     <div className="container max-w-3xl mx-auto py-8 px-4">
@@ -189,34 +242,70 @@ export default function PaymentSettings() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
-                  <div className={`h-12 w-12 rounded-full flex items-center justify-center ${payoutsReady ? 'bg-primary/10' : 'bg-warning/10'}`}>
-                    {payoutsReady ? <Check className="h-6 w-6 text-primary" /> : <AlertCircle className="h-6 w-6 text-warning" />}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center ${payoutsReady ? 'bg-primary/10' : 'bg-warning/10'}`}>
+                      {payoutsReady ? <Check className="h-6 w-6 text-primary" /> : <AlertCircle className="h-6 w-6 text-warning" />}
+                    </div>
+                    <div>
+                      <p className="font-medium">{badgeLabel}</p>
+                      <p className="text-sm text-muted-foreground">{readinessCopy}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">
-                      {payoutsReady ? 'Ready to receive payouts' : state.kind === 'restricted' ? 'Additional information needed' : 'Verification in progress'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {payoutsReady
-                        ? 'Stripe will pay 90% of every completed sale into your connected bank account.'
-                        : 'Continue Stripe onboarding to finish verifying your account and enable payouts.'}
-                    </p>
+
+                  {account?.disabled_reason && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Stripe has restricted this account</AlertTitle>
+                      <AlertDescription>{account.disabled_reason}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {dueItems.length > 0 && (
+                    <div className="rounded-lg border p-4">
+                      <h4 className="font-medium mb-2">Action required in Stripe</h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        {dueItems.slice(0, 8).map((item) => <li key={item}>• {item.replaceAll('_', ' ')}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {pendingItems.length > 0 && (
+                    <div className="rounded-lg border p-4">
+                      <h4 className="font-medium mb-2">Submitted for review</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {pendingItems.length} Stripe requirement{pendingItems.length === 1 ? '' : 's'} are pending verification.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button
+                      variant={payoutsReady ? 'outline' : 'default'}
+                      onClick={handleConnect}
+                      disabled={isConnecting}
+                    >
+                      {isConnecting ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Redirecting…</>
+                      ) : (
+                        <><ExternalLink className="h-4 w-4 mr-2" />{payoutsReady ? 'Manage Stripe Profile' : 'Continue Stripe Setup'}</>
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+                      {isRefreshing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                      Refresh status
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                    <div>Payments: {account?.charges_enabled ? 'Enabled' : 'Not enabled'}</div>
+                    <div>Payouts: {account?.payouts_enabled ? 'Enabled' : 'Not enabled'}</div>
+                    <div>Card payments capability: {account?.capability_card_payments ?? 'unknown'}</div>
+                    <div>Transfers capability: {account?.capability_transfers ?? 'unknown'}</div>
+                    <div className="sm:col-span-2">Stripe account: {account?.stripe_account_id ?? '—'}</div>
+                    <div className="sm:col-span-2">Last checked: {account?.last_synced_at ? new Date(account.last_synced_at).toLocaleString() : 'Not yet synced'}</div>
                   </div>
                 </div>
-
-                <Button
-                  variant={payoutsReady ? 'outline' : 'default'}
-                  className="w-full"
-                  onClick={handleConnect}
-                  disabled={isConnecting}
-                >
-                  {isConnecting ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Redirecting…</>
-                  ) : (
-                    <><ExternalLink className="h-4 w-4 mr-2" />{payoutsReady ? 'Manage Payment Account' : 'Continue Stripe Onboarding'}</>
-                  )}
-                </Button>
               </div>
             )}
           </CardContent>

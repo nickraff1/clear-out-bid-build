@@ -47,7 +47,7 @@ export default function AppLayout() {
     { to: '/app/seller/pickups', label: 'Pickups', icon: Truck },
     { to: '/app/messages', label: 'Messages', icon: MessageSquare },
     { to: '/app/seller/payouts', label: 'Payouts', icon: DollarSign },
-    { to: '/app/seller/payments', label: 'Payment setup', icon: Tag },
+    { to: '/app/seller/payments', label: 'Payout setup', icon: Tag },
   ];
 
   const adminNav = [

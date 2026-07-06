@@ -3,6 +3,7 @@
 // requiring a webhook round-trip.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient, resolveConfiguredPaymentEnvironment, type StripeEnv } from "../_shared/stripe.ts";
+import { summarizeConnectAccount } from "../_shared/connect-status.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,30 +80,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const charges = !!account.charges_enabled;
-    const payouts = !!account.payouts_enabled;
-    const details = !!account.details_submitted;
-    const status = payouts && charges
-      ? "active"
-      : details && !payouts
-        ? "restricted"
-        : "pending";
+    const summary = summarizeConnectAccount(account);
 
     await admin.from("seller_stripe_accounts").update({
-      charges_enabled: charges,
-      payouts_enabled: payouts,
-      details_submitted: details,
-      onboarding_complete: details,
-      account_status: status,
-      updated_at: new Date().toISOString(),
+      ...summary,
+      stripe_environment: env,
     }).eq("org_id", orgId);
 
     return new Response(JSON.stringify({
       refreshed: true,
-      charges_enabled: charges,
-      payouts_enabled: payouts,
-      details_submitted: details,
-      account_status: status,
+      ...summary,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("stripe-connect-refresh error", e);

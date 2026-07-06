@@ -47,6 +47,7 @@ type PayoutRow = {
   refunded_amount: number | null;
   refund_status: string | null;
   _has_issue: boolean;
+  _connect?: ConnectAccount | null;
   order?: {
     id: string;
     status: string;
@@ -60,6 +61,17 @@ type PayoutRow = {
 };
 
 type ReportOrderRef = { order_id: string | null };
+type ConnectAccount = {
+  org_id: string;
+  stripe_account_id: string | null;
+  connect_readiness_status: string | null;
+  payouts_enabled: boolean | null;
+  capability_transfers: string | null;
+  disabled_reason: string | null;
+  requirements_currently_due: string[] | null;
+  requirements_past_due: string[] | null;
+  last_synced_at: string | null;
+};
 
 // NOTE: do NOT destructure supabase.rpc — it loses `this` binding and throws
 // "Cannot read properties of undefined (reading 'rest')" from supabase-js.
@@ -68,6 +80,36 @@ type SetPayoutArgs = { _payment_id: string; _status: string; _reference: string 
 const callSetPayoutStatus = (args: SetPayoutArgs) =>
   (supabase.rpc as unknown as (fn: string, args: SetPayoutArgs) => Promise<{ error: { message: string } | null }>)
     .call(supabase, "admin_set_payout_status", args);
+
+const readinessLabel: Record<string, string> = {
+  ready: "Ready",
+  payout_setup_incomplete: "Setup incomplete",
+  review_pending: "Review pending",
+  action_required: "Action required",
+  payments_paused: "Payments paused",
+  payouts_paused: "Payouts paused",
+  not_started: "Not started",
+};
+
+const readinessVariant = (status?: string | null): "success" | "warning" | "destructive" | "muted" => {
+  if (status === "ready") return "success";
+  if (status === "review_pending" || status === "payout_setup_incomplete") return "warning";
+  if (status === "not_started" || !status) return "muted";
+  return "destructive";
+};
+
+const connectBlockReason = (account?: ConnectAccount | null) => {
+  if (!account?.stripe_account_id) return "No Stripe Connect account";
+  if (account.connect_readiness_status === "ready") return null;
+  if (account.disabled_reason) return account.disabled_reason;
+  const pastDue = account.requirements_past_due ?? [];
+  if (pastDue.length) return `${pastDue.length} past-due Stripe requirement${pastDue.length === 1 ? "" : "s"}`;
+  const current = account.requirements_currently_due ?? [];
+  if (current.length) return `${current.length} Stripe requirement${current.length === 1 ? "" : "s"} due`;
+  if (!account.payouts_enabled) return "Payouts not enabled";
+  if (account.capability_transfers !== "active") return "Transfers not active";
+  return "Stripe not payout-ready";
+};
 
 export default function AdminPayouts() {
   const { toast } = useToast();
@@ -106,7 +148,24 @@ export default function AdminPayouts() {
         .in('status', ['open','investigating']);
       issueSet = new Set(((rep ?? []) as ReportOrderRef[]).map((r) => r.order_id).filter((id): id is string => Boolean(id)));
     }
-    setRows(payoutRows.map((r) => ({ ...r, _has_issue: issueSet.has(r.order?.id ?? "") })));
+    const orgIds = [...new Set(payoutRows.map((r) => r.order?.lot?.event?.org_id).filter((id): id is string => Boolean(id)))];
+    let connectByOrg = new Map<string, ConnectAccount>();
+    if (orgIds.length) {
+      const { data: accounts } = await supabase
+        .from("seller_stripe_accounts")
+        .select(`
+          org_id, stripe_account_id, connect_readiness_status, payouts_enabled,
+          capability_transfers, disabled_reason, requirements_currently_due,
+          requirements_past_due, last_synced_at
+        `)
+        .in("org_id", orgIds);
+      connectByOrg = new Map(((accounts ?? []) as ConnectAccount[]).map((account) => [account.org_id, account]));
+    }
+    setRows(payoutRows.map((r) => ({
+      ...r,
+      _has_issue: issueSet.has(r.order?.id ?? ""),
+      _connect: connectByOrg.get(r.order?.lot?.event?.org_id ?? "") ?? null,
+    })));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -272,6 +331,7 @@ export default function AdminPayouts() {
             <TableHead>Buyer paid</TableHead>
             <TableHead>Net payout</TableHead>
             <TableHead>Stripe</TableHead>
+            <TableHead>Seller Connect</TableHead>
             <TableHead>Refunded</TableHead>
             <TableHead>Payout</TableHead>
             <TableHead></TableHead>
@@ -294,13 +354,28 @@ export default function AdminPayouts() {
                 <TableCell className="font-medium">${Number(r.seller_payout).toFixed(2)}</TableCell>
                 <TableCell><Badge variant="success">{r.status}</Badge></TableCell>
                 <TableCell>
+                  <div className="space-y-1 min-w-[150px]">
+                    <Badge variant={readinessVariant(r._connect?.connect_readiness_status)}>
+                      {readinessLabel[r._connect?.connect_readiness_status ?? "not_started"] ?? "Unknown"}
+                    </Badge>
+                    {connectBlockReason(r._connect) && (
+                      <div className="text-xs text-muted-foreground">{connectBlockReason(r._connect)}</div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
                   {Number(r.refunded_amount ?? 0) > 0
                     ? <Badge variant={r.refund_status === "succeeded" ? "success" : "warning"}>${Number(r.refunded_amount).toFixed(2)}</Badge>
                     : <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 <TableCell><Badge variant={VARIANT[r.manual_payout_status]}>{LABEL[r.manual_payout_status]}</Badge></TableCell>
                 <TableCell className="space-x-2">
-                  <Button size="sm" variant="outline" onClick={() => setConfirmTransfer(r)} disabled={!!r.stripe_transfer_id || r.manual_payout_status === "manual_payout_paid"}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setConfirmTransfer(r)}
+                    disabled={!!r.stripe_transfer_id || r.manual_payout_status === "manual_payout_paid" || !!connectBlockReason(r._connect)}
+                  >
                     <Send className="h-3.5 w-3.5 mr-1" />Transfer
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => openRefund(r)} disabled={r.manual_payout_status === "manual_payout_paid"}>
@@ -342,7 +417,7 @@ export default function AdminPayouts() {
             ))}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={13} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={14} className="text-center py-10 text-muted-foreground">
                   No payouts match this filter yet.
                 </TableCell>
               </TableRow>

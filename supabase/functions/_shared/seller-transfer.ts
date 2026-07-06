@@ -4,6 +4,7 @@
 // admin path (admin-create-seller-transfer).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient, type StripeEnv, assertLivePaymentsEnabled } from "./stripe.ts";
+import { explainConnectBlock } from "./connect-status.ts";
 
 type Admin = ReturnType<typeof createClient>;
 
@@ -28,6 +29,11 @@ type PaymentRow = {
 type SellerAccount = {
   stripe_account_id: string | null;
   payouts_enabled: boolean | null;
+  capability_transfers: string | null;
+  connect_readiness_status: string | null;
+  disabled_reason: string | null;
+  requirements_currently_due: string[] | null;
+  requirements_past_due: string[] | null;
 };
 
 type SettingsRow = { auto_payouts_enabled: boolean | null };
@@ -85,16 +91,16 @@ export async function transferSellerPayout(
 
   const { data: sellerAccountData } = await admin
     .from("seller_stripe_accounts")
-    .select("stripe_account_id, payouts_enabled")
+    .select(`
+      stripe_account_id, payouts_enabled, capability_transfers,
+      connect_readiness_status, disabled_reason,
+      requirements_currently_due, requirements_past_due
+    `)
     .eq("org_id", sellerOrgId)
     .maybeSingle();
   const sellerAccount = sellerAccountData as SellerAccount | null;
-  if (!sellerAccount?.stripe_account_id) {
-    return { ok: false, error: "Seller has no Stripe Connect account" };
-  }
-  if (!sellerAccount.payouts_enabled) {
-    return { ok: false, error: "Seller Stripe payouts are not enabled" };
-  }
+  const connectBlock = explainConnectBlock(sellerAccount ?? {});
+  if (connectBlock) return { ok: false, error: connectBlock };
 
   const env: StripeEnv = payment.environment === "live" ? "live" : "sandbox";
   assertLivePaymentsEnabled(env);
@@ -103,7 +109,7 @@ export async function transferSellerPayout(
   const transfer = await stripe.transfers.create({
     amount: Math.round(Number(payment.seller_payout) * 100),
     currency: "aud",
-    destination: sellerAccount.stripe_account_id,
+    destination: sellerAccount!.stripe_account_id!,
     metadata: {
       payment_id: payment.id,
       order_id: payment.order_id,

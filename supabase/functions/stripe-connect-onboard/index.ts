@@ -2,6 +2,7 @@
 // Routes all Stripe API calls through the Lovable gateway proxy.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient, resolveConfiguredPaymentEnvironment, type StripeEnv } from "../_shared/stripe.ts";
+import { summarizeConnectAccount } from "../_shared/connect-status.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -105,11 +106,8 @@ Deno.serve(async (req) => {
       await admin.from("seller_stripe_accounts").upsert({
         org_id: orgId,
         stripe_account_id: accountId,
-        account_status: "pending",
-        onboarding_complete: false,
-        payouts_enabled: false,
-        details_submitted: false,
-        charges_enabled: false,
+        ...summarizeConnectAccount(account),
+        stripe_environment: env,
       }, { onConflict: "org_id" });
     }
 
@@ -119,7 +117,16 @@ Deno.serve(async (req) => {
       refresh_url: returnUrl,
       return_url: returnUrl,
       type: "account_onboarding",
+      collection_options: {
+        fields: "eventually_due",
+        future_requirements: "include",
+      },
     });
+
+    await admin.from("seller_stripe_accounts").update({
+      last_onboarding_link_created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq("org_id", orgId);
 
     return new Response(JSON.stringify({ url: link.url, account_id: accountId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

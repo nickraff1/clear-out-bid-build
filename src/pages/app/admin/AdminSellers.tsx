@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Loader2, MoreVertical, Award, BadgeCheck, Ban, ShieldCheck, Search, Building2 } from 'lucide-react';
+import { Loader2, MoreVertical, Award, BadgeCheck, Ban, ShieldCheck, Search, Building2, RefreshCw, ExternalLink } from 'lucide-react';
 import { EmptyState } from '@/components/app/EmptyState';
 import { toast } from 'sonner';
 
@@ -17,16 +17,22 @@ export default function AdminSellers() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: orgList }, { data: events }, { data: lots }, { data: orders }, { data: payments }, { data: reports }] = await Promise.all([
+    const [{ data: orgList }, { data: events }, { data: lots }, { data: orders }, { data: payments }, { data: reports }, { data: connectAccounts }] = await Promise.all([
       supabase.from('organizations').select('id, name, org_type, is_verified, is_founding, is_disabled, rating_avg, rating_count, created_at').order('created_at', { ascending: false }),
       supabase.from('clearance_events').select('id, org_id'),
       supabase.from('lots').select('id, event_id, status'),
       supabase.from('orders').select('id, event_id, status, amount'),
       supabase.from('payments').select('order_id, status, manual_payout_status, seller_payout'),
       supabase.from('lot_reports').select('id, lot_id, status'),
+      supabase.from('seller_stripe_accounts').select(`
+        org_id, stripe_account_id, connect_readiness_status, charges_enabled,
+        payouts_enabled, capability_transfers, disabled_reason,
+        requirements_currently_due, requirements_past_due, last_synced_at
+      `),
     ]);
     const eventOrg = new Map((events ?? []).map((e:any) => [e.id, e.org_id]));
     const lotOrg = new Map((lots ?? []).map((l:any) => [l.id, eventOrg.get(l.event_id)]));
+    const connectByOrg = new Map((connectAccounts ?? []).map((a:any) => [a.org_id, a]));
     const enriched = (orgList ?? []).map((o:any) => {
       const orgLots = (lots ?? []).filter((l:any) => eventOrg.get(l.event_id) === o.id);
       const orgOrders = (orders ?? []).filter((ord:any) => eventOrg.get(ord.event_id) === o.id);
@@ -40,6 +46,7 @@ export default function AdminSellers() {
         active_lots: orgLots.filter((l:any) => l.status === 'active').length,
         sold_lots: orgLots.filter((l:any) => l.status === 'sold').length,
         gmv, pending_payout: pendingPayout, open_reports: rep,
+        connect: connectByOrg.get(o.id) ?? null,
       };
     });
     setOrgs(enriched);
@@ -52,6 +59,60 @@ export default function AdminSellers() {
     if (error) return toast.error(error.message);
     toast.success(label);
     load();
+  };
+
+  const refreshStripe = async (orgId: string) => {
+    const { data, error } = await supabase.functions.invoke('stripe-connect-refresh', {
+      body: { org_id: orgId },
+    });
+    if (error || data?.error) return toast.error(error?.message || data?.error || 'Could not refresh Stripe status');
+    toast.success('Stripe status refreshed');
+    load();
+  };
+
+  const sendOnboarding = async (orgId: string, hasStripeAccount: boolean) => {
+    if (!hasStripeAccount) {
+      toast.error('Ask this seller to start payout setup from their seller portal first.');
+      return;
+    }
+    const { data, error } = await supabase.functions.invoke('stripe-connect-onboard', {
+      body: { org_id: orgId, return_url: window.location.href },
+    });
+    if (error || data?.error || !data?.url) return toast.error(error?.message || data?.error || 'Could not create onboarding link');
+    await navigator.clipboard?.writeText(data.url as string).catch(() => undefined);
+    window.open(data.url as string, '_blank', 'noopener,noreferrer');
+    toast.success('Stripe onboarding link opened and copied');
+    load();
+  };
+
+  const readinessLabel: Record<string, string> = {
+    ready: 'Ready',
+    payout_setup_incomplete: 'Setup incomplete',
+    review_pending: 'Review pending',
+    action_required: 'Action required',
+    payments_paused: 'Payments paused',
+    payouts_paused: 'Payouts paused',
+    not_started: 'Not started',
+  };
+
+  const readinessVariant = (status?: string | null): 'success' | 'warning' | 'destructive' | 'muted' => {
+    if (status === 'ready') return 'success';
+    if (status === 'review_pending' || status === 'payout_setup_incomplete') return 'warning';
+    if (status === 'not_started' || !status) return 'muted';
+    return 'destructive';
+  };
+
+  const connectReason = (connect: any) => {
+    if (!connect?.stripe_account_id) return 'No connected account';
+    if (connect.connect_readiness_status === 'ready') return 'Transfers active';
+    if (connect.disabled_reason) return connect.disabled_reason;
+    const pastDue = connect.requirements_past_due ?? [];
+    if (pastDue.length) return `${pastDue.length} past-due requirement${pastDue.length === 1 ? '' : 's'}`;
+    const due = connect.requirements_currently_due ?? [];
+    if (due.length) return `${due.length} requirement${due.length === 1 ? '' : 's'} due`;
+    if (!connect.payouts_enabled) return 'Payouts not enabled';
+    if (connect.capability_transfers !== 'active') return 'Transfers not active';
+    return 'Check Stripe';
   };
 
   const filtered = orgs.filter(o => !q || o.name.toLowerCase().includes(q.toLowerCase()));
@@ -84,6 +145,7 @@ export default function AdminSellers() {
             <TableHead>Sold</TableHead>
             <TableHead>GMV</TableHead>
             <TableHead>Pending payout</TableHead>
+            <TableHead>Stripe Connect</TableHead>
             <TableHead>Open issues</TableHead>
             <TableHead>Badges</TableHead>
             <TableHead></TableHead>
@@ -97,6 +159,14 @@ export default function AdminSellers() {
                 <TableCell>{o.sold_lots}</TableCell>
                 <TableCell>${o.gmv.toFixed(2)}</TableCell>
                 <TableCell>{o.pending_payout > 0 ? <Badge variant="warning">${o.pending_payout.toFixed(2)}</Badge> : '—'}</TableCell>
+                <TableCell>
+                  <div className="space-y-1 min-w-[170px]">
+                    <Badge variant={readinessVariant(o.connect?.connect_readiness_status)} className="text-[10px]">
+                      {readinessLabel[o.connect?.connect_readiness_status ?? 'not_started'] ?? 'Unknown'}
+                    </Badge>
+                    <div className="text-xs text-muted-foreground">{connectReason(o.connect)}</div>
+                  </div>
+                </TableCell>
                 <TableCell>{o.open_reports > 0 ? <Badge variant="destructive">{o.open_reports}</Badge> : '—'}</TableCell>
                 <TableCell className="space-x-1">
                   {o.is_verified && <Badge variant="success" className="text-[10px]"><ShieldCheck className="h-3 w-3 mr-1" />verified</Badge>}
@@ -115,6 +185,12 @@ export default function AdminSellers() {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => act('admin_set_org_disabled', { _org_id: o.id, _disabled: !o.is_disabled }, o.is_disabled ? 'Unsuspended' : 'Suspended')}>
                         <Ban className="h-4 w-4 mr-2" />{o.is_disabled ? 'Unsuspend' : 'Suspend seller'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => refreshStripe(o.id)}>
+                        <RefreshCw className="h-4 w-4 mr-2" />Refresh Stripe status
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => sendOnboarding(o.id, Boolean(o.connect?.stripe_account_id))}>
+                        <ExternalLink className="h-4 w-4 mr-2" />Open onboarding link
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

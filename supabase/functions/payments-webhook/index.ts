@@ -1,8 +1,9 @@
 // Stripe webhook for built-in (manual_payout_mode) payments.
 // Subscribed events include checkout.session.completed and payment_intent.payment_failed.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
+import { createStripeClient, type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
 import { completePaidOrder, ORDER_CONFIRMED_MESSAGE } from "../_shared/paid-order.ts";
+import { summarizeConnectAccount } from "../_shared/connect-status.ts";
 
 let _supabase: ReturnType<typeof createClient> | null = null;
 
@@ -24,6 +25,19 @@ type StripeAccountEvent = {
   charges_enabled?: boolean | null;
   payouts_enabled?: boolean | null;
   details_submitted?: boolean | null;
+  capabilities?: { card_payments?: string | null; transfers?: string | null } | null;
+  requirements?: {
+    currently_due?: string[] | null;
+    past_due?: string[] | null;
+    eventually_due?: string[] | null;
+    pending_verification?: string[] | null;
+    disabled_reason?: string | null;
+  } | null;
+  future_requirements?: {
+    currently_due?: string[] | null;
+    past_due?: string[] | null;
+    eventually_due?: string[] | null;
+  } | null;
 };
 
 function getSupabase() {
@@ -67,16 +81,18 @@ async function handlePaymentFailed(pi: PaymentIntent, env: StripeEnv) {
 }
 
 // Connect: keep seller_stripe_accounts in sync with Stripe.
-async function handleAccountUpdated(acct: StripeAccountEvent) {
-  const details = acct.details_submitted === true;
+async function handleAccountUpdated(acct: StripeAccountEvent, env: StripeEnv) {
   await getSupabase().from("seller_stripe_accounts").update({
-    charges_enabled: acct.charges_enabled ?? false,
-    payouts_enabled: acct.payouts_enabled ?? false,
-    details_submitted: details,
-    onboarding_complete: details,
-    account_status: details ? "active" : "pending",
-    updated_at: new Date().toISOString(),
+    ...summarizeConnectAccount(acct),
+    stripe_environment: env,
   }).eq("stripe_account_id", acct.id);
+}
+
+async function refreshConnectedAccount(accountId: string | null | undefined, env: StripeEnv) {
+  if (!accountId) return;
+  const stripe = createStripeClient(env);
+  const account = await stripe.accounts.retrieve(accountId);
+  await handleAccountUpdated(account as StripeAccountEvent, env);
 }
 
 // Cancel the pending order tied to a session/payment-intent, but ONLY if it is
@@ -176,7 +192,14 @@ Deno.serve(async (req) => {
           await cancelPendingOrderForSession({ paymentIntentId: (eventObject as PaymentIntent).id }, env);
           break;
         case "account.updated":
-          await handleAccountUpdated(eventObject as StripeAccountEvent);
+          await handleAccountUpdated(eventObject as StripeAccountEvent, env);
+          break;
+        case "capability.updated":
+        case "person.updated":
+        case "account.external_account.created":
+        case "account.external_account.updated":
+        case "account.external_account.deleted":
+          await refreshConnectedAccount((eventObject as { account?: string | null }).account, env);
           break;
         default:
           console.log("Unhandled event:", event.type);
