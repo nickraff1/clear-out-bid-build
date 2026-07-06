@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { CreditCard, Loader2, ShieldCheck, Plus } from 'lucide-react';
 import { AddPaymentMethodDialog } from '@/components/bidder/AddPaymentMethodDialog';
 
-type Card = {
+type SavedCard = {
   stripe_payment_method_id: string | null;
   payment_method_brand: string | null;
   payment_method_last4: string | null;
@@ -17,7 +17,7 @@ type Card = {
 export default function BuyerPaymentMethods() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [card, setCard] = useState<Card | null>(null);
+  const [card, setCard] = useState<SavedCard | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -28,7 +28,7 @@ export default function BuyerPaymentMethods() {
       .select('stripe_payment_method_id, payment_method_brand, payment_method_last4, payment_method_verified_at')
       .eq('user_id', user.id)
       .maybeSingle();
-    setCard((data as Card | null) ?? null);
+    setCard((data as SavedCard | null) ?? null);
     setLoading(false);
   }, [user]);
 
