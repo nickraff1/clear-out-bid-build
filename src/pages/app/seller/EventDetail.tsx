@@ -339,7 +339,7 @@ export default function EventDetail() {
                               </DropdownMenuItem>
                             )}
                             {lot.pricing_type === 'auction' && (lot.status === 'unsold' || lot.status === 'cancelled') && (
-                              <DropdownMenuItem onClick={() => setRelistLot({ id: lot.id, title: lot.title, start_price: lot.start_price, reserve_price: lot.reserve_price })}>
+                              <DropdownMenuItem onClick={() => setRelistLot({ id: lot.id, title: lot.title, event_id: lot.event_id, start_price: lot.start_price, reserve_price: lot.reserve_price })}>
                                 <RotateCw className="h-4 w-4 mr-2" /> Relist auction
                               </DropdownMenuItem>
                             )}
