@@ -15,6 +15,32 @@ const admin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+async function upsertAccountStatus(orgId: string, account: any, env: StripeEnv) {
+  const summary = summarizeConnectAccount(account);
+  const richPayload = {
+    org_id: orgId,
+    stripe_account_id: account.id,
+    ...summary,
+    stripe_environment: env,
+  };
+  const { error } = await admin
+    .from("seller_stripe_accounts")
+    .upsert(richPayload, { onConflict: "org_id" });
+  if (!error) return;
+
+  console.warn("Rich seller_stripe_accounts upsert failed, falling back to legacy columns", error.message);
+  const { error: fallbackError } = await admin.from("seller_stripe_accounts").upsert({
+    org_id: orgId,
+    stripe_account_id: account.id,
+    account_status: summary.account_status,
+    onboarding_complete: summary.onboarding_complete,
+    payouts_enabled: summary.payouts_enabled,
+    details_submitted: summary.details_submitted,
+    charges_enabled: summary.charges_enabled,
+  }, { onConflict: "org_id" });
+  if (fallbackError) throw fallbackError;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") {
@@ -103,12 +129,7 @@ Deno.serve(async (req) => {
       });
       accountId = account.id;
 
-      await admin.from("seller_stripe_accounts").upsert({
-        org_id: orgId,
-        stripe_account_id: accountId,
-        ...summarizeConnectAccount(account),
-        stripe_environment: env,
-      }, { onConflict: "org_id" });
+      await upsertAccountStatus(orgId, account, env);
     }
 
     // Account links are single-use — always mint a fresh one.

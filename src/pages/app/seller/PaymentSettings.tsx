@@ -47,6 +47,25 @@ function classify(row: StripeAccountStatus | null): ConnectionState {
   return { kind: 'pending', account: row };
 }
 
+function normalizeStripeRow(row: Partial<StripeAccountStatus> | null): StripeAccountStatus | null {
+  if (!row?.stripe_account_id) return null;
+  return {
+    stripe_account_id: row.stripe_account_id ?? null,
+    charges_enabled: row.charges_enabled ?? false,
+    payouts_enabled: row.payouts_enabled ?? false,
+    details_submitted: row.details_submitted ?? false,
+    account_status: row.account_status ?? null,
+    connect_readiness_status: row.connect_readiness_status ?? null,
+    capability_card_payments: row.capability_card_payments ?? null,
+    capability_transfers: row.capability_transfers ?? null,
+    disabled_reason: row.disabled_reason ?? null,
+    requirements_currently_due: row.requirements_currently_due ?? [],
+    requirements_past_due: row.requirements_past_due ?? [],
+    requirements_pending_verification: row.requirements_pending_verification ?? [],
+    last_synced_at: row.last_synced_at ?? null,
+  };
+}
+
 export default function PaymentSettings() {
   const { primaryOrg } = useAuth();
   const { toast } = useToast();
@@ -68,7 +87,7 @@ export default function PaymentSettings() {
     } catch (e) {
       console.warn('stripe-connect-refresh failed', e);
     }
-    const { data } = await supabase
+    const richResult = await supabase
       .from('seller_stripe_accounts')
       .select(`
         stripe_account_id, charges_enabled, payouts_enabled, details_submitted,
@@ -78,7 +97,22 @@ export default function PaymentSettings() {
       `)
       .eq('org_id', primaryOrg.id)
       .maybeSingle();
-    setState(classify((data as StripeAccountStatus | null) ?? null));
+
+    let row = normalizeStripeRow((richResult.data as Partial<StripeAccountStatus> | null) ?? null);
+    if (richResult.error) {
+      console.warn('seller_stripe_accounts readiness select failed, falling back to legacy columns', richResult.error);
+      const legacyResult = await supabase
+        .from('seller_stripe_accounts')
+        .select('stripe_account_id, charges_enabled, payouts_enabled, details_submitted, account_status')
+        .eq('org_id', primaryOrg.id)
+        .maybeSingle();
+      if (legacyResult.error) {
+        console.warn('seller_stripe_accounts legacy select failed', legacyResult.error);
+      }
+      row = normalizeStripeRow((legacyResult.data as Partial<StripeAccountStatus> | null) ?? null);
+    }
+
+    setState(classify(row));
     setLoading(false);
   }, [primaryOrg?.id]);
 

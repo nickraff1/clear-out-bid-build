@@ -16,6 +16,27 @@ const admin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+async function updateAccountStatus(orgId: string, account: any, env: StripeEnv) {
+  const summary = summarizeConnectAccount(account);
+  const { error } = await admin.from("seller_stripe_accounts").update({
+    ...summary,
+    stripe_environment: env,
+  }).eq("org_id", orgId);
+  if (!error) return summary;
+
+  console.warn("Rich seller_stripe_accounts update failed, falling back to legacy columns", error.message);
+  const { error: fallbackError } = await admin.from("seller_stripe_accounts").update({
+    charges_enabled: summary.charges_enabled,
+    payouts_enabled: summary.payouts_enabled,
+    details_submitted: summary.details_submitted,
+    onboarding_complete: summary.onboarding_complete,
+    account_status: summary.account_status,
+    updated_at: new Date().toISOString(),
+  }).eq("org_id", orgId);
+  if (fallbackError) throw fallbackError;
+  return summary;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") {
@@ -80,12 +101,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const summary = summarizeConnectAccount(account);
-
-    await admin.from("seller_stripe_accounts").update({
-      ...summary,
-      stripe_environment: env,
-    }).eq("org_id", orgId);
+    const summary = await updateAccountStatus(orgId, account, env);
 
     return new Response(JSON.stringify({
       refreshed: true,
