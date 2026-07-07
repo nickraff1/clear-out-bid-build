@@ -321,7 +321,7 @@ export default function PaymentSettings() {
                     <div className="rounded-lg border p-4">
                       <h4 className="font-medium mb-2">Action required in Stripe</h4>
                       <ul className="space-y-1 text-sm text-muted-foreground">
-                        {dueItems.slice(0, 8).map((item) => <li key={item}>• {item.replaceAll('_', ' ')}</li>)}
+                        {dueItems.slice(0, 8).map((item) => <li key={item}>• {item.split('_').join(' ')}</li>)}
                       </ul>
                     </div>
                   )}
