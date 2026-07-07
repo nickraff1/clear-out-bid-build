@@ -303,7 +303,7 @@ export default function AdminPayouts() {
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Payouts</h1>
-          <p className="text-muted-foreground">Manual seller payouts (beta) — review paid orders and mark when payouts are sent.</p>
+          <p className="text-muted-foreground">Review seller payout readiness, holds, transfer status, and payout completion.</p>
         </div>
         <Select value={filter} onValueChange={setFilter}>
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>

@@ -169,11 +169,40 @@ export default function OrderDetail() {
 
   async function update(fields: Record<string, unknown>, successMsg: string) {
     setBusy(true);
-    const { error } = await supabase.from('orders').update(fields).eq('id', order.id);
+    const { data, error } = await supabase
+      .from('orders')
+      .update(fields)
+      .eq('id', order.id)
+      .select('id')
+      .maybeSingle();
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(error.message); return false; }
+    if (!data) {
+      toast.error('Could not update this order. Refresh the page and check your account permissions.');
+      return false;
+    }
     toast.success(successMsg);
-    load();
+    await load();
+    return true;
+  }
+
+  async function runPickupAction(action: string, successMsg: string, extra: Record<string, unknown> = {}) {
+    setBusy(true);
+    const { error } = await (supabase.rpc as any)('update_order_pickup', {
+      _order_id: order.id,
+      _action: action,
+      _proposed_pickup_at: null,
+      _pickup_code: null,
+      ...extra,
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return false;
+    }
+    toast.success(successMsg);
+    await load();
+    return true;
   }
 
   async function notify(userId: string | undefined, type: string, title: string, message: string) {
@@ -187,43 +216,25 @@ export default function OrderDetail() {
     if (!proposedAt) { toast.error('Pick a date/time'); return; }
     const when = new Date(proposedAt);
     if (when.getTime() < Date.now()) { toast.error('Pickup time must be in the future'); return; }
-    await update(
-      {
-        proposed_pickup_at: when.toISOString(),
-        proposed_pickup_by: user!.id,
-        pickup_status: 'pickup_proposed',
-      },
-      'Pickup time proposed',
-    );
+    await runPickupAction('propose', 'Pickup time proposed', {
+      _proposed_pickup_at: when.toISOString(),
+    });
   }
 
   async function acceptProposal() {
-    await update(
-      {
-        agreed_pickup_at: order.proposed_pickup_at,
-        pickup_status: 'pickup_confirmed',
-      },
-      'Pickup time confirmed',
-    );
+    await runPickupAction('accept', 'Pickup time confirmed');
   }
 
   async function markReady() {
-    await update(
-      { status: 'ready_for_pickup', pickup_status: 'ready_for_pickup' },
-      'Marked ready for pickup',
-    );
-    await notify(order.buyer_id, 'pickup_ready', 'Ready for pickup',
-      `Your item "${order.lot?.title}" is ready for pickup.`);
+    const ok = await runPickupAction('mark_ready', 'Marked ready for pickup');
+    if (ok) {
+      await notify(order.buyer_id, 'pickup_ready', 'Ready for pickup',
+        `Your item "${order.lot?.title}" is ready for pickup.`);
+    }
   }
 
   async function buyerMarkCollected() {
-    await update(
-      {
-        buyer_collected_at: new Date().toISOString(),
-        pickup_status: 'collected_pending_seller_confirmation',
-      },
-      'Marked as collected. Awaiting seller confirmation.',
-    );
+    await runPickupAction('buyer_collected', 'Marked as collected. Awaiting seller confirmation.');
   }
 
   async function sellerConfirmPickup() {
@@ -231,16 +242,13 @@ export default function OrderDetail() {
       toast.error('Pickup code does not match');
       return;
     }
-    await update(
-      {
-        status: 'collected',
-        pickup_status: 'completed',
-        seller_confirmed_at: new Date().toISOString(),
-      },
-      'Pickup confirmed. Order complete.',
-    );
-    await notify(order.buyer_id, 'pickup_complete', 'Pickup complete',
-      `Your pickup of "${order.lot?.title}" is confirmed. Please leave a review.`);
+    const ok = await runPickupAction('seller_confirm', 'Pickup confirmed. Order complete.', {
+      _pickup_code: enteredCode.trim(),
+    });
+    if (ok) {
+      await notify(order.buyer_id, 'pickup_complete', 'Pickup complete',
+        `Your pickup of "${order.lot?.title}" is confirmed. Please leave a review.`);
+    }
   }
 
   async function submitReport() {
@@ -430,7 +438,7 @@ export default function OrderDetail() {
                 {paid && order.proposed_pickup_by !== user?.id && (
                   <div className="flex gap-2">
                     <Button size="sm" onClick={acceptProposal} disabled={busy}>Accept proposed time</Button>
-                    <Button size="sm" variant="outline" onClick={() => update({ pickup_status: 'awaiting_arrangement', proposed_pickup_at: null }, 'Proposal cleared — suggest another time')} disabled={busy}>
+                    <Button size="sm" variant="outline" onClick={() => runPickupAction('clear', 'Proposal cleared — suggest another time')} disabled={busy}>
                       Suggest different time
                     </Button>
                   </div>
@@ -576,8 +584,8 @@ export default function OrderDetail() {
                 <Row label="Offcutt commission (10%)" value={`-$${sellerFee.toFixed(2)}`} />
                 <Separator />
                 <Row label="Net payout" value={`$${sellerPayout.toFixed(2)}`} bold />
-                <Row label="Payout status" value="Manual — pending" />
-                <p className="text-xs text-muted-foreground">Payouts are processed manually during the beta.</p>
+                <Row label="Payout status" value="Pending release" />
+                <p className="text-xs text-muted-foreground">Payout is released after collection is confirmed and payout checks pass.</p>
               </>
             )}
           </div>

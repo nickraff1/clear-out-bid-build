@@ -219,8 +219,8 @@ export default function AdminOverview() {
       </section>
 
       <Card className="p-3 bg-muted/30 text-xs text-muted-foreground flex items-center justify-between">
-        <span>Payouts are manual during beta. Pay sellers off-platform, then mark them paid here.</span>
-        <Badge variant="muted">Beta</Badge>
+        <span>Review payout readiness, holds, and transfer status before releasing seller funds.</span>
+        <Badge variant="muted">Payout controls</Badge>
       </Card>
     </div>
   );
