@@ -1,5 +1,6 @@
 // Stripe webhook for built-in (manual_payout_mode) payments.
-// Subscribed events include checkout.session.completed and payment_intent.payment_failed.
+// Subscribed events include checkout.session.completed and direct PaymentIntent
+// events from auction winner off-session charges.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient, type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
 import { completePaidOrder, ORDER_CONFIRMED_MESSAGE } from "../_shared/paid-order.ts";
@@ -15,6 +16,16 @@ type CheckoutSession = {
 
 type PaymentIntent = {
   id: string;
+  amount_received?: number | null;
+  amount?: number | null;
+  metadata?: {
+    order_id?: string | null;
+    base_amount?: string | null;
+    buyer_fee?: string | null;
+    seller_fee?: string | null;
+    seller_payout?: string | null;
+    source?: string | null;
+  } | null;
   last_payment_error?: { message?: string | null } | null;
 };
 
@@ -78,6 +89,63 @@ async function handlePaymentFailed(pi: PaymentIntent, env: StripeEnv) {
     environment: env,
     updated_at: new Date().toISOString(),
   }).eq("stripe_payment_intent_id", pi.id);
+}
+
+async function handlePaymentSucceeded(pi: PaymentIntent, env: StripeEnv) {
+  const sb = getSupabase();
+  const metadataOrderId = pi.metadata?.order_id ?? null;
+
+  const { data: existingPayment } = await sb
+    .from("payments")
+    .select("id, order_id, status")
+    .eq("stripe_payment_intent_id", pi.id)
+    .maybeSingle();
+  const payment = existingPayment as unknown as PaymentRow | null;
+  const orderId = payment?.order_id ?? metadataOrderId;
+
+  if (!orderId) {
+    console.log("payment_intent.succeeded without order_id; ignoring", pi.id);
+    return;
+  }
+
+  if (payment?.id) {
+    await sb.from("payments").update({
+      status: "succeeded",
+      stripe_payment_intent_id: pi.id,
+      payment_method: "card",
+      environment: env,
+      error_message: null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", payment.id);
+  } else {
+    const total = Number(((pi.amount_received ?? pi.amount ?? 0) / 100).toFixed(2));
+    const baseAmount = Number(pi.metadata?.base_amount ?? (total / 1.10).toFixed(2));
+    const buyerFee = Number(pi.metadata?.buyer_fee ?? (total - baseAmount).toFixed(2));
+    const sellerFee = Number(pi.metadata?.seller_fee ?? (baseAmount * 0.10).toFixed(2));
+    const sellerPayout = Number(pi.metadata?.seller_payout ?? (baseAmount - sellerFee).toFixed(2));
+
+    await sb.from("payments").insert({
+      order_id: orderId,
+      base_amount: baseAmount,
+      buyer_fee: buyerFee,
+      seller_fee: sellerFee,
+      seller_payout: sellerPayout,
+      amount_charged: total,
+      application_fee_amount: buyerFee + sellerFee,
+      status: "succeeded",
+      stripe_payment_intent_id: pi.id,
+      payment_method: "card",
+      payment_mode: "manual_payout_mode",
+      manual_payout_status: "manual_payout_pending",
+      environment: env,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  await completePaidOrder(sb, {
+    orderId,
+    paymentReference: pi.id,
+  });
 }
 
 // Connect: keep seller_stripe_accounts in sync with Stripe.
@@ -179,6 +247,9 @@ Deno.serve(async (req) => {
       switch (event.type) {
         case "checkout.session.completed":
           await handleSessionCompleted(eventObject as CheckoutSession, env);
+          break;
+        case "payment_intent.succeeded":
+          await handlePaymentSucceeded(eventObject as PaymentIntent, env);
           break;
         case "payment_intent.payment_failed":
           await handlePaymentFailed(eventObject as PaymentIntent, env);
