@@ -17,6 +17,7 @@ DECLARE
   seller_creator uuid;
   lot_title text;
   seller_org_id uuid;
+  conversation_id uuid;
 BEGIN
   SELECT
     o.*,
@@ -112,12 +113,30 @@ BEGIN
   seller_creator := repaired_order.resolved_seller_creator;
 
   IF seller_org_id IS NOT NULL THEN
-    PERFORM public.ensure_conversation(
-      repaired_order.buyer_id,
-      seller_org_id,
-      repaired_order.lot_id,
-      target_order_id
-    );
+    INSERT INTO public.conversations (buyer_id, seller_org_id, lot_id, order_id, last_message_at)
+    VALUES (repaired_order.buyer_id, seller_org_id, repaired_order.lot_id, target_order_id, now())
+    ON CONFLICT (order_id) DO UPDATE SET
+      buyer_id = EXCLUDED.buyer_id,
+      seller_org_id = EXCLUDED.seller_org_id,
+      lot_id = EXCLUDED.lot_id,
+      last_message_at = GREATEST(public.conversations.last_message_at, now())
+    RETURNING id INTO conversation_id;
+
+    IF conversation_id IS NOT NULL AND NOT EXISTS (
+      SELECT 1
+      FROM public.messages m
+      WHERE m.conversation_id = conversation_id
+        AND m.is_system = true
+        AND m.body = 'Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.'
+    ) THEN
+      INSERT INTO public.messages (conversation_id, sender_id, is_system, body)
+      VALUES (
+        conversation_id,
+        repaired_order.buyer_id,
+        true,
+        'Order confirmed. Please arrange pickup through this chat. Pickup details are available on the order page once payment is confirmed.'
+      );
+    END IF;
   END IF;
 
   IF NOT EXISTS (
