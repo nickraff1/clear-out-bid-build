@@ -3,6 +3,10 @@
 -- not subscribed to payment_intent.succeeded at the time, so the order stayed
 -- pending in Offcutt. This repair is intentionally narrow and idempotent.
 
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS auction_payment_attempted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS auction_payment_error text;
+
 DO $$
 DECLARE
   target_order_id uuid := '17d0300a-c423-4e91-8010-36085e8ae170'::uuid;
