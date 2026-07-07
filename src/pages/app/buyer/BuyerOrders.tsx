@@ -18,7 +18,10 @@ type OrderWithDetails = Order & {
   lot: Lot & { event?: { org_id: string; created_by: string } };
   event: ClearanceEvent;
   has_review?: boolean;
+  auction_payment_error?: string | null;
 };
+
+const money = (amount: number) => `$${amount.toFixed(2)}`;
 
 export default function BuyerOrders() {
   const { user, organizations } = useAuth();
@@ -145,8 +148,10 @@ export default function BuyerOrders() {
             const total = Number(order.amount ?? 0);
             const base = Math.round((total / 1.10) * 100) / 100;
             const fee = Math.round((total - base) * 100) / 100;
+            const isAuctionOrder = order.lot?.pricing_type === 'auction';
+            const auctionChargeNeedsAction = isAuctionOrder && !!order.auction_payment_error;
             const target =
-              order.status === 'pending_payment'
+              order.status === 'pending_payment' && (!isAuctionOrder || auctionChargeNeedsAction)
                 ? `/app/buyer/checkout/${order.id}`
                 : `/app/orders/${order.id}`;
             return (
@@ -165,9 +170,16 @@ export default function BuyerOrders() {
 
                 <div className="flex-1 text-sm">
                   <p className="text-muted-foreground">
-                    Item ${base.toFixed(0)} · Fee ${fee.toFixed(0)}
+                    Item {money(base)} · Buyer fee {money(fee)}
                   </p>
-                  <p className="font-semibold">Total ${total.toFixed(0)}</p>
+                  <p className="font-semibold">Total {money(total)}</p>
+                  {isAuctionOrder && order.status === 'pending_payment' && (
+                    <p className={auctionChargeNeedsAction ? 'text-xs text-destructive mt-1' : 'text-xs text-muted-foreground mt-1'}>
+                      {auctionChargeNeedsAction
+                        ? 'Automatic auction charge needs attention. Pay now to secure the item.'
+                        : 'Winning auction payment is being processed from your saved card.'}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-1">
@@ -184,7 +196,13 @@ export default function BuyerOrders() {
                 <Button asChild size="sm" className="md:w-auto">
                   <Link to={target}>
                     {order.status === 'pending_payment' ? (
-                      <><CreditCard className="h-4 w-4 mr-1" /> Pay now</>
+                      <>
+                        {isAuctionOrder && !auctionChargeNeedsAction ? (
+                          <>View order <ArrowRight className="h-4 w-4 ml-1" /></>
+                        ) : (
+                          <><CreditCard className="h-4 w-4 mr-1" /> Pay now</>
+                        )}
+                      </>
                     ) : (
                       <>Manage <ArrowRight className="h-4 w-4 ml-1" /></>
                     )}

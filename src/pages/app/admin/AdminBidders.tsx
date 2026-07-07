@@ -108,7 +108,9 @@ export default function AdminBidders() {
   const sweep = async () => {
     const { data, error } = await (supabase.rpc as any)('sweep_defaulted_winners');
     if (error) return toast.error(error.message);
-    toast.success(`Sweep complete — ${(data ?? []).length} order(s) processed`);
+    const rows = data ?? [];
+    const offered = rows.filter((row: any) => row.next_order_id).length;
+    toast.success(`Sweep complete — ${rows.length} order(s) processed, ${offered} offered to next bidder`);
     load();
   };
 

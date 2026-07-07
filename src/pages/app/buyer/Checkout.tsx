@@ -22,7 +22,7 @@ export default function Checkout() {
     (async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, amount, status, lot:lots(title, quantity, unit), event:clearance_events(site_address, suburb, state, postcode, pickup_start)")
+        .select("id, amount, status, auction_payment_error, lot:lots(title, quantity, unit, pricing_type), event:clearance_events(site_address, suburb, state, postcode, pickup_start)")
         .eq("id", orderId)
         .maybeSingle();
       if (error || !data) {
@@ -77,6 +77,7 @@ export default function Checkout() {
   const total = Number(order.amount);
   const basePrice = Math.round((total / 1.10) * 100) / 100;
   const buyerFee = Math.round((total - basePrice) * 100) / 100;
+  const isAuctionOrder = order.lot?.pricing_type === "auction";
 
   return (
     <div>
@@ -90,6 +91,19 @@ export default function Checkout() {
           <Card className="h-fit">
           <CardHeader><CardTitle>Order summary</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+              {isAuctionOrder && (
+                <Alert variant={order.auction_payment_error ? "destructive" : "default"}>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>
+                    {order.auction_payment_error ? "Automatic auction payment needs attention" : "Auction payment is processing"}
+                  </AlertTitle>
+                  <AlertDescription>
+                    {order.auction_payment_error
+                      ? "Offcutt could not charge your saved card automatically. Complete payment here to secure the item."
+                      : "Offcutt is attempting to charge your saved card automatically. If this remains pending, this page can be used as a manual fallback."}
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="flex gap-3">
                 <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                   <Package className="h-7 w-7 text-muted-foreground" />

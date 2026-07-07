@@ -45,6 +45,8 @@ type LotWithDetails = Lot & {
   event: ClearanceEvent & { organization?: Organization };
   category: Category | null;
   compliance_tags: ComplianceTag[];
+  reserved_order_id?: string | null;
+  winning_bidder_id?: string | null;
 };
 
 export default function LotDetail() {
@@ -380,6 +382,19 @@ export default function LotDetail() {
   const reserveMet = !!lot.reserve_price && (lot.current_bid ?? 0) >= lot.reserve_price;
   const bidIncrement = getBidIncrement(currentPrice);
   const statusLabel = lot.status.charAt(0).toUpperCase() + lot.status.slice(1).replace(/_/g, ' ');
+  const isWinningBidder = !!user && lot.winning_bidder_id === user.id;
+  const reservedTitle =
+    isAuction && isWinningBidder
+      ? 'You won this auction'
+      : isAuction
+        ? 'Auction ended and reserved for the winning bidder'
+        : 'Currently in checkout with another buyer';
+  const reservedDescription =
+    isAuction && isWinningBidder
+      ? 'Offcutt is processing payment from your saved card. If the charge needs attention, use your orders page.'
+      : isAuction
+        ? 'The winning bidder is completing payment. This listing is no longer open for bidding.'
+        : "Another buyer is in checkout. Check back if their payment doesn't complete.";
 
   // Stable anonymous alias per bidder per lot
   const bidderAlias = (bidderId: string, isYou: boolean) => {
@@ -405,14 +420,19 @@ export default function LotDetail() {
                 {lot.status === 'sold'
                   ? 'This item has been sold'
                   : lot.status === 'reserved'
-                    ? 'Currently in checkout with another buyer'
+                    ? reservedTitle
                     : 'This item is no longer available'}
               </div>
               <div className="text-xs text-muted-foreground">
                 {lot.status === 'reserved'
-                  ? "Another buyer is in checkout. Check back if their payment doesn't complete."
+                  ? reservedDescription
                   : 'It is no longer available to buy or bid on.'}
               </div>
+              {lot.status === 'reserved' && isWinningBidder && lot.reserved_order_id && (
+                <Button asChild size="sm" variant="outline" className="mt-3">
+                  <Link to={`/app/orders/${lot.reserved_order_id}`}>View winning order</Link>
+                </Button>
+              )}
             </div>
           </div>
         )}

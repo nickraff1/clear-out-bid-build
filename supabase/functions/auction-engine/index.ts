@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { chargeAuctionWinnerOrder } from '../_shared/auction-winner-charge.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,6 +37,7 @@ interface BidRequest {
 
 interface CloseAuctionRequest {
   lot_id: string
+  environment?: 'sandbox' | 'live'
 }
 
 serve(async (req) => {
@@ -415,8 +417,8 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
 
   // Create order for winner (with 10% buyer fee)
   const baseAmount = winningBid.amount
-  const buyerFee = baseAmount * 0.10
-  const totalAmount = baseAmount + buyerFee
+  const buyerFee = Math.round(baseAmount * 0.10 * 100) / 100
+  const totalAmount = Math.round((baseAmount + buyerFee) * 100) / 100
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
@@ -441,10 +443,19 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
     })
   }
 
-  // Update lot status to sold
+  const reservedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
+  // Reserve the lot for the winner. The paid-order path marks it sold only
+  // after the saved-card auction charge succeeds.
   await supabase
     .from('lots')
-    .update({ status: 'sold' })
+    .update({
+      status: 'reserved',
+      reserved_order_id: order.id,
+      reserved_until: reservedUntil,
+      winning_bidder_id: winningBid.user_id,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', lot_id)
 
   // Record bid event
@@ -467,16 +478,22 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
       user_id: winningBid.user_id,
       type: 'auction_won',
       title: 'You won an auction!',
-      message: `Congratulations! You won "${lot.title}" for $${totalAmount.toFixed(2)} (including 10% buyer fee)`,
+      message: `Congratulations! You won "${lot.title}" for $${totalAmount.toFixed(2)}. Offcutt is charging your saved card automatically.`,
       data: { lot_id, order_id: order.id, amount: totalAmount, base_amount: baseAmount, buyer_fee: buyerFee }
     })
 
-  console.log(`[AUCTION] Lot ${lot_id} sold to ${winningBid.user_id} for $${winningBid.amount}`)
+  const chargeResult = await chargeAuctionWinnerOrder(supabase, {
+    orderId: order.id,
+    env: body.environment === 'live' ? 'live' : (winningBid.payment_environment ?? 'sandbox'),
+  })
+
+  console.log(`[AUCTION] Lot ${lot_id} closed for ${winningBid.user_id} at $${winningBid.amount}`, chargeResult)
 
   return new Response(JSON.stringify({ 
     success: true, 
     result: 'sold',
     order,
+    charge_result: chargeResult,
     winner: {
       user_id: winningBid.user_id,
       amount: winningBid.amount

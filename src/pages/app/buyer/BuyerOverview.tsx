@@ -26,6 +26,13 @@ type BidWithLot = Bid & {
   lot: Lot & { event: ClearanceEvent };
 };
 
+type RecentOrder = Order & {
+  lot?: Pick<Lot, 'title' | 'pricing_type'>;
+  auction_payment_error?: string | null;
+};
+
+const money = (amount: number) => `$${amount.toFixed(2)}`;
+
 export default function BuyerOverview() {
   const { user, profile, organizations } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -37,7 +44,7 @@ export default function BuyerOverview() {
     watchlistCount: 0,
   });
   const [recentBids, setRecentBids] = useState<BidWithLot[]>([]);
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -78,13 +85,13 @@ export default function BuyerOverview() {
         : `buyer_id.eq.${user!.id}`;
       const { data: ordersData } = await supabase
         .from('orders')
-        .select('*, lot:lots(title)')
+        .select('*, lot:lots(title, pricing_type)')
         .or(orFilter)
         .order('created_at', { ascending: false })
         .limit(5);
 
       if (ordersData) {
-        setRecentOrders(ordersData as unknown as Order[]);
+        setRecentOrders(ordersData as unknown as RecentOrder[]);
         
         const pendingPickups = ordersData.filter(o => 
           o.status === 'ready_for_pickup' || o.status === 'paid'
@@ -239,29 +246,38 @@ export default function BuyerOverview() {
             />
           ) : (
             <div className="space-y-3">
-              {recentOrders.map(order => (
-                <Link
-                  key={order.id}
-                  to={
-                    order.status === 'pending_payment'
-                      ? `/app/buyer/checkout/${order.id}`
-                      : `/app/orders/${order.id}`
-                  }
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{(order as any).lot?.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      ${order.amount.toLocaleString()}
-                      {order.status === 'pending_payment' && ' · Pay now to secure'}
-                      {(order.status === 'paid' || order.status === 'ready_for_pickup') && ' · Arrange pickup'}
-                    </p>
-                  </div>
-                  <Badge variant={orderStatusTone(order.status)}>
-                    {orderStatusLabel(order.status)}
-                  </Badge>
-                </Link>
-              ))}
+              {recentOrders.map(order => {
+                const isAuctionOrder = order.lot?.pricing_type === 'auction';
+                const auctionChargeNeedsAction = isAuctionOrder && !!order.auction_payment_error;
+                const pendingCopy = isAuctionOrder
+                  ? auctionChargeNeedsAction
+                    ? ' · Auction payment needs attention'
+                    : ' · Auction payment processing'
+                  : ' · Pay now to secure';
+                return (
+                  <Link
+                    key={order.id}
+                    to={
+                      order.status === 'pending_payment' && (!isAuctionOrder || auctionChargeNeedsAction)
+                        ? `/app/buyer/checkout/${order.id}`
+                        : `/app/orders/${order.id}`
+                    }
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{order.lot?.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {money(Number(order.amount ?? 0))}
+                        {order.status === 'pending_payment' && pendingCopy}
+                        {(order.status === 'paid' || order.status === 'ready_for_pickup') && ' · Arrange pickup'}
+                      </p>
+                    </div>
+                    <Badge variant={orderStatusTone(order.status)}>
+                      {orderStatusLabel(order.status)}
+                    </Badge>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

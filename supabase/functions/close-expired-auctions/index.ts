@@ -37,6 +37,25 @@ Deno.serve(async (req) => {
       chargeResults.push({ lot_id: result.lot_id, order_id: orderId, ...charge });
     }
 
+    const { data: sweepData, error: sweepError } = await sb.rpc("sweep_defaulted_winners");
+    if (sweepError) throw sweepError;
+    const sweepResults = (sweepData ?? []) as Array<{
+      order_id: string;
+      result: string;
+      next_order_id?: string | null;
+    }>;
+
+    for (const sweep of sweepResults) {
+      if (!sweep.next_order_id) continue;
+      const charge = await chargeAuctionWinnerOrder(sb, { orderId: sweep.next_order_id });
+      chargeResults.push({
+        source: "next_bidder_offer",
+        previous_order_id: sweep.order_id,
+        order_id: sweep.next_order_id,
+        ...charge,
+      });
+    }
+
     const defaulted = chargeResults.filter((r) => r.ok === false).length;
     const summary = results.reduce<Record<string, number>>((acc, r) => {
       acc[r.result] = (acc[r.result] ?? 0) + 1;
@@ -48,6 +67,7 @@ Deno.serve(async (req) => {
       defaulted,
       summary,
       results,
+      defaulted_winner_results: sweepResults,
       charge_results: chargeResults,
     }), {
       status: 200,

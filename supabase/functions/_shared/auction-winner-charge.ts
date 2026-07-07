@@ -20,6 +20,24 @@ type BidderVerification = {
 
 type PaymentRow = { id: string };
 
+async function notifyAuctionPaymentActionNeeded(
+  sb: SupabaseAdmin,
+  order: OrderForCharge,
+  message: string,
+) {
+  await sb.from("notifications").insert({
+    user_id: order.buyer_id,
+    type: "auction_payment_action_required",
+    title: "Auction payment needs attention",
+    message,
+    data: {
+      order_id: order.id,
+      lot_id: order.lot?.id,
+      source: "auction_winner_auto_charge",
+    },
+  });
+}
+
 export async function chargeAuctionWinnerOrder(
   sb: SupabaseAdmin,
   args: { orderId: string; env?: StripeEnv },
@@ -63,6 +81,11 @@ export async function chargeAuctionWinnerOrder(
       failed_payment_count: 1,
       updated_at: new Date().toISOString(),
     }).eq("user_id", order.buyer_id);
+    await notifyAuctionPaymentActionNeeded(
+      sb,
+      order,
+      `You won "${order.lot?.title ?? "an auction"}", but Offcutt could not find a verified saved card. Please pay from your orders page to secure the item.`,
+    );
     return { ok: false, error: "payment_method_required" };
   }
 
@@ -160,10 +183,15 @@ export async function chargeAuctionWinnerOrder(
       updated_at: new Date().toISOString(),
     }).eq("id", paymentId);
     await sb.from("orders").update({
+      auction_payment_attempted_at: new Date().toISOString(),
       auction_payment_error: message,
       updated_at: new Date().toISOString(),
     }).eq("id", order.id);
-    await sb.rpc("handle_defaulted_winner", { _order_id: order.id });
+    await notifyAuctionPaymentActionNeeded(
+      sb,
+      order,
+      `Your saved card could not be charged for "${order.lot?.title ?? "your auction win"}". Please pay from your orders page or contact Offcutt support.`,
+    );
     return { ok: false, order_id: order.id, error: message };
   }
 }
