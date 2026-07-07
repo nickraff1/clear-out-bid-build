@@ -1415,7 +1415,9 @@ export type Database = {
           admin_notes: string | null
           agreed_pickup_at: string | null
           amount: number
+          auction_payment_attempted_at: string | null
           auction_payment_environment: string | null
+          auction_payment_error: string | null
           buyer_collected_at: string | null
           buyer_id: string
           buyer_org_id: string
@@ -1438,7 +1440,9 @@ export type Database = {
           admin_notes?: string | null
           agreed_pickup_at?: string | null
           amount: number
+          auction_payment_attempted_at?: string | null
           auction_payment_environment?: string | null
+          auction_payment_error?: string | null
           buyer_collected_at?: string | null
           buyer_id: string
           buyer_org_id: string
@@ -1461,7 +1465,9 @@ export type Database = {
           admin_notes?: string | null
           agreed_pickup_at?: string | null
           amount?: number
+          auction_payment_attempted_at?: string | null
           auction_payment_environment?: string | null
+          auction_payment_error?: string | null
           buyer_collected_at?: string | null
           buyer_id?: string
           buyer_org_id?: string
