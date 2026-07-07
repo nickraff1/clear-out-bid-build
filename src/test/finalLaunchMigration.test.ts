@@ -188,6 +188,9 @@ describe("duplicate seller organisation cleanup", () => {
     const dropCompatMigration = readMigration(
       "supabase/migrations/20260706063000_drop_duplicate_seller_merge_compat_overload.sql",
     );
+    const deleteEmptyMigration = readMigration(
+      "supabase/migrations/20260706063500_admin_delete_empty_duplicate_seller_orgs.sql",
+    );
 
     expect(migration).toContain("This migration does not auto-delete data");
     expect(migration).toContain("CREATE OR REPLACE VIEW public.admin_duplicate_seller_org_candidates");
@@ -204,5 +207,12 @@ describe("duplicate seller organisation cleanup", () => {
     expect(dropCompatMigration).toContain(
       "DROP FUNCTION IF EXISTS public.admin_merge_duplicate_seller_org(text, uuid, uuid)",
     );
+    expect(deleteEmptyMigration).toContain("CREATE OR REPLACE FUNCTION public.admin_delete_empty_duplicate_seller_orgs");
+    expect(deleteEmptyMigration).toContain("IF NOT public.is_admin(auth.uid())");
+    expect(deleteEmptyMigration).toContain("has_events_or_listings");
+    expect(deleteEmptyMigration).toContain("has_stripe_account");
+    expect(deleteEmptyMigration).toContain("has_conversations");
+    expect(deleteEmptyMigration).toContain("DELETE FROM public.org_members");
+    expect(deleteEmptyMigration).toContain("DELETE FROM public.organizations");
   });
 });

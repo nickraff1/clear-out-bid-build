@@ -161,30 +161,30 @@ export default function AdminSellers() {
     load();
   };
 
-  const mergeHiddenDuplicates = async (targetOrgId: string, sourceOrgIds: string[]) => {
+  const deleteEmptyHiddenDuplicates = async (targetOrgId: string, sourceOrgIds: string[]) => {
     if (sourceOrgIds.length === 0) return;
     const ok = window.confirm(
-      `Merge ${sourceOrgIds.length} hidden duplicate seller organisation${sourceOrgIds.length === 1 ? '' : 's'} into this seller?\n\nThis moves listings, events, conversations, reviews, badges, members and Stripe status where safe, then deletes the empty duplicate org rows.`
+      `Delete ${sourceOrgIds.length} hidden duplicate seller organisation${sourceOrgIds.length === 1 ? '' : 's'} if empty?\n\nThe database will refuse to delete any org with listings, orders, Stripe, messages, reviews, reports, badges, imports or audit history.`
     );
     if (!ok) return;
 
-    for (const sourceOrgId of sourceOrgIds) {
-      const { error } = await (supabase.rpc as any)('admin_merge_duplicate_seller_org', {
-        _target_org_id: targetOrgId,
-        _source_org_id: sourceOrgId,
-        _admin_note: 'Merged from admin sellers duplicate cleanup',
-      });
-      if (error) {
-        const message = error.message?.includes('schema cache') || error.message?.includes('Could not find the function')
-          ? 'Merge unavailable: Lovable has not applied the duplicate-seller merge migration yet. Sync latest GitHub migrations, then hard refresh.'
-          : `Merge stopped: ${error.message}`;
-        toast.error(message);
-        await load();
-        return;
-      }
+    const { data, error } = await (supabase.rpc as any)('admin_delete_empty_duplicate_seller_orgs', {
+      _target_org_id: targetOrgId,
+      _source_org_ids: sourceOrgIds,
+      _admin_note: 'Deleted empty duplicate seller orgs from admin sellers cleanup',
+    });
+    if (error) {
+      const message = error.message?.includes('schema cache') || error.message?.includes('Could not find the function')
+        ? 'Delete unavailable: Lovable has not applied the empty-duplicate cleanup migration yet. Sync latest GitHub migrations, then hard refresh.'
+        : `Delete stopped: ${error.message}`;
+      toast.error(message);
+      await load();
+      return;
     }
 
-    toast.success('Duplicate seller organisations merged');
+    const deletedCount = Number(data?.deleted_count ?? 0);
+    const skippedCount = Array.isArray(data?.skipped) ? data.skipped.length : 0;
+    toast.success(`Deleted ${deletedCount} empty duplicate${deletedCount === 1 ? '' : 's'}${skippedCount ? `; ${skippedCount} skipped because they contain data` : ''}`);
     load();
   };
 
@@ -324,8 +324,8 @@ export default function AdminSellers() {
                         <ExternalLink className="h-4 w-4 mr-2" />Open onboarding link
                       </DropdownMenuItem>
                       {o._duplicateOrgIds?.length > 0 && (
-                        <DropdownMenuItem onClick={() => mergeHiddenDuplicates(o.id, o._duplicateOrgIds)}>
-                          <Building2 className="h-4 w-4 mr-2" />Merge hidden duplicates
+                        <DropdownMenuItem onClick={() => deleteEmptyHiddenDuplicates(o.id, o._duplicateOrgIds)}>
+                          <Building2 className="h-4 w-4 mr-2" />Delete empty duplicates
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
