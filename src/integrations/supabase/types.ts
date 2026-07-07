@@ -2150,38 +2150,83 @@ export type Database = {
       seller_stripe_accounts: {
         Row: {
           account_status: string | null
+          admin_notes: string | null
+          capability_card_payments: string | null
+          capability_transfers: string | null
           charges_enabled: boolean | null
+          connect_readiness_status: string
           created_at: string
           details_submitted: boolean | null
+          disabled_reason: string | null
+          future_requirements_currently_due: string[]
+          future_requirements_eventually_due: string[]
+          future_requirements_past_due: string[]
           id: string
+          last_onboarding_link_created_at: string | null
+          last_synced_at: string | null
           onboarding_complete: boolean | null
           org_id: string
           payouts_enabled: boolean | null
+          requirements_currently_due: string[]
+          requirements_eventually_due: string[]
+          requirements_past_due: string[]
+          requirements_pending_verification: string[]
           stripe_account_id: string | null
+          stripe_environment: string | null
           updated_at: string
         }
         Insert: {
           account_status?: string | null
+          admin_notes?: string | null
+          capability_card_payments?: string | null
+          capability_transfers?: string | null
           charges_enabled?: boolean | null
+          connect_readiness_status?: string
           created_at?: string
           details_submitted?: boolean | null
+          disabled_reason?: string | null
+          future_requirements_currently_due?: string[]
+          future_requirements_eventually_due?: string[]
+          future_requirements_past_due?: string[]
           id?: string
+          last_onboarding_link_created_at?: string | null
+          last_synced_at?: string | null
           onboarding_complete?: boolean | null
           org_id: string
           payouts_enabled?: boolean | null
+          requirements_currently_due?: string[]
+          requirements_eventually_due?: string[]
+          requirements_past_due?: string[]
+          requirements_pending_verification?: string[]
           stripe_account_id?: string | null
+          stripe_environment?: string | null
           updated_at?: string
         }
         Update: {
           account_status?: string | null
+          admin_notes?: string | null
+          capability_card_payments?: string | null
+          capability_transfers?: string | null
           charges_enabled?: boolean | null
+          connect_readiness_status?: string
           created_at?: string
           details_submitted?: boolean | null
+          disabled_reason?: string | null
+          future_requirements_currently_due?: string[]
+          future_requirements_eventually_due?: string[]
+          future_requirements_past_due?: string[]
           id?: string
+          last_onboarding_link_created_at?: string | null
+          last_synced_at?: string | null
           onboarding_complete?: boolean | null
           org_id?: string
           payouts_enabled?: boolean | null
+          requirements_currently_due?: string[]
+          requirements_eventually_due?: string[]
+          requirements_past_due?: string[]
+          requirements_pending_verification?: string[]
           stripe_account_id?: string | null
+          stripe_environment?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2417,6 +2462,43 @@ export type Database = {
             foreignKeyName: "conversations_seller_org_id_fkey"
             columns: ["seller_org_id"]
             isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_seller_connect_readiness: {
+        Row: {
+          account_status: string | null
+          capability_card_payments: string | null
+          capability_transfers: string | null
+          charges_enabled: boolean | null
+          connect_readiness_status: string | null
+          details_submitted: boolean | null
+          disabled_reason: string | null
+          last_synced_at: string | null
+          org_id: string | null
+          organization_name: string | null
+          payouts_enabled: boolean | null
+          pending_payout_count: number | null
+          pending_payout_total: number | null
+          requirements_currently_due: string[] | null
+          requirements_past_due: string[] | null
+          requirements_pending_verification: string[] | null
+          stripe_account_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_stripe_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_stripe_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
