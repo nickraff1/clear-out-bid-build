@@ -2785,6 +2785,15 @@ export type Database = {
           result: string
         }[]
       }
+      update_order_pickup: {
+        Args: {
+          _action: string
+          _order_id: string
+          _pickup_code?: string
+          _proposed_pickup_at?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role:
