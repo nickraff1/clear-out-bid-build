@@ -156,14 +156,14 @@ export default function AdminSellerAssist() {
       supabase.from('lots').select('id, title, description, quantity, unit, pricing_type, fixed_price, start_price, reserve_price, auction_end, status, bid_count, event_id, event:clearance_events!inner(title, org_id)').eq('event.org_id', sellerOrgId).order('created_at', { ascending: false }),
       supabase.from('orders').select('id, status, pickup_status, amount, created_at, lot:lots(title), buyer:profiles!orders_buyer_id_fkey(full_name, email), event:clearance_events!inner(org_id)').eq('event.org_id', sellerOrgId).order('created_at', { ascending: false }).limit(25),
       supabase.from('seller_stripe_accounts').select('stripe_account_id, connect_readiness_status, charges_enabled, payouts_enabled, capability_transfers, disabled_reason, requirements_currently_due, requirements_past_due, last_synced_at').eq('org_id', sellerOrgId).maybeSingle(),
-      supabase.from('admin_seller_assist_audit_logs').select('id, action, entity_type, entity_id, metadata, created_at').eq('seller_org_id', sellerOrgId).order('created_at', { ascending: false }).limit(25),
+      (supabase as any).from('admin_seller_assist_audit_logs').select('id, action, entity_type, entity_id, metadata, created_at').eq('seller_org_id', sellerOrgId).order('created_at', { ascending: false }).limit(25),
     ]);
     setOrg(orgData as Org | null);
     setCategories((catData ?? []) as { id: string; name: string }[]);
     setLots((lotData ?? []) as unknown as LotRow[]);
     setOrders((orderData ?? []) as unknown as OrderRow[]);
     setStripe((stripeData as StripeAccount | null) ?? null);
-    setLogs((logData ?? []) as AuditLog[]);
+    setLogs((logData ?? []) as unknown as AuditLog[]);
     setLoading(false);
   };
 
