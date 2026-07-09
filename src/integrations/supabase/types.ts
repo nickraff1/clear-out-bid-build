@@ -1297,8 +1297,12 @@ export type Database = {
         Row: {
           created_at: string
           data: Json | null
+          email_error: string | null
+          email_message_id: string | null
+          email_queued_at: string | null
           email_sent_at: string | null
           email_should_send: boolean
+          email_template_name: string | null
           id: string
           link_url: string | null
           message: string | null
@@ -1316,8 +1320,12 @@ export type Database = {
         Insert: {
           created_at?: string
           data?: Json | null
+          email_error?: string | null
+          email_message_id?: string | null
+          email_queued_at?: string | null
           email_sent_at?: string | null
           email_should_send?: boolean
+          email_template_name?: string | null
           id?: string
           link_url?: string | null
           message?: string | null
@@ -1335,8 +1343,12 @@ export type Database = {
         Update: {
           created_at?: string
           data?: Json | null
+          email_error?: string | null
+          email_message_id?: string | null
+          email_queued_at?: string | null
           email_sent_at?: string | null
           email_should_send?: boolean
+          email_template_name?: string | null
           id?: string
           link_url?: string | null
           message?: string | null
@@ -2727,6 +2739,7 @@ export type Database = {
         }[]
       }
       close_expired_auction: { Args: { _lot_id: string }; Returns: string }
+      create_scheduled_email_notifications: { Args: never; Returns: Json }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -2786,6 +2799,10 @@ export type Database = {
           source_queue: string
         }
         Returns: number
+      }
+      notification_type_should_email: {
+        Args: { _type: string }
+        Returns: boolean
       }
       notify_admins: {
         Args: {
