@@ -96,8 +96,14 @@ export default function AppLayout() {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
-  // Check if user has dual roles (both buyer and seller)
-  const hasDualRoles = isSeller && isBuyer;
+  const showSellerQuickAction = (activePortal === 'seller' && isSeller) || isAdminAssistMode;
+  const mobileNavItems = [
+    ...navItems,
+    ...commonNav,
+    ...(showSellerQuickAction
+      ? [{ to: '/app/seller/events/new', label: 'New Event', icon: PlusCircle }]
+      : []),
+  ];
 
   return (
     <Layout hideFooter>
@@ -191,7 +197,7 @@ export default function AppLayout() {
             </div>
 
             {/* Quick Actions */}
-            {((activePortal === 'seller' && isSeller) || isAdminAssistMode) && (
+            {showSellerQuickAction && (
               <div className="pt-4 mt-4 border-t border-sidebar-border">
                 <Button asChild className="w-full" size="sm">
                   <Link to="/app/seller/events/new">
@@ -206,28 +212,43 @@ export default function AppLayout() {
 
         {/* Mobile Nav */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background z-50">
-          <nav className="flex justify-around p-2">
-            {navItems.slice(0, 5).map(item => (
+          <nav
+            aria-label={`${portalTitle} navigation`}
+            className="flex gap-1 overflow-x-auto overscroll-x-contain px-2 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {mobileNavItems.map(item => (
               <Link
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  'flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium transition-colors',
+                  'flex min-w-[76px] shrink-0 flex-col items-center justify-center gap-1 rounded-md px-2 py-2 text-center text-xs font-medium leading-tight transition-colors',
                   isActive(item.to)
-                    ? 'text-primary'
-                    : 'text-muted-foreground'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
               >
                 <item.icon className="h-5 w-5" />
-                {item.label}
+                <span className="max-w-[72px] whitespace-normal break-words">{item.label}</span>
               </Link>
             ))}
           </nav>
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto pb-20 md:pb-0">
-          <div className="sticky top-0 z-30 flex justify-end items-center gap-2 px-4 py-2 border-b border-border bg-background/95 backdrop-blur">
+        <main className="flex-1 overflow-auto pb-24 md:pb-0">
+          <div className="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 py-2 border-b border-border bg-background/95 backdrop-blur">
+            <div className="md:hidden min-w-0 flex-1">
+              {!isAdmin && !isAdminAssistMode && (isSeller || isBuyer) ? (
+                <div className="max-w-[240px]">
+                  <PortalSwitcher
+                    activePortal={activePortal}
+                    onPortalChange={setActivePortal}
+                  />
+                </div>
+              ) : (
+                <p className="truncate text-sm font-medium text-muted-foreground">{portalTitle}</p>
+              )}
+            </div>
             <NotificationsBell />
           </div>
           {isAdminAssistMode && (
