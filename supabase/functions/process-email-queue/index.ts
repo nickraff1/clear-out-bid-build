@@ -321,6 +321,16 @@ Deno.serve(async (req) => {
           status: 'sent',
         })
 
+        if (typeof payload.notification_id === 'string' && payload.notification_id) {
+          await supabase
+            .from('notifications')
+            .update({
+              email_sent_at: new Date().toISOString(),
+              email_error: null,
+            })
+            .eq('id', payload.notification_id)
+        }
+
         // Delete from queue
         const { error: delError } = await supabase.rpc('delete_email', {
           queue_name: queue,
@@ -385,6 +395,12 @@ Deno.serve(async (req) => {
           status: 'failed',
           error_message: errorMsg.slice(0, 1000),
         })
+        if (typeof payload.notification_id === 'string' && payload.notification_id) {
+          await supabase
+            .from('notifications')
+            .update({ email_error: errorMsg.slice(0, 1000) })
+            .eq('id', payload.notification_id)
+        }
         if (payload?.message_id && typeof payload.message_id === 'string') {
           failedAttemptsByMessageId.set(payload.message_id, failedAttempts + 1)
         }

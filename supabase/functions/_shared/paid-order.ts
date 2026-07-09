@@ -101,6 +101,13 @@ export async function completePaidOrder(
       title: "Item sold",
       message: `"${lotTitle}" has been paid for. Arrange pickup with the buyer and mark it ready when prepared.`,
       data: { order_id: orderId },
+    }, {
+      user_id: sellerCreator,
+      type: "seller_buyer_charged_payout_timing",
+      title: "Buyer payment confirmed",
+      message:
+        `The buyer has been charged for "${lotTitle}". Your payout is expected within 24-48 hours after collection is confirmed and release checks pass.`,
+      data: { order_id: orderId },
     });
   }
   await sb.from("notifications").insert(notifications);

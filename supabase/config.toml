@@ -21,6 +21,8 @@ project_id = "uiusztanyjwmccdabtvs"
     verify_jwt = false
   [functions.create-checkout]
     verify_jwt = false
+  [functions.dispatch-transactional-emails]
+    verify_jwt = true
   [functions.authorize-bid-deposit]
     verify_jwt = false
   [functions.payments-webhook]

@@ -303,29 +303,6 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
       }
     })
 
-  // 10. Create outbid notification for previous high bidder
-  if (lot.current_bid) {
-    const { data: previousHighBid } = await supabase
-      .from('bids')
-      .select('user_id')
-      .eq('lot_id', lot_id)
-      .eq('amount', lot.current_bid)
-      .neq('user_id', userId)
-      .single()
-
-    if (previousHighBid) {
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: previousHighBid.user_id,
-          type: 'outbid',
-          title: 'You have been outbid!',
-          message: `Someone placed a higher bid of $${amount.toFixed(2)} on "${lot.title}"`,
-          data: { lot_id, new_amount: amount }
-        })
-    }
-  }
-
   console.log(`[AUCTION] Bid placed successfully: bid_id=${newBid.id}`)
 
   return new Response(JSON.stringify({ 
