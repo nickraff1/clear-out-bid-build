@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Menu, X, Search, Bell, User, LogOut, LayoutDashboard, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { BRAND } from '@/lib/constants';
-import offcuttLogo from '@/assets/offcutt-logo.png.asset.json';
+import offcuttLogo from '@/assets/offcutt-logo.svg.asset.json';
 
 export function Header() {
   const { user, profile, signOut, isLoading } = useAuth();
