@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Menu, X, Search, Bell, User, LogOut, LayoutDashboard, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { BRAND } from '@/lib/constants';
+import offcuttLogo from '@/assets/offcutt-logo.png.asset.json';
 
 export function Header() {
   const { user, profile, signOut, isLoading } = useAuth();
@@ -33,11 +34,8 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">O</span>
-          </div>
-          <span className="text-xl font-bold text-foreground">{BRAND.name}</span>
+        <Link to="/" className="flex items-center" aria-label={BRAND.name}>
+          <img src={offcuttLogo.url} alt={`${BRAND.name} logo`} className="h-9 w-auto" />
         </Link>
 
         {/* Desktop Navigation */}
