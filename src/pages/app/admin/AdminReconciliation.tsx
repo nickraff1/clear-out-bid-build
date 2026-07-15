@@ -189,7 +189,7 @@ export default function AdminReconciliation() {
                   <div className="flex justify-between"><span>Seller fee</span><strong>{money(selected.seller_fee)}</strong></div>
                   <div className="flex justify-between"><span>Seller payout</span><strong>{money(selected.seller_payout)}</strong></div>
                   <div className="flex justify-between"><span>Refunded</span><strong>{money(selected.refunded_amount)}</strong></div>
-                  <div className="flex justify-between"><span>Tax treatment</span><Badge variant={selected.tax_calculation_status === "calculated" ? "success" : "warning"}>{selected.tax_calculation_status.replaceAll("_", " ")}</Badge></div>
+                  <div className="flex justify-between"><span>Tax treatment</span><Badge variant={selected.tax_calculation_status === "calculated" ? "success" : "warning"}>{selected.tax_calculation_status.split("_").join(" ")}</Badge></div>
                 </div>
                 {selected.tax_calculation_status !== "calculated" && (
                   <p className="text-xs text-muted-foreground">GST/tax has not been configured in Offcutt, so no tax amount is inferred. Confirm the fee tax treatment with your accountant before using this ledger for BAS reporting.</p>
