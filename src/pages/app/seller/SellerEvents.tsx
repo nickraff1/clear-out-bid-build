@@ -81,7 +81,7 @@ export default function SellerEvents() {
       draft: 'muted',
       active: 'success',
       completed: 'info',
-      expired: 'warning',
+      expired: 'destructive',
       cancelled: 'destructive'
     };
     return variants[status] ?? 'muted';
