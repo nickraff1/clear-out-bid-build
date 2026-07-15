@@ -39,6 +39,7 @@ import type { ClearanceEvent, Lot, Order } from '@/types/database';
 import { format, parseISO } from 'date-fns';
 import { RotateCw } from 'lucide-react';
 import { RelistAuctionDialog, type RelistTarget } from '@/components/seller/RelistAuctionDialog';
+import { canAddListingToEvent, getEffectiveEventStatus } from '@/lib/event-lifecycle';
 
 type EventWithDetails = ClearanceEvent & {
   lots: Lot[];
@@ -106,6 +107,7 @@ export default function EventDetail() {
       draft: 'muted',
       active: 'success',
       completed: 'info',
+      expired: 'warning',
       cancelled: 'destructive',
       sold: 'success',
       unsold: 'warning',
@@ -136,6 +138,8 @@ export default function EventDetail() {
   const activeLots = event.lots.filter(l => l.status === 'active');
   const soldLots = event.lots.filter(l => l.status === 'sold');
   const expiredLots = event.lots.filter(l => l.status === 'unsold' || l.status === 'cancelled');
+  const effectiveStatus = getEffectiveEventStatus(event);
+  const canAddListing = canAddListingToEvent(event);
 
   return (
     <div className="p-6 space-y-6">
@@ -159,8 +163,8 @@ export default function EventDetail() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-2xl font-bold">{event.title}</h1>
-              <Badge variant={getStatusColor(event.status)}>
-                {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
+              <Badge variant={getStatusColor(effectiveStatus)}>
+                {effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1)}
               </Badge>
             </div>
             
@@ -181,12 +185,14 @@ export default function EventDetail() {
           </div>
 
           <div className="flex gap-2">
-            <Button asChild>
-              <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add listing
-              </Link>
-            </Button>
+            {canAddListing && (
+              <Button asChild>
+                <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add listing
+                </Link>
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
@@ -198,7 +204,7 @@ export default function EventDetail() {
                   Edit Event
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {event.status === 'draft' && (
+                {canAddListing && event.status === 'draft' && (
                   <DropdownMenuItem 
                     onClick={() => updateEventStatus('active')}
                     className="text-success"
@@ -206,7 +212,7 @@ export default function EventDetail() {
                     Publish Event
                   </DropdownMenuItem>
                 )}
-                {event.status === 'active' && (
+                {canAddListing && event.status === 'active' && (
                   <DropdownMenuItem onClick={() => updateEventStatus('completed')}>
                     Complete Event
                   </DropdownMenuItem>
@@ -224,6 +230,15 @@ export default function EventDetail() {
           </div>
         </div>
       </div>
+
+      {!canAddListing && effectiveStatus === 'expired' && (
+        <Alert className="border-warning/30 bg-warning/10">
+          <Clock className="h-4 w-4 text-warning" />
+          <AlertDescription>
+            This event expired on {format(parseISO(event.pickup_end), 'MMM d, yyyy')}. New listings cannot be added. Existing listings keep their own sale and auction lifecycle.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Event Details */}
       {event.description && (
@@ -253,14 +268,16 @@ export default function EventDetail() {
               <Package className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
               <h3 className="text-lg font-semibold mb-2">No listings yet</h3>
               <p className="text-muted-foreground mb-4">
-                Add your first listing to this event
+                {canAddListing ? 'Add your first listing to this event' : 'This event is closed to new listings'}
               </p>
-              <Button asChild>
-                <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add listing
-                </Link>
-              </Button>
+              {canAddListing && (
+                <Button asChild>
+                  <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add listing
+                  </Link>
+                </Button>
+              )}
             </div>
           ) : (
             <div className="dashboard-card p-0 overflow-hidden">
@@ -322,7 +339,7 @@ export default function EventDetail() {
                               Edit listing
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {lot.status === 'draft' && (
+                            {canAddListing && lot.status === 'draft' && (
                               <DropdownMenuItem 
                                 onClick={() => updateLotStatus(lot.id, 'active')}
                                 className="text-success"
@@ -338,7 +355,7 @@ export default function EventDetail() {
                                 Cancel listing
                               </DropdownMenuItem>
                             )}
-                            {lot.pricing_type === 'auction' && (lot.status === 'unsold' || lot.status === 'cancelled') && (
+                            {canAddListing && lot.pricing_type === 'auction' && (lot.status === 'unsold' || lot.status === 'cancelled') && (
                               <DropdownMenuItem onClick={() => setRelistLot({ id: lot.id, title: lot.title, event_id: lot.event_id, start_price: lot.start_price, reserve_price: lot.reserve_price })}>
                                 <RotateCw className="h-4 w-4 mr-2" /> Relist auction
                               </DropdownMenuItem>

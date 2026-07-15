@@ -87,6 +87,7 @@ export default function BulkUpload() {
         .select('id')
         .eq('org_id', primaryOrg.id)
         .eq('status', 'active')
+        .gt('pickup_end', new Date().toISOString())
         .limit(1)
         .maybeSingle();
 

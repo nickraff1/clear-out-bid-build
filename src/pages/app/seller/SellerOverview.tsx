@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { ClearanceEvent, Lot, Order } from '@/types/database';
 import { format, parseISO, isToday, isThisWeek } from 'date-fns';
+import { getEffectiveEventStatus } from '@/lib/event-lifecycle';
 
 export default function SellerOverview() {
   const { user, profile, primaryOrg } = useAuth();
@@ -56,7 +57,7 @@ export default function SellerOverview() {
         setRecentEvents(eventsData as (ClearanceEvent & { lots: Lot[] })[]);
         
         // Calculate stats
-        const activeEvents = eventsData.filter(e => e.status === 'active').length;
+        const activeEvents = eventsData.filter(e => getEffectiveEventStatus(e as ClearanceEvent) === 'active').length;
         let lotsLive = 0;
         let soldLots = 0;
         
@@ -104,6 +105,7 @@ export default function SellerOverview() {
       draft: 'muted',
       active: 'success',
       completed: 'info',
+      expired: 'warning',
       cancelled: 'destructive',
     };
     return colors[status] ?? 'muted';
@@ -219,7 +221,9 @@ export default function SellerOverview() {
             />
           ) : (
             <div className="space-y-3">
-              {recentEvents.slice(0, 4).map(event => (
+              {recentEvents.slice(0, 4).map(event => {
+                const effectiveStatus = getEffectiveEventStatus(event);
+                return (
                 <Link
                   key={event.id}
                   to={`/app/seller/events/${event.id}`}
@@ -228,8 +232,8 @@ export default function SellerOverview() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium truncate">{event.title}</p>
-                      <Badge variant={getStatusColor(event.status)} className="shrink-0">
-                        {event.status}
+                      <Badge variant={getStatusColor(effectiveStatus)} className="shrink-0">
+                        {effectiveStatus}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -238,7 +242,8 @@ export default function SellerOverview() {
                   </div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

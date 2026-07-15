@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select';
 import type { ClearanceEvent, Lot } from '@/types/database';
 import { format, parseISO } from 'date-fns';
+import { canAddListingToEvent, getEffectiveEventStatus } from '@/lib/event-lifecycle';
 
 type EventWithLots = ClearanceEvent & {
   lots: Lot[];
@@ -80,6 +81,7 @@ export default function SellerEvents() {
       draft: 'muted',
       active: 'success',
       completed: 'info',
+      expired: 'warning',
       cancelled: 'destructive'
     };
     return variants[status] ?? 'muted';
@@ -88,7 +90,7 @@ export default function SellerEvents() {
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.suburb.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || event.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || getEffectiveEventStatus(event) === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -154,6 +156,7 @@ export default function SellerEvents() {
             <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="expired">Expired</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
@@ -183,6 +186,8 @@ export default function SellerEvents() {
       ) : (
         <div className="space-y-4">
           {filteredEvents.map(event => {
+            const effectiveStatus = getEffectiveEventStatus(event);
+            const canAddListing = canAddListingToEvent(event);
             const soldLots = event.lots.filter(l => l.status === 'sold').length;
             const activeLots = event.lots.filter(l => l.status === 'active').length;
             const draftLots = event.lots.filter(l => l.status === 'draft').length;
@@ -199,8 +204,8 @@ export default function SellerEvents() {
                         >
                           {event.title}
                         </Link>
-                        <Badge variant={getStatusBadge(event.status)}>
-                          {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
+                        <Badge variant={getStatusBadge(effectiveStatus)}>
+                          {effectiveStatus.charAt(0).toUpperCase() + effectiveStatus.slice(1)}
                         </Badge>
                       </div>
                       
@@ -217,11 +222,13 @@ export default function SellerEvents() {
                           <DropdownMenuItem onClick={() => navigate(`/app/seller/events/${event.id}/edit`)}>
                             Edit Event
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/app/seller/lots/new?eventId=${event.id}`)}>
-                            Add listing
-                          </DropdownMenuItem>
+                          {canAddListing && (
+                            <DropdownMenuItem onClick={() => navigate(`/app/seller/lots/new?eventId=${event.id}`)}>
+                              Add listing
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
-                          {event.status === 'draft' && (
+                          {canAddListing && event.status === 'draft' && (
                             <DropdownMenuItem 
                               onClick={() => updateEventStatus(event.id, 'active')}
                               className="text-success"
@@ -229,7 +236,7 @@ export default function SellerEvents() {
                               Publish Event
                             </DropdownMenuItem>
                           )}
-                          {event.status === 'active' && (
+                          {canAddListing && event.status === 'active' && (
                             <DropdownMenuItem onClick={() => updateEventStatus(event.id, 'completed')}>
                               Complete Event
                             </DropdownMenuItem>
@@ -268,12 +275,14 @@ export default function SellerEvents() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add listing
-                        </Link>
-                      </Button>
+                      {canAddListing && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/app/seller/lots/new?eventId=${event.id}`}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add listing
+                          </Link>
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/app/seller/events/${event.id}`}>
                           Manage <ArrowRight className="h-4 w-4 ml-1" />

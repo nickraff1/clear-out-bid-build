@@ -16,8 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Camera, Check, Gavel, Loader2, Tag, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Camera, Check, Gavel, Loader2, Tag, Trash2, X } from 'lucide-react';
 import { LOT_CONDITIONS } from '@/lib/constants';
+import { canAddListingToEvent, getEffectiveEventStatus } from '@/lib/event-lifecycle';
 import type { ClearanceEvent, ComplianceTag, Category } from '@/types/database';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Link } from 'react-router-dom';
@@ -72,6 +73,8 @@ export default function CreateLot() {
     compliance_tags: [] as string[],
     publish: false,
   });
+  const selectedEvent = events.find(event => event.id === formData.event_id);
+  const selectedEventClosed = selectedEvent ? !canAddListingToEvent(selectedEvent) : false;
 
   useEffect(() => {
     if (primaryOrg) {
@@ -96,8 +99,9 @@ export default function CreateLot() {
     if (data) {
       setEvents(data);
       // If no event selected and only one event exists, auto-select it
-      if (!formData.event_id && data.length === 1) {
-        setFormData(prev => ({ ...prev, event_id: data[0].id }));
+      const openEvents = data.filter(canAddListingToEvent);
+      if (!formData.event_id && openEvents.length === 1) {
+        setFormData(prev => ({ ...prev, event_id: openEvents[0].id }));
       }
     }
   };
@@ -105,7 +109,8 @@ export default function CreateLot() {
   // Auto-create a default "Ongoing listings" event if seller has none
   const ensureDefaultEvent = async (): Promise<string | null> => {
     if (formData.event_id) return formData.event_id;
-    if (events.length > 0) return events[0].id;
+    const openEvent = events.find(canAddListingToEvent);
+    if (openEvent) return openEvent.id;
     if (!primaryOrg || !user) return null;
     const now = new Date();
     const end = new Date(); end.setMonth(end.getMonth() + 3);
@@ -223,6 +228,19 @@ export default function CreateLot() {
         return;
       }
 
+      const { data: currentEvent, error: eventError } = await supabase
+        .from('clearance_events')
+        .select('id, pickup_end, status')
+        .eq('id', eventId)
+        .single();
+
+      if (eventError) throw eventError;
+      if (!canAddListingToEvent(currentEvent)) {
+        setError('This clearance event has expired or closed. Choose a current event before creating the listing.');
+        setLoading(false);
+        return;
+      }
+
       // Create lot
       const lotData: any = {
         event_id: eventId,
@@ -291,7 +309,12 @@ export default function CreateLot() {
       // Navigate back to listings
       navigate(`/app/seller/lots?created=1`);
     } catch (err: any) {
-      setError(err.message || 'Failed to create lot');
+      const message = err.message || 'Failed to create lot';
+      setError(
+        message.includes('event_expired') || message.includes('event_closed')
+          ? 'This clearance event has expired or closed. Choose a current event before creating the listing.'
+          : message,
+      );
     } finally {
       setLoading(false);
     }
@@ -324,13 +347,22 @@ export default function CreateLot() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No event — list on its own</SelectItem>
-                {events.map(event => (
-                  <SelectItem key={event.id} value={event.id}>
-                    {event.title} ({event.suburb})
-                  </SelectItem>
-                ))}
+                {events.map(event => {
+                  const status = getEffectiveEventStatus(event);
+                  return (
+                    <SelectItem key={event.id} value={event.id} disabled={!canAddListingToEvent(event)}>
+                      {event.title} ({event.suburb}){status === 'expired' ? ' - Expired' : ''}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
+            {selectedEventClosed && (
+              <div className="mt-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>This event has expired or closed. Select another event before creating a listing.</span>
+              </div>
+            )}
           </CardContent>
         </Card>
         )}
@@ -648,14 +680,14 @@ export default function CreateLot() {
             variant="outline"
             className="flex-1"
             onClick={() => handleSubmit(false)}
-            disabled={loading}
+            disabled={loading || selectedEventClosed}
           >
             Save as Draft
           </Button>
           <Button
             className="flex-1"
             onClick={() => handleSubmit(true)}
-            disabled={loading || !allAttested}
+            disabled={loading || !allAttested || selectedEventClosed}
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
