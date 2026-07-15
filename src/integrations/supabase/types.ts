@@ -203,6 +203,13 @@ export type Database = {
             foreignKeyName: "auction_deposits_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "auction_deposits_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "admin_stuck_orders"
             referencedColumns: ["lot_id"]
           },
@@ -275,6 +282,13 @@ export type Database = {
             foreignKeyName: "bid_events_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "bid_events_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "admin_stuck_orders"
             referencedColumns: ["lot_id"]
           },
@@ -331,6 +345,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "bids"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bidder_audit_log_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
           },
           {
             foreignKeyName: "bidder_audit_log_lot_id_fkey"
@@ -512,6 +533,13 @@ export type Database = {
             foreignKeyName: "bids_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "bids_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "admin_stuck_orders"
             referencedColumns: ["lot_id"]
           },
@@ -583,6 +611,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "bulk_imports"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_import_rows_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
           },
           {
             foreignKeyName: "bulk_import_rows_lot_id_fkey"
@@ -854,6 +889,13 @@ export type Database = {
             foreignKeyName: "conversations_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "conversations_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "admin_stuck_orders"
             referencedColumns: ["lot_id"]
           },
@@ -1012,6 +1054,13 @@ export type Database = {
             foreignKeyName: "lot_compliance_tags_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "lot_compliance_tags_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "admin_stuck_orders"
             referencedColumns: ["lot_id"]
           },
@@ -1060,6 +1109,13 @@ export type Database = {
           url?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lot_media_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
           {
             foreignKeyName: "lot_media_lot_id_fkey"
             columns: ["lot_id"]
@@ -1117,6 +1173,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lot_reports_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
           {
             foreignKeyName: "lot_reports_lot_id_fkey"
             columns: ["lot_id"]
@@ -1382,6 +1445,13 @@ export type Database = {
             foreignKeyName: "notifications_related_lot_id_fkey"
             columns: ["related_lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "notifications_related_lot_id_fkey"
+            columns: ["related_lot_id"]
+            isOneToOne: false
             referencedRelation: "admin_stuck_orders"
             referencedColumns: ["lot_id"]
           },
@@ -1533,6 +1603,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clearance_events_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
           },
           {
             foreignKeyName: "orders_lot_id_fkey"
@@ -1737,7 +1814,150 @@ export type Database = {
             foreignKeyName: "payment_refunds_payment_id_fkey"
             columns: ["payment_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["payment_id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
             referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_transfer_reconciliation: {
+        Row: {
+          attempt_number: number
+          base_amount: number | null
+          buyer_charge_amount: number | null
+          buyer_fee: number | null
+          buyer_fee_tax_amount: number | null
+          created_at: string
+          currency: string
+          environment: string
+          error_code: string | null
+          error_message: string | null
+          event_type: string
+          id: string
+          idempotency_key: string | null
+          metadata: Json
+          order_id: string
+          outcome: string
+          payment_id: string
+          seller_fee: number | null
+          seller_fee_tax_amount: number | null
+          seller_org_id: string | null
+          seller_payout: number | null
+          source_transaction_used: boolean
+          stripe_balance_transaction_id: string | null
+          stripe_charge_id: string | null
+          stripe_destination_account_id: string | null
+          stripe_payment_intent_id: string | null
+          stripe_transfer_id: string | null
+          tax_calculation_status: string
+        }
+        Insert: {
+          attempt_number?: number
+          base_amount?: number | null
+          buyer_charge_amount?: number | null
+          buyer_fee?: number | null
+          buyer_fee_tax_amount?: number | null
+          created_at?: string
+          currency?: string
+          environment: string
+          error_code?: string | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json
+          order_id: string
+          outcome: string
+          payment_id: string
+          seller_fee?: number | null
+          seller_fee_tax_amount?: number | null
+          seller_org_id?: string | null
+          seller_payout?: number | null
+          source_transaction_used?: boolean
+          stripe_balance_transaction_id?: string | null
+          stripe_charge_id?: string | null
+          stripe_destination_account_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_transfer_id?: string | null
+          tax_calculation_status?: string
+        }
+        Update: {
+          attempt_number?: number
+          base_amount?: number | null
+          buyer_charge_amount?: number | null
+          buyer_fee?: number | null
+          buyer_fee_tax_amount?: number | null
+          created_at?: string
+          currency?: string
+          environment?: string
+          error_code?: string | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json
+          order_id?: string
+          outcome?: string
+          payment_id?: string
+          seller_fee?: number | null
+          seller_fee_tax_amount?: number | null
+          seller_org_id?: string | null
+          seller_payout?: number | null
+          source_transaction_used?: boolean
+          stripe_balance_transaction_id?: string | null
+          stripe_charge_id?: string | null
+          stripe_destination_account_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_transfer_id?: string | null
+          tax_calculation_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transfer_reconciliation_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "payment_transfer_reconciliation_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfer_reconciliation_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["payment_id"]
+          },
+          {
+            foreignKeyName: "payment_transfer_reconciliation_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfer_reconciliation_seller_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transfer_reconciliation_seller_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1748,8 +1968,8 @@ export type Database = {
           amount_charged: number
           application_fee_amount: number | null
           base_amount: number
-          buyer_fee_tax_amount: number | null
           buyer_fee: number
+          buyer_fee_tax_amount: number | null
           created_at: string
           environment: string
           error_message: string | null
@@ -1758,13 +1978,13 @@ export type Database = {
           manual_payout_reference: string | null
           manual_payout_status: Database["public"]["Enums"]["manual_payout_status"]
           order_id: string
+          payment_method: string | null
+          payment_mode: Database["public"]["Enums"]["payment_mode"]
           payout_attempt_count: number
           payout_last_attempt_at: string | null
           payout_last_error: string | null
           payout_processing_status: string
           payout_source_transaction_used: boolean
-          payment_method: string | null
-          payment_mode: Database["public"]["Enums"]["payment_mode"]
           refund_status: string | null
           refunded_amount: number
           seller_fee: number
@@ -1780,8 +2000,8 @@ export type Database = {
           stripe_payment_intent_id: string | null
           stripe_refund_id: string | null
           stripe_session_id: string | null
-          stripe_transfer_id: string | null
           stripe_transfer_created_at: string | null
+          stripe_transfer_id: string | null
           tax_calculation_status: string
           updated_at: string
         }
@@ -1790,8 +2010,8 @@ export type Database = {
           amount_charged: number
           application_fee_amount?: number | null
           base_amount: number
-          buyer_fee_tax_amount?: number | null
           buyer_fee?: number
+          buyer_fee_tax_amount?: number | null
           created_at?: string
           environment?: string
           error_message?: string | null
@@ -1800,13 +2020,13 @@ export type Database = {
           manual_payout_reference?: string | null
           manual_payout_status?: Database["public"]["Enums"]["manual_payout_status"]
           order_id: string
+          payment_method?: string | null
+          payment_mode?: Database["public"]["Enums"]["payment_mode"]
           payout_attempt_count?: number
           payout_last_attempt_at?: string | null
           payout_last_error?: string | null
           payout_processing_status?: string
           payout_source_transaction_used?: boolean
-          payment_method?: string | null
-          payment_mode?: Database["public"]["Enums"]["payment_mode"]
           refund_status?: string | null
           refunded_amount?: number
           seller_fee?: number
@@ -1822,8 +2042,8 @@ export type Database = {
           stripe_payment_intent_id?: string | null
           stripe_refund_id?: string | null
           stripe_session_id?: string | null
-          stripe_transfer_id?: string | null
           stripe_transfer_created_at?: string | null
+          stripe_transfer_id?: string | null
           tax_calculation_status?: string
           updated_at?: string
         }
@@ -1832,8 +2052,8 @@ export type Database = {
           amount_charged?: number
           application_fee_amount?: number | null
           base_amount?: number
-          buyer_fee_tax_amount?: number | null
           buyer_fee?: number
+          buyer_fee_tax_amount?: number | null
           created_at?: string
           environment?: string
           error_message?: string | null
@@ -1842,13 +2062,13 @@ export type Database = {
           manual_payout_reference?: string | null
           manual_payout_status?: Database["public"]["Enums"]["manual_payout_status"]
           order_id?: string
+          payment_method?: string | null
+          payment_mode?: Database["public"]["Enums"]["payment_mode"]
           payout_attempt_count?: number
           payout_last_attempt_at?: string | null
           payout_last_error?: string | null
           payout_processing_status?: string
           payout_source_transaction_used?: boolean
-          payment_method?: string | null
-          payment_mode?: Database["public"]["Enums"]["payment_mode"]
           refund_status?: string | null
           refunded_amount?: number
           seller_fee?: number
@@ -1864,8 +2084,8 @@ export type Database = {
           stripe_payment_intent_id?: string | null
           stripe_refund_id?: string | null
           stripe_session_id?: string | null
-          stripe_transfer_id?: string | null
           stripe_transfer_created_at?: string | null
+          stripe_transfer_id?: string | null
           tax_calculation_status?: string
           updated_at?: string
         }
@@ -2104,6 +2324,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "saved_search_alerts_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
           {
             foreignKeyName: "saved_search_alerts_lot_id_fkey"
             columns: ["lot_id"]
@@ -2402,6 +2629,13 @@ export type Database = {
             foreignKeyName: "watchlist_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "watchlist_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "admin_stuck_orders"
             referencedColumns: ["lot_id"]
           },
@@ -2423,61 +2657,6 @@ export type Database = {
       }
     }
     Views: {
-      admin_payment_reconciliation: {
-        Row: {
-          amount_charged: number
-          base_amount: number
-          buyer_email: string | null
-          buyer_fee: number
-          buyer_fee_tax_amount: number | null
-          buyer_id: string
-          buyer_name: string | null
-          environment: string
-          latest_error_code: string | null
-          latest_error_message: string | null
-          latest_event_at: string | null
-          latest_event_outcome: string | null
-          latest_event_type: string | null
-          lot_id: string | null
-          lot_title: string | null
-          manual_payout_status: Database["public"]["Enums"]["manual_payout_status"]
-          order_id: string
-          order_status: Database["public"]["Enums"]["order_status"]
-          payment_created_at: string
-          payment_id: string
-          payment_method: string | null
-          payment_mode: Database["public"]["Enums"]["payment_mode"]
-          payment_status: Database["public"]["Enums"]["payment_status"]
-          payment_updated_at: string
-          payout_attempt_count: number
-          payout_last_attempt_at: string | null
-          payout_last_error: string | null
-          payout_processing_status: string
-          payout_source_transaction_used: boolean
-          pickup_status: string | null
-          platform_fee_total: number
-          refund_status: string | null
-          refunded_amount: number
-          seller_fee: number
-          seller_fee_tax_amount: number | null
-          seller_name: string | null
-          seller_org_id: string | null
-          seller_payout: number
-          seller_stripe_account_id: string | null
-          stripe_balance_transaction_id: string | null
-          stripe_charge_amount: number | null
-          stripe_charge_available_on: string | null
-          stripe_charge_currency: string | null
-          stripe_charge_id: string | null
-          stripe_charge_settlement_status: string
-          stripe_payment_intent_id: string | null
-          stripe_session_id: string | null
-          stripe_transfer_created_at: string | null
-          stripe_transfer_id: string | null
-          tax_calculation_status: string
-        }
-        Relationships: []
-      }
       admin_duplicate_seller_org_candidates: {
         Row: {
           conversation_count: number | null
@@ -2550,6 +2729,13 @@ export type Database = {
             foreignKeyName: "conversations_lot_id_fkey"
             columns: ["lot_id"]
             isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
+          {
+            foreignKeyName: "conversations_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
             referencedRelation: "admin_stuck_orders"
             referencedColumns: ["lot_id"]
           },
@@ -2572,6 +2758,99 @@ export type Database = {
             columns: ["seller_org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_payment_reconciliation: {
+        Row: {
+          amount_charged: number | null
+          base_amount: number | null
+          buyer_email: string | null
+          buyer_fee: number | null
+          buyer_fee_tax_amount: number | null
+          buyer_id: string | null
+          buyer_name: string | null
+          environment: string | null
+          latest_error_code: string | null
+          latest_error_message: string | null
+          latest_event_at: string | null
+          latest_event_outcome: string | null
+          latest_event_type: string | null
+          lot_id: string | null
+          lot_title: string | null
+          manual_payout_status:
+            | Database["public"]["Enums"]["manual_payout_status"]
+            | null
+          order_id: string | null
+          order_status: Database["public"]["Enums"]["order_status"] | null
+          payment_created_at: string | null
+          payment_id: string | null
+          payment_method: string | null
+          payment_mode: Database["public"]["Enums"]["payment_mode"] | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          payment_updated_at: string | null
+          payout_attempt_count: number | null
+          payout_last_attempt_at: string | null
+          payout_last_error: string | null
+          payout_processing_status: string | null
+          payout_source_transaction_used: boolean | null
+          pickup_status: string | null
+          platform_fee_total: number | null
+          refund_status: string | null
+          refunded_amount: number | null
+          seller_fee: number | null
+          seller_fee_tax_amount: number | null
+          seller_name: string | null
+          seller_org_id: string | null
+          seller_payout: number | null
+          seller_stripe_account_id: string | null
+          stripe_balance_transaction_id: string | null
+          stripe_charge_amount: number | null
+          stripe_charge_available_on: string | null
+          stripe_charge_currency: string | null
+          stripe_charge_id: string | null
+          stripe_charge_settlement_status: string | null
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+          stripe_transfer_created_at: string | null
+          stripe_transfer_id: string | null
+          tax_calculation_status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clearance_events_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "admin_duplicate_seller_org_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clearance_events_org_id_fkey"
+            columns: ["seller_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "admin_stuck_orders"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -2719,6 +2998,13 @@ export type Database = {
           unique_bidders: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "bids_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "admin_payment_reconciliation"
+            referencedColumns: ["lot_id"]
+          },
           {
             foreignKeyName: "bids_lot_id_fkey"
             columns: ["lot_id"]
