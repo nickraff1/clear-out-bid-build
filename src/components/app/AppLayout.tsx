@@ -2,7 +2,7 @@ import { Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign, Rocket, ShieldCheck, CreditCard, ShieldAlert, LogOut } from 'lucide-react';
+import { Loader2, LayoutDashboard, Package, Calendar, ShoppingCart, Heart, Bell, Settings, Building2, Users, BarChart3, Gavel, Tag, PlusCircle, FileText, Truck, MessageSquare, Flag, Upload, DollarSign, Rocket, ShieldCheck, CreditCard, ShieldAlert, LogOut, ReceiptText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PortalSwitcher } from './PortalSwitcher';
 import { useActivePortal } from '@/hooks/useActivePortal';
@@ -61,6 +61,7 @@ export default function AppLayout() {
     { to: '/app/admin/orders', label: 'Orders', icon: ShoppingCart },
     { to: '/app/admin/messages', label: 'Messages', icon: MessageSquare },
     { to: '/app/admin/payouts', label: 'Payouts', icon: DollarSign },
+    { to: '/app/admin/reconciliation', label: 'Reconciliation', icon: ReceiptText },
     { to: '/app/admin/reports', label: 'Reports', icon: Flag },
     { to: '/app/admin/fees', label: 'Fees', icon: Tag },
   ];

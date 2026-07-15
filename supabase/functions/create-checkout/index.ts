@@ -92,7 +92,18 @@ Deno.serve(async (req) => {
         },
         quantity: 1,
       }],
-      payment_intent_data: { description: lotTitle },
+      payment_intent_data: {
+        description: lotTitle,
+        metadata: {
+          order_id: order.id,
+          buyer_id: user.id,
+          source: "offcutt_checkout",
+          base_amount: basePrice.toFixed(2),
+          buyer_fee: buyerFee.toFixed(2),
+          seller_fee: sellerFee.toFixed(2),
+          seller_payout: sellerPayout.toFixed(2),
+        },
+      },
       metadata: {
         order_id: order.id,
         buyer_id: user.id,

@@ -67,6 +67,7 @@ import AdminListings from "./pages/app/admin/AdminListings";
 import AdminOrders from "./pages/app/admin/AdminOrders";
 import AdminReports from "./pages/app/admin/AdminReports";
 import AdminPayouts from "./pages/app/admin/AdminPayouts";
+import AdminReconciliation from "./pages/app/admin/AdminReconciliation";
 import AdminLaunch from "./pages/app/admin/AdminLaunch";
 import AdminSellers from "./pages/app/admin/AdminSellers";
 import AdminSellerAssist from "./pages/app/admin/AdminSellerAssist";
@@ -304,6 +305,9 @@ const App = () => (
               } />
               <Route path="/app/admin/payments" element={
                 <RoleGuard allowedRoles={['admin']}><AdminPayouts /></RoleGuard>
+              } />
+              <Route path="/app/admin/reconciliation" element={
+                <RoleGuard allowedRoles={['admin']}><AdminReconciliation /></RoleGuard>
               } />
               <Route path="/app/admin/launch" element={
                 <RoleGuard allowedRoles={['admin']}><AdminLaunch /></RoleGuard>

@@ -159,9 +159,37 @@ export async function chargeAuctionWinnerOrder(
       throw new Error(`PaymentIntent status: ${intent.status}`);
     }
 
+    const chargeId = typeof intent.latest_charge === "string"
+      ? intent.latest_charge
+      : intent.latest_charge?.id ?? null;
+    if (!chargeId) {
+      throw new Error("Succeeded auction payment did not return a Stripe Charge ID");
+    }
+    const charge = await stripe.charges.retrieve(chargeId, {
+      expand: ["balance_transaction"],
+    });
+    const balance = typeof charge.balance_transaction === "string"
+      ? null
+      : charge.balance_transaction;
+    const balanceTransactionId = typeof charge.balance_transaction === "string"
+      ? charge.balance_transaction
+      : charge.balance_transaction?.id ?? null;
+
     await sb.from("payments").update({
       status: "succeeded",
       stripe_payment_intent_id: intent.id,
+      stripe_charge_id: charge.id,
+      stripe_charge_amount: charge.amount / 100,
+      stripe_charge_currency: charge.currency.toLowerCase(),
+      stripe_balance_transaction_id: balanceTransactionId,
+      stripe_charge_available_on: balance?.available_on
+        ? new Date(balance.available_on * 1000).toISOString()
+        : null,
+      stripe_charge_settlement_status: balance?.status === "available"
+        ? "available"
+        : balance?.status === "pending"
+        ? "pending"
+        : "unknown",
       payment_method: "card",
       environment: env,
       error_message: null,
@@ -173,7 +201,12 @@ export async function chargeAuctionWinnerOrder(
       paymentReference: intent.id,
     });
 
-    return { ok: true, order_id: order.id, payment_intent_id: intent.id };
+    return {
+      ok: true,
+      order_id: order.id,
+      payment_intent_id: intent.id,
+      charge_id: charge.id,
+    };
   } catch (err) {
     const message = (err as Error).message;
     await sb.from("payments").update({

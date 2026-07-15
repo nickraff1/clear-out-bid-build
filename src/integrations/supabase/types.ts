@@ -1748,6 +1748,7 @@ export type Database = {
           amount_charged: number
           application_fee_amount: number | null
           base_amount: number
+          buyer_fee_tax_amount: number | null
           buyer_fee: number
           created_at: string
           environment: string
@@ -1757,18 +1758,31 @@ export type Database = {
           manual_payout_reference: string | null
           manual_payout_status: Database["public"]["Enums"]["manual_payout_status"]
           order_id: string
+          payout_attempt_count: number
+          payout_last_attempt_at: string | null
+          payout_last_error: string | null
+          payout_processing_status: string
+          payout_source_transaction_used: boolean
           payment_method: string | null
           payment_mode: Database["public"]["Enums"]["payment_mode"]
           refund_status: string | null
           refunded_amount: number
           seller_fee: number
+          seller_fee_tax_amount: number | null
           seller_payout: number
           status: Database["public"]["Enums"]["payment_status"]
+          stripe_balance_transaction_id: string | null
+          stripe_charge_amount: number | null
+          stripe_charge_available_on: string | null
+          stripe_charge_currency: string | null
           stripe_charge_id: string | null
+          stripe_charge_settlement_status: string
           stripe_payment_intent_id: string | null
           stripe_refund_id: string | null
           stripe_session_id: string | null
           stripe_transfer_id: string | null
+          stripe_transfer_created_at: string | null
+          tax_calculation_status: string
           updated_at: string
         }
         Insert: {
@@ -1776,6 +1790,7 @@ export type Database = {
           amount_charged: number
           application_fee_amount?: number | null
           base_amount: number
+          buyer_fee_tax_amount?: number | null
           buyer_fee?: number
           created_at?: string
           environment?: string
@@ -1785,18 +1800,31 @@ export type Database = {
           manual_payout_reference?: string | null
           manual_payout_status?: Database["public"]["Enums"]["manual_payout_status"]
           order_id: string
+          payout_attempt_count?: number
+          payout_last_attempt_at?: string | null
+          payout_last_error?: string | null
+          payout_processing_status?: string
+          payout_source_transaction_used?: boolean
           payment_method?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode"]
           refund_status?: string | null
           refunded_amount?: number
           seller_fee?: number
+          seller_fee_tax_amount?: number | null
           seller_payout?: number
           status?: Database["public"]["Enums"]["payment_status"]
+          stripe_balance_transaction_id?: string | null
+          stripe_charge_amount?: number | null
+          stripe_charge_available_on?: string | null
+          stripe_charge_currency?: string | null
           stripe_charge_id?: string | null
+          stripe_charge_settlement_status?: string
           stripe_payment_intent_id?: string | null
           stripe_refund_id?: string | null
           stripe_session_id?: string | null
           stripe_transfer_id?: string | null
+          stripe_transfer_created_at?: string | null
+          tax_calculation_status?: string
           updated_at?: string
         }
         Update: {
@@ -1804,6 +1832,7 @@ export type Database = {
           amount_charged?: number
           application_fee_amount?: number | null
           base_amount?: number
+          buyer_fee_tax_amount?: number | null
           buyer_fee?: number
           created_at?: string
           environment?: string
@@ -1813,18 +1842,31 @@ export type Database = {
           manual_payout_reference?: string | null
           manual_payout_status?: Database["public"]["Enums"]["manual_payout_status"]
           order_id?: string
+          payout_attempt_count?: number
+          payout_last_attempt_at?: string | null
+          payout_last_error?: string | null
+          payout_processing_status?: string
+          payout_source_transaction_used?: boolean
           payment_method?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode"]
           refund_status?: string | null
           refunded_amount?: number
           seller_fee?: number
+          seller_fee_tax_amount?: number | null
           seller_payout?: number
           status?: Database["public"]["Enums"]["payment_status"]
+          stripe_balance_transaction_id?: string | null
+          stripe_charge_amount?: number | null
+          stripe_charge_available_on?: string | null
+          stripe_charge_currency?: string | null
           stripe_charge_id?: string | null
+          stripe_charge_settlement_status?: string
           stripe_payment_intent_id?: string | null
           stripe_refund_id?: string | null
           stripe_session_id?: string | null
           stripe_transfer_id?: string | null
+          stripe_transfer_created_at?: string | null
+          tax_calculation_status?: string
           updated_at?: string
         }
         Relationships: [
@@ -2381,6 +2423,61 @@ export type Database = {
       }
     }
     Views: {
+      admin_payment_reconciliation: {
+        Row: {
+          amount_charged: number
+          base_amount: number
+          buyer_email: string | null
+          buyer_fee: number
+          buyer_fee_tax_amount: number | null
+          buyer_id: string
+          buyer_name: string | null
+          environment: string
+          latest_error_code: string | null
+          latest_error_message: string | null
+          latest_event_at: string | null
+          latest_event_outcome: string | null
+          latest_event_type: string | null
+          lot_id: string | null
+          lot_title: string | null
+          manual_payout_status: Database["public"]["Enums"]["manual_payout_status"]
+          order_id: string
+          order_status: Database["public"]["Enums"]["order_status"]
+          payment_created_at: string
+          payment_id: string
+          payment_method: string | null
+          payment_mode: Database["public"]["Enums"]["payment_mode"]
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          payment_updated_at: string
+          payout_attempt_count: number
+          payout_last_attempt_at: string | null
+          payout_last_error: string | null
+          payout_processing_status: string
+          payout_source_transaction_used: boolean
+          pickup_status: string | null
+          platform_fee_total: number
+          refund_status: string | null
+          refunded_amount: number
+          seller_fee: number
+          seller_fee_tax_amount: number | null
+          seller_name: string | null
+          seller_org_id: string | null
+          seller_payout: number
+          seller_stripe_account_id: string | null
+          stripe_balance_transaction_id: string | null
+          stripe_charge_amount: number | null
+          stripe_charge_available_on: string | null
+          stripe_charge_currency: string | null
+          stripe_charge_id: string | null
+          stripe_charge_settlement_status: string
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+          stripe_transfer_created_at: string | null
+          stripe_transfer_id: string | null
+          tax_calculation_status: string
+        }
+        Relationships: []
+      }
       admin_duplicate_seller_org_candidates: {
         Row: {
           conversation_count: number | null

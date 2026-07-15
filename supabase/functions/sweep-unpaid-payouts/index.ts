@@ -19,18 +19,20 @@ Deno.serve(async (_req) => {
 
     const { data: payments } = await admin
       .from("payments")
-      .select("id, order:orders!payments_order_id_fkey(status)")
+      .select("id, manual_payout_status, order:orders!payments_order_id_fkey(status)")
       .eq("status", "succeeded")
       .is("stripe_transfer_id", null)
       .limit(50);
 
     const rows = (payments ?? []) as unknown as Array<{
       id: string;
+      manual_payout_status: string;
       order: { status: string } | null;
     }>;
 
     for (const row of rows) {
       if (row.order?.status !== "collected") continue;
+      if (row.manual_payout_status === "manual_payout_on_hold") continue;
       try {
         const outcome = await transferSellerPayout(admin, row.id, "Auto payout sweep");
         results.push({ payment_id: row.id, outcome });

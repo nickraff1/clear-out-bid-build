@@ -46,7 +46,7 @@ export default function SellerPayouts() {
 
         const { data, error: ordersError } = await supabase
           .from("orders")
-          .select("id, amount, status, created_at, lot:lots(title), payment:payments(base_amount, buyer_fee, seller_fee, seller_payout, status, manual_payout_status, manual_payout_paid_at)")
+          .select("id, amount, status, created_at, lot:lots(title), payment:payments(base_amount, buyer_fee, seller_fee, seller_payout, status, manual_payout_status, manual_payout_paid_at, payout_processing_status, payout_last_error, stripe_transfer_id, stripe_charge_available_on)")
           .in("event_id", ids)
           .order("created_at", { ascending: false });
         if (ordersError) throw ordersError;
@@ -67,7 +67,11 @@ export default function SellerPayouts() {
   const totalSold = paidRows.reduce((s, r) => s + Number((Array.isArray(r.payment) ? r.payment[0] : r.payment)?.base_amount ?? 0), 0);
   const totalNet = paidRows.reduce((s, r) => s + Number((Array.isArray(r.payment) ? r.payment[0] : r.payment)?.seller_payout ?? 0), 0);
   const pendingNet = paidRows
-    .filter(r => ((Array.isArray(r.payment) ? r.payment[0] : r.payment)?.manual_payout_status) === "manual_payout_pending")
+    .filter(r => {
+      const payment = Array.isArray(r.payment) ? r.payment[0] : r.payment;
+      return payment?.manual_payout_status === "manual_payout_pending"
+        || payment?.payout_processing_status === "awaiting_stripe_settlement";
+    })
     .reduce((s, r) => s + Number((Array.isArray(r.payment) ? r.payment[0] : r.payment)?.seller_payout ?? 0), 0);
 
   return (
@@ -127,6 +131,7 @@ export default function SellerPayouts() {
             {paidRows.map(r => {
               const p = Array.isArray(r.payment) ? r.payment[0] : r.payment;
               const status = p?.manual_payout_status ?? "manual_payout_pending";
+              const awaitingSettlement = p?.payout_processing_status === "awaiting_stripe_settlement";
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.lot?.title}</TableCell>
@@ -134,7 +139,20 @@ export default function SellerPayouts() {
                   <TableCell>${Number(p?.base_amount ?? 0).toFixed(2)}</TableCell>
                   <TableCell className="text-muted-foreground">${Number(p?.seller_fee ?? 0).toFixed(2)}</TableCell>
                   <TableCell className="font-medium">${Number(p?.seller_payout ?? 0).toFixed(2)}</TableCell>
-                  <TableCell><Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge></TableCell>
+                  <TableCell>
+                    <div className="min-w-[230px] space-y-1">
+                      <Badge variant={awaitingSettlement ? "warning" : STATUS_VARIANT[status]}>
+                        {awaitingSettlement ? "Awaiting Stripe funds settlement" : STATUS_LABEL[status]}
+                      </Badge>
+                      {awaitingSettlement && (
+                        <p className="text-xs text-muted-foreground">Your payout has been approved and will be released automatically once the buyer’s payment becomes available in Stripe.</p>
+                      )}
+                      {p?.payout_last_error && !awaitingSettlement && (
+                        <p className="text-xs text-destructive">{p.payout_last_error}</p>
+                      )}
+                      {p?.stripe_transfer_id && <code className="block text-[10px] text-muted-foreground">{p.stripe_transfer_id}</code>}
+                    </div>
+                  </TableCell>
                 </TableRow>
               );
             })}

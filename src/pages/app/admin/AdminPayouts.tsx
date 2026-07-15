@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Loader2, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, Loader2, ReceiptText, RefreshCw, Send } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -44,6 +45,12 @@ type PayoutRow = {
   environment: string;
   created_at: string;
   stripe_transfer_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_charge_settlement_status: string;
+  payout_processing_status: string;
+  payout_last_error: string | null;
+  payout_source_transaction_used: boolean;
   refunded_amount: number | null;
   refund_status: string | null;
   _has_issue: boolean;
@@ -128,7 +135,9 @@ export default function AdminPayouts() {
       .select(`
         id, base_amount, buyer_fee, seller_fee, seller_payout, amount_charged,
         status, manual_payout_status, manual_payout_paid_at, manual_payout_reference,
-        admin_notes, environment, created_at, stripe_transfer_id, refunded_amount, refund_status,
+        admin_notes, environment, created_at, stripe_transfer_id, stripe_payment_intent_id,
+        stripe_charge_id, stripe_charge_settlement_status, payout_processing_status,
+        payout_last_error, payout_source_transaction_used, refunded_amount, refund_status,
         order:orders!payments_order_id_fkey(
           id, status, pickup_status,
           buyer:profiles!orders_buyer_id_fkey(full_name, email),
@@ -222,7 +231,12 @@ export default function AdminPayouts() {
         variant: "destructive",
       });
     } else {
-      toast({ title: "Seller transfer created", description: data?.transfer_id });
+      toast({
+        title: data?.awaiting_settlement
+          ? "Transfer accepted; awaiting Stripe settlement"
+          : "Seller transfer created",
+        description: data?.transfer_id,
+      });
       load();
     }
     setConfirmTransfer(null);
@@ -300,22 +314,25 @@ export default function AdminPayouts() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Payouts</h1>
           <p className="text-muted-foreground">Review seller payout readiness, holds, transfer status, and payout completion.</p>
         </div>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            {STATUSES.map(s => <SelectItem key={s} value={s}>{LABEL[s]}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild><Link to="/app/admin/reconciliation"><ReceiptText className="mr-2 h-4 w-4" />Reconciliation</Link></Button>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {STATUSES.map(s => <SelectItem key={s} value={s}>{LABEL[s]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="rounded-md border border-warning/40 bg-warning/10 text-sm p-3 flex items-start gap-2">
         <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
-        <span><strong>Automated payouts are live.</strong> When an order is marked collected, the platform automatically transfers 90% of the sale to the seller's Stripe balance. Use the Transfer button below only to retry a payout that failed or was missed (e.g. seller onboarded late).</span>
+        <span><strong>Automated payouts are live.</strong> New transfers are linked to the original buyer Charge. Stripe can accept the transfer while that Charge is pending, then release it to the seller as the Charge settles. Use Transfer only to retry a missed payout.</span>
       </div>
 
       <div className="border rounded-md overflow-x-auto">
@@ -368,7 +385,21 @@ export default function AdminPayouts() {
                     ? <Badge variant={r.refund_status === "succeeded" ? "success" : "warning"}>${Number(r.refunded_amount).toFixed(2)}</Badge>
                     : <span className="text-muted-foreground">—</span>}
                 </TableCell>
-                <TableCell><Badge variant={VARIANT[r.manual_payout_status]}>{LABEL[r.manual_payout_status]}</Badge></TableCell>
+                <TableCell>
+                  <div className="min-w-[210px] space-y-1">
+                    <Badge variant={r.payout_processing_status === "awaiting_stripe_settlement" ? "warning" : VARIANT[r.manual_payout_status]}>
+                      {r.payout_processing_status === "awaiting_stripe_settlement"
+                        ? "Awaiting Stripe funds settlement"
+                        : LABEL[r.manual_payout_status]}
+                    </Badge>
+                    {r.payout_processing_status === "awaiting_stripe_settlement" && (
+                      <p className="text-xs text-muted-foreground">Your payout has been approved and will be released automatically once the buyer’s payment becomes available in Stripe.</p>
+                    )}
+                    {r.payout_last_error && <p className="text-xs text-destructive">{r.payout_last_error}</p>}
+                    {r.stripe_charge_id && <code className="block text-[10px] text-muted-foreground">{r.stripe_charge_id}</code>}
+                    {r.stripe_transfer_id && <code className="block text-[10px] text-muted-foreground">{r.stripe_transfer_id}</code>}
+                  </div>
+                </TableCell>
                 <TableCell className="space-x-2">
                   <Button
                     size="sm"
@@ -391,7 +422,7 @@ export default function AdminPayouts() {
                         <Select value={draft.status} onValueChange={(v) => setDraft(d => ({ ...d, status: v }))}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {STATUSES.map(s => <SelectItem key={s} value={s}>{LABEL[s]}</SelectItem>)}
+                            {STATUSES.map(s => <SelectItem key={s} value={s} disabled={s === "manual_payout_paid" && !r.stripe_transfer_id}>{LABEL[s]}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         {draft.status === "manual_payout_paid" && (r._has_issue || r.order?.status !== "collected") && (

@@ -11,13 +11,15 @@ let _supabase: ReturnType<typeof createClient> | null = null;
 type CheckoutSession = {
   id: string;
   metadata?: { order_id?: string | null } | null;
-  payment_intent?: string | null;
+  payment_intent?: string | { id: string } | null;
 };
 
 type PaymentIntent = {
   id: string;
   amount_received?: number | null;
   amount?: number | null;
+  currency?: string | null;
+  latest_charge?: string | { id: string } | null;
   metadata?: {
     order_id?: string | null;
     base_amount?: string | null;
@@ -29,7 +31,48 @@ type PaymentIntent = {
   last_payment_error?: { message?: string | null } | null;
 };
 
+type Charge = {
+  id: string;
+  amount: number;
+  currency: string;
+  paid?: boolean | null;
+  status?: string | null;
+  payment_intent?: string | { id: string } | null;
+  balance_transaction?: string | {
+    id: string;
+    status?: string | null;
+    available_on?: number | null;
+  } | null;
+};
+
+type ChargeDetails = {
+  chargeId: string;
+  amount: number;
+  currency: string;
+  balanceTransactionId: string | null;
+  settlementStatus: "unknown" | "pending" | "available";
+  availableOn: string | null;
+};
+
 type PaymentRow = { id: string; order_id?: string | null; status?: string | null };
+
+type ReconciliationPayment = {
+  id: string;
+  order_id: string;
+  environment: string;
+  stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_balance_transaction_id: string | null;
+  amount_charged: number;
+  base_amount: number;
+  buyer_fee: number;
+  seller_fee: number;
+  seller_payout: number;
+  buyer_fee_tax_amount: number | null;
+  seller_fee_tax_amount: number | null;
+  tax_calculation_status: string | null;
+  order: { event: { org_id: string } | null } | null;
+};
 
 type StripeAccountEvent = {
   id: string;
@@ -61,6 +104,91 @@ function getSupabase() {
   return _supabase;
 }
 
+const stripeId = (value: string | { id: string } | null | undefined) =>
+  typeof value === "string" ? value : value?.id ?? null;
+
+async function resolveChargeDetails(pi: PaymentIntent, env: StripeEnv): Promise<ChargeDetails | null> {
+  const stripe = createStripeClient(env);
+  let chargeId = stripeId(pi.latest_charge);
+  if (!chargeId) {
+    const retrieved = await stripe.paymentIntents.retrieve(pi.id, {
+      expand: ["latest_charge.balance_transaction"],
+    });
+    chargeId = stripeId(retrieved.latest_charge as string | { id: string } | null);
+  }
+  if (!chargeId) return null;
+
+  const charge = await stripe.charges.retrieve(chargeId, {
+    expand: ["balance_transaction"],
+  }) as unknown as Charge;
+  const balance = typeof charge.balance_transaction === "string"
+    ? null
+    : charge.balance_transaction;
+  const balanceTransactionId = typeof charge.balance_transaction === "string"
+    ? charge.balance_transaction
+    : charge.balance_transaction?.id ?? null;
+  const settlementStatus: ChargeDetails["settlementStatus"] = balance?.status === "available"
+    ? "available"
+    : balance?.status === "pending"
+    ? "pending"
+    : "unknown";
+
+  return {
+    chargeId: charge.id,
+    amount: charge.amount / 100,
+    currency: charge.currency.toLowerCase(),
+    balanceTransactionId,
+    settlementStatus,
+    availableOn: balance?.available_on
+      ? new Date(balance.available_on * 1000).toISOString()
+      : null,
+  };
+}
+
+const chargeUpdate = (charge: ChargeDetails | null) => charge ? {
+  stripe_charge_id: charge.chargeId,
+  stripe_charge_amount: charge.amount,
+  stripe_charge_currency: charge.currency,
+  stripe_balance_transaction_id: charge.balanceTransactionId,
+  stripe_charge_available_on: charge.availableOn,
+  stripe_charge_settlement_status: charge.settlementStatus,
+} : {};
+
+async function recordChargeReconciliation(paymentId: string) {
+  const sb = getSupabase();
+  const { data } = await sb.from("payments").select(`
+    id, order_id, environment, stripe_payment_intent_id, stripe_charge_id,
+    stripe_balance_transaction_id, amount_charged, base_amount, buyer_fee,
+    seller_fee, seller_payout, buyer_fee_tax_amount, seller_fee_tax_amount,
+    tax_calculation_status,
+    order:orders!payments_order_id_fkey(event:clearance_events(org_id))
+  `).eq("id", paymentId).maybeSingle();
+  const payment = data as unknown as ReconciliationPayment | null;
+  if (!payment?.stripe_charge_id) return;
+  const { error } = await sb.from("payment_transfer_reconciliation").insert({
+    payment_id: payment.id,
+    order_id: payment.order_id,
+    seller_org_id: payment.order?.event?.org_id ?? null,
+    event_type: "charge_recorded",
+    outcome: "recorded",
+    environment: payment.environment === "live" ? "live" : "sandbox",
+    stripe_payment_intent_id: payment.stripe_payment_intent_id,
+    stripe_charge_id: payment.stripe_charge_id,
+    stripe_balance_transaction_id: payment.stripe_balance_transaction_id,
+    currency: "aud",
+    buyer_charge_amount: payment.amount_charged,
+    base_amount: payment.base_amount,
+    buyer_fee: payment.buyer_fee,
+    seller_fee: payment.seller_fee,
+    seller_payout: payment.seller_payout,
+    buyer_fee_tax_amount: payment.buyer_fee_tax_amount,
+    seller_fee_tax_amount: payment.seller_fee_tax_amount,
+    tax_calculation_status: payment.tax_calculation_status ?? "not_configured",
+    metadata: { source: "payments-webhook" },
+  });
+  if (error) console.error("Could not record charge reconciliation", error.message);
+}
+
 async function handleSessionCompleted(session: CheckoutSession, env: StripeEnv) {
   const orderId = session.metadata?.order_id;
   if (!orderId) {
@@ -68,17 +196,29 @@ async function handleSessionCompleted(session: CheckoutSession, env: StripeEnv) 
     return;
   }
   const sb = getSupabase();
+  const paymentIntentId = stripeId(session.payment_intent);
+  let charge: ChargeDetails | null = null;
+  if (paymentIntentId) {
+    const stripe = createStripeClient(env);
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ["latest_charge.balance_transaction"],
+    });
+    charge = await resolveChargeDetails(intent as unknown as PaymentIntent, env);
+  }
 
-  await sb.from("payments").update({
+  const { data: updatedPayment } = await sb.from("payments").update({
     status: "succeeded",
-    stripe_payment_intent_id: session.payment_intent ?? null,
+    stripe_payment_intent_id: paymentIntentId,
+    ...chargeUpdate(charge),
     environment: env,
     updated_at: new Date().toISOString(),
-  }).eq("stripe_session_id", session.id);
+  }).eq("stripe_session_id", session.id).select("id").maybeSingle();
+
+  if (updatedPayment?.id) await recordChargeReconciliation(updatedPayment.id);
 
   await completePaidOrder(sb, {
     orderId,
-    paymentReference: session.payment_intent ?? session.id,
+    paymentReference: paymentIntentId ?? session.id,
   });
 }
 
@@ -94,6 +234,7 @@ async function handlePaymentFailed(pi: PaymentIntent, env: StripeEnv) {
 async function handlePaymentSucceeded(pi: PaymentIntent, env: StripeEnv) {
   const sb = getSupabase();
   const metadataOrderId = pi.metadata?.order_id ?? null;
+  const charge = await resolveChargeDetails(pi, env);
 
   const { data: existingPayment } = await sb
     .from("payments")
@@ -112,6 +253,7 @@ async function handlePaymentSucceeded(pi: PaymentIntent, env: StripeEnv) {
     await sb.from("payments").update({
       status: "succeeded",
       stripe_payment_intent_id: pi.id,
+      ...chargeUpdate(charge),
       payment_method: "card",
       environment: env,
       error_message: null,
@@ -134,18 +276,51 @@ async function handlePaymentSucceeded(pi: PaymentIntent, env: StripeEnv) {
       application_fee_amount: buyerFee + sellerFee,
       status: "succeeded",
       stripe_payment_intent_id: pi.id,
+      ...chargeUpdate(charge),
       payment_method: "card",
       payment_mode: "manual_payout_mode",
       manual_payout_status: "manual_payout_pending",
       environment: env,
       updated_at: new Date().toISOString(),
-    });
+    }).select("id").single();
   }
+
+  const { data: reconciledPayment } = await sb.from("payments")
+    .select("id").eq("stripe_payment_intent_id", pi.id).maybeSingle();
+  if (reconciledPayment?.id) await recordChargeReconciliation(reconciledPayment.id);
 
   await completePaidOrder(sb, {
     orderId,
     paymentReference: pi.id,
   });
+}
+
+async function handleChargeSucceeded(charge: Charge, env: StripeEnv) {
+  const paymentIntentId = stripeId(charge.payment_intent);
+  if (!paymentIntentId) return;
+  const balance = typeof charge.balance_transaction === "string" ? null : charge.balance_transaction;
+  const details: ChargeDetails = {
+    chargeId: charge.id,
+    amount: charge.amount / 100,
+    currency: charge.currency.toLowerCase(),
+    balanceTransactionId: typeof charge.balance_transaction === "string"
+      ? charge.balance_transaction
+      : charge.balance_transaction?.id ?? null,
+    settlementStatus: balance?.status === "available"
+      ? "available"
+      : balance?.status === "pending"
+      ? "pending"
+      : "unknown",
+    availableOn: balance?.available_on
+      ? new Date(balance.available_on * 1000).toISOString()
+      : null,
+  };
+  const { data } = await getSupabase().from("payments").update({
+    ...chargeUpdate(details),
+    environment: env,
+    updated_at: new Date().toISOString(),
+  }).eq("stripe_payment_intent_id", paymentIntentId).select("id").maybeSingle();
+  if (data?.id) await recordChargeReconciliation(data.id);
 }
 
 // Connect: keep seller_stripe_accounts in sync with Stripe.
@@ -250,6 +425,9 @@ Deno.serve(async (req) => {
           break;
         case "payment_intent.succeeded":
           await handlePaymentSucceeded(eventObject as PaymentIntent, env);
+          break;
+        case "charge.succeeded":
+          await handleChargeSucceeded(eventObject as Charge, env);
           break;
         case "payment_intent.payment_failed":
           await handlePaymentFailed(eventObject as PaymentIntent, env);
