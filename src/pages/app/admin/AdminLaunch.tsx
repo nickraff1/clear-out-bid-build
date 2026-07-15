@@ -26,7 +26,6 @@ type Stats = {
   paidOrders: number;
   expiredAuctionsActive: number;
   paidOrdersNoPickupCode: number;
-  expiredPickupActive: number;
   uncategorizedActive: number;
   latestTxnStatus: string | null;
   latestTxnAt: string | null;
@@ -79,7 +78,7 @@ export default function AdminLaunch() {
     const [
       activeLots, sellerOrgsCount, sellerUsers, buyerProfiles,
       pendingPayouts, unresolvedReports, stuckOrders, paidOrders, latestPayment,
-      expiredAuctions, paidNoCode, expiredPickupLots, uncategorizedLots,
+      expiredAuctions, paidNoCode, uncategorizedLots,
       adminRpcCheck, messagingIssues, conversationsNoMessages, paidOrderMissingSystemMessages, paidNoConversation,
       paymentIntegrityIssues, failedWebhookEvents, auctionChargeFailures,
     ] = await Promise.all([
@@ -94,7 +93,6 @@ export default function AdminLaunch() {
       supabase.from("payments").select("status, created_at").order("created_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active").eq("pricing_type", "auction").lt("auction_end", nowIso),
       supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "paid").is("pickup_code", null),
-      supabase.from("lots").select("id, event:clearance_events!inner(pickup_end)", { count: "exact", head: true }).eq("status", "active").lt("event.pickup_end", nowIso),
       supabase.from("lots").select("id", { count: "exact", head: true }).eq("status", "active").is("category_id", null),
       user ? isAdminRpc("is_admin", { _user_id: user.id }) : Promise.resolve({ data: false, error: null }),
       fromUntyped("admin_messaging_integrity").select("conversation_id", { count: "exact", head: true }).not("issue", "is", null),
@@ -119,7 +117,6 @@ export default function AdminLaunch() {
       paidOrders: paidOrders.count ?? 0,
       expiredAuctionsActive: expiredAuctions.count ?? 0,
       paidOrdersNoPickupCode: paidNoCode.count ?? 0,
-      expiredPickupActive: expiredPickupLots.count ?? 0,
       uncategorizedActive: uncategorizedLots.count ?? 0,
       latestTxnStatus: latestPayment.data?.status ?? null,
       latestTxnAt: latestPayment.data?.created_at ?? null,
@@ -243,11 +240,9 @@ export default function AdminLaunch() {
       href: "/app/admin/orders",
     },
     {
-      label: "Active listings with expired pickup window",
-      status: stats.expiredPickupActive === 0 ? "pass" : "fail",
-      detail: stats.expiredPickupActive === 0
-        ? "All active listings have a future pickup window. Server triggers reject bids/orders on expired windows."
-        : `${stats.expiredPickupActive} active listing(s) sit on past pickup windows. Hide them or contact the seller to reschedule.`,
+      label: "Event dates do not hide live listings",
+      status: "pass",
+      detail: "Marketplace availability is controlled by listing status and auction timing. Event dates remain operational context only.",
       href: "/app/admin/listings",
     },
     {
@@ -280,9 +275,9 @@ export default function AdminLaunch() {
       detail: "Database trigger blocks sellers (and members of the seller org) from bidding on their own lots.",
     },
     {
-      label: "Pickup-window server guard",
+      label: "Listing-level availability guard",
       status: "pass",
-      detail: "Triggers on bids and orders reject placement when the event pickup window has already ended.",
+      detail: "Bids and orders are controlled by listing status, auction status and payment/order state rather than expired parent event dates.",
     },
     {
       label: "Webhook cancellation handling",

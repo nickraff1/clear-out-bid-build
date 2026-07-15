@@ -75,8 +75,7 @@ export default function Marketplace() {
           ),
           category:categories(*)
         `)
-        .eq('status', 'active')
-        .gte('clearance_events.pickup_end', new Date().toISOString());
+        .eq('status', 'active');
 
       if (categoryFilter) {
         const cat = categories.find(c => c.slug === categoryFilter);

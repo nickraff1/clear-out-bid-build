@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import {
 import { ArrowLeft, ArrowRight, Calendar, Check, Loader2, MapPin, Settings } from 'lucide-react';
 import { AUSTRALIAN_STATES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import type { ClearanceEvent } from '@/types/database';
 
 const STEPS = [
   { id: 'basics', title: 'Event Basics', description: 'Project name and location' },
@@ -45,9 +46,12 @@ type EventFormData = {
 
 export default function CreateEvent() {
   const navigate = useNavigate();
+  const { id } = useParams();
   const { user, primaryOrg } = useAuth();
+  const isEditMode = Boolean(id);
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(Boolean(id));
   const [error, setError] = useState('');
 
   // Form state
@@ -71,6 +75,61 @@ export default function CreateEvent() {
     contact_phone: '',
     contact_email: '',
   });
+
+  useEffect(() => {
+    if (!id) return;
+
+    let cancelled = false;
+    const toDateTimeLocal = (value: string) => {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+      return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+    };
+
+    const loadEvent = async () => {
+      setInitialLoading(true);
+      setError('');
+
+      const { data, error: fetchError } = await supabase
+        .from('clearance_events')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (fetchError) {
+        setError(fetchError.message);
+      } else if (!data) {
+        setError('Event not found');
+      } else {
+        const event = data as ClearanceEvent;
+        setFormData({
+          title: event.title ?? '',
+          description: event.description ?? '',
+          site_address: event.site_address ?? '',
+          suburb: event.suburb ?? '',
+          state: event.state ?? 'NSW',
+          postcode: event.postcode ?? '',
+          pickup_start: toDateTimeLocal(event.pickup_start),
+          pickup_end: toDateTimeLocal(event.pickup_end),
+          access_notes: event.access_notes ?? '',
+          has_forklift: false,
+          has_dock: false,
+          pickup_hours: '',
+          contact_name: event.contact_name ?? '',
+          contact_phone: event.contact_phone ?? '',
+          contact_email: event.contact_email ?? '',
+        });
+      }
+
+      setInitialLoading(false);
+    };
+
+    loadEvent();
+    return () => { cancelled = true; };
+  }, [id]);
 
   const updateFormData = <K extends keyof EventFormData>(field: K, value: EventFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -132,11 +191,7 @@ export default function CreateEvent() {
         accessNotes = `${accessNotes}\n\n${constraints.join(' • ')}`.trim();
       }
 
-      const { data, error: insertError } = await supabase
-        .from('clearance_events')
-        .insert({
-          org_id: primaryOrg.id,
-          created_by: user.id,
+      const payload = {
           title: formData.title,
           description: formData.description || null,
           site_address: formData.site_address,
@@ -149,6 +204,25 @@ export default function CreateEvent() {
           contact_name: formData.contact_name || null,
           contact_phone: formData.contact_phone || null,
           contact_email: formData.contact_email || null,
+      };
+
+      if (isEditMode && id) {
+        const { error: updateError } = await supabase
+          .from('clearance_events')
+          .update(payload)
+          .eq('id', id);
+
+        if (updateError) throw updateError;
+        navigate(`/app/seller/events/${id}`);
+        return;
+      }
+
+      const { data, error: insertError } = await supabase
+        .from('clearance_events')
+        .insert({
+          ...payload,
+          org_id: primaryOrg.id,
+          created_by: user.id,
           status: 'draft',
         })
         .select()
@@ -173,9 +247,20 @@ export default function CreateEvent() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <h1 className="text-2xl font-bold">Create Clearance Event</h1>
-        <p className="text-muted-foreground">Set up a new event to start listing your surplus materials</p>
+        <h1 className="text-2xl font-bold">{isEditMode ? 'Edit Clearance Event' : 'Create Clearance Event'}</h1>
+        <p className="text-muted-foreground">
+          {isEditMode
+            ? 'Update the event details buyers and team members see for this group of listings'
+            : 'Set up a new event to start listing your surplus materials'}
+        </p>
       </div>
+
+      {initialLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <>
 
       {/* Progress Steps */}
       <div className="flex items-center justify-between mb-8">
@@ -469,7 +554,9 @@ export default function CreateEvent() {
 
               <div className="bg-muted/50 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">
-                  Your event will be created as a <strong>draft</strong>. You can add lots and publish it when you're ready.
+                  {isEditMode
+                    ? 'Changes to this event update the event container only. Listing visibility is controlled by each listing status and auction timing.'
+                    : <>Your event will be created as a <strong>draft</strong>. You can add lots and publish it when you're ready.</>}
                 </p>
               </div>
             </div>
@@ -504,10 +591,12 @@ export default function CreateEvent() {
             ) : (
               <Check className="h-4 w-4 mr-2" />
             )}
-            Create Event
+            {isEditMode ? 'Save Event' : 'Create Event'}
           </Button>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

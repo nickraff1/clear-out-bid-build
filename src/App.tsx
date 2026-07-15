@@ -174,6 +174,11 @@ const App = () => (
                   <EventDetail />
                 </RoleGuard>
               } />
+              <Route path="/app/seller/events/:id/edit" element={
+                <RoleGuard allowedRoles={['seller', 'admin']}>
+                  <CreateEvent />
+                </RoleGuard>
+              } />
               <Route path="/app/seller/lots" element={
                 <RoleGuard allowedRoles={['seller', 'admin']}>
                   <SellerLots />
