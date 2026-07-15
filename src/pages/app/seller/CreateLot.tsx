@@ -99,7 +99,7 @@ export default function CreateLot() {
     if (data) {
       setEvents(data);
       // If no event selected and only one event exists, auto-select it
-      const openEvents = data.filter(canAddListingToEvent);
+      const openEvents = data.filter((e) => canAddListingToEvent(e));
       if (!formData.event_id && openEvents.length === 1) {
         setFormData(prev => ({ ...prev, event_id: openEvents[0].id }));
       }
@@ -109,7 +109,7 @@ export default function CreateLot() {
   // Auto-create a default "Ongoing listings" event if seller has none
   const ensureDefaultEvent = async (): Promise<string | null> => {
     if (formData.event_id) return formData.event_id;
-    const openEvent = events.find(canAddListingToEvent);
+    const openEvent = events.find((e) => canAddListingToEvent(e));
     if (openEvent) return openEvent.id;
     if (!primaryOrg || !user) return null;
     const now = new Date();
