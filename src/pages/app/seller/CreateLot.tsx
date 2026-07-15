@@ -199,7 +199,12 @@ export default function CreateLot() {
         setError('Auction end date is required');
         return false;
       }
-      if (new Date(formData.auction_end) <= new Date()) {
+      const endDate = new Date(formData.auction_end);
+      if (Number.isNaN(endDate.getTime())) {
+        setError('Auction end date is invalid. Please pick a date and time.');
+        return false;
+      }
+      if (endDate <= new Date()) {
         setError('Auction end must be in the future');
         return false;
       }
@@ -260,7 +265,13 @@ export default function CreateLot() {
         lotData.start_price = parseFloat(formData.start_price);
         lotData.reserve_price = formData.reserve_price ? parseFloat(formData.reserve_price) : null;
         // datetime-local value is local time; convert to UTC ISO for storage
-        lotData.auction_end = new Date(formData.auction_end).toISOString();
+        const endDate = new Date(formData.auction_end);
+        if (Number.isNaN(endDate.getTime())) {
+          setError('Auction end date is invalid. Please pick a date and time.');
+          setLoading(false);
+          return;
+        }
+        lotData.auction_end = endDate.toISOString();
       }
 
       const { data: lot, error: lotError } = await supabase
@@ -309,7 +320,8 @@ export default function CreateLot() {
       // Navigate back to listings
       navigate(`/app/seller/lots?created=1`);
     } catch (err: any) {
-      const message = err.message || 'Failed to create lot';
+      console.error('CreateLot publish failed:', err);
+      const message = err?.message || 'Failed to create lot';
       setError(
         message.includes('event_expired') || message.includes('event_closed')
           ? 'This clearance event has expired or closed. Choose a current event before creating the listing.'
