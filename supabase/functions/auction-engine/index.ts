@@ -264,8 +264,15 @@ async function handlePlaceBid(body: BidRequest, supabase: any, userId: string) {
 
   if (bidError) {
     console.error('[AUCTION] Error inserting bid:', bidError)
-    return new Response(JSON.stringify({ error: 'Failed to place bid' }), {
-      status: 500,
+    const dbMessage = bidError.message || bidError.details || 'Failed to place bid'
+    const isPickupWindowError = /pickup_window_expired|pickup window/i.test(dbMessage)
+    return new Response(JSON.stringify({
+      error: isPickupWindowError
+        ? 'This bid was blocked by an expired parent event pickup window. The listing is active, but the database still needs the event-date gate migration applied.'
+        : dbMessage,
+      details: dbMessage,
+    }), {
+      status: isPickupWindowError ? 409 : 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }

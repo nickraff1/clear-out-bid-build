@@ -49,6 +49,23 @@ type LotWithDetails = Lot & {
   winning_bidder_id?: string | null;
 };
 
+async function getFunctionErrorMessage(error: unknown) {
+  const fallback = error instanceof Error ? error.message : 'Failed to place bid. Please try again.';
+  const context = (error as { context?: Response })?.context;
+
+  if (context && typeof context.clone === 'function') {
+    try {
+      const body = await context.clone().json();
+      if (typeof body?.error === 'string') return body.error;
+      if (typeof body?.message === 'string') return body.message;
+    } catch {
+      // Fall through to the SDK-provided message.
+    }
+  }
+
+  return fallback;
+}
+
 export default function LotDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -281,7 +298,7 @@ export default function LotDetail() {
       // Handle edge function invocation errors
       if (error) {
         console.error('[Bid] Edge function error:', error);
-        setBidError(error.message || 'Failed to place bid. Please try again.');
+        setBidError(await getFunctionErrorMessage(error));
         return;
       }
       
