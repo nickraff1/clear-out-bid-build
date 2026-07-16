@@ -31,6 +31,22 @@ describe("Stripe source-transaction payouts", () => {
     expect(transfer).toContain('transfer.id.startsWith("tr_")');
     expect(transfer).toContain('skipped: "already_transferred"');
     expect(transfer).toContain('manual_payout_status === "manual_payout_on_hold"');
+    expect(transfer).toContain('event_type: "transfer_skipped"');
+    expect(transfer).toContain('seller_connect_not_ready');
+  });
+
+  it("keeps collected-order auto payout trigger environment-safe and observable", () => {
+    const migration = read(
+      "supabase/migrations/20260716010000_repair_auto_payout_trigger_and_logging.sql",
+    );
+
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION public.trigger_auto_payout()");
+    expect(migration).toContain("current_setting('app.settings.supabase_url', true)");
+    expect(migration).toContain("current_setting('app.settings.supabase_anon_key', true)");
+    expect(migration).not.toContain("https://uiusztanyjwmccdabtvs.supabase.co/functions/v1/auto-payout-on-collected");
+    expect(migration).toContain("auto_payout_trigger_not_configured");
+    expect(migration).toContain("payment_transfer_reconciliation");
+    expect(migration).toContain("orders_auto_payout_on_collected");
   });
 
   it("creates an admin-only accounting ledger without inventing tax", () => {

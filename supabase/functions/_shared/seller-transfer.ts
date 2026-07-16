@@ -71,7 +71,7 @@ function stripeError(err: unknown) {
 async function recordReconciliation(
   admin: Admin,
   payment: PaymentRow,
-  sellerOrgId: string,
+  sellerOrgId: string | null,
   values: Record<string, unknown>,
 ) {
   const { error } = await admin.from("payment_transfer_reconciliation").insert({
@@ -201,22 +201,46 @@ export async function transferSellerPayout(
   if (paymentError) return { ok: false, error: paymentError.message };
   const payment = paymentData as unknown as PaymentRow | null;
   if (!payment) return { ok: false, error: "Payment not found" };
+
+  const sellerOrgId = payment.order?.lot?.event?.org_id ?? null;
+  const recordSkip = async (errorCode: string, errorMessage: string) => {
+    if (!sellerOrgId) return;
+    await recordReconciliation(admin, payment, sellerOrgId, {
+      event_type: "transfer_skipped",
+      outcome: "skipped",
+      stripe_destination_account_id: null,
+      source_transaction_used: Boolean(payment.stripe_charge_id),
+      currency: "aud",
+      error_code: errorCode,
+      error_message: errorMessage,
+      metadata: { note },
+    });
+  };
+
   if (payment.status !== "succeeded") {
-    return { ok: false, error: `Cannot transfer payout: payment is ${payment.status}` };
+    const message = `Cannot transfer payout: payment is ${payment.status}`;
+    await recordSkip("payment_not_succeeded", message);
+    return { ok: false, error: message };
   }
   if (payment.stripe_transfer_id) {
+    await recordSkip("already_transferred", "Stripe transfer already exists");
     return { ok: false, skipped: "already_transferred", transfer_id: payment.stripe_transfer_id };
   }
   if (payment.manual_payout_status === "manual_payout_on_hold") {
+    await recordSkip("payout_on_hold", "Payout is on hold");
     return { ok: false, skipped: "payout_on_hold" };
   }
   if (payment.order?.status !== "collected") {
-    return { ok: false, error: "Order must be collected before seller transfer" };
+    const message = "Order must be collected before seller transfer";
+    await recordSkip("order_not_collected", message);
+    return { ok: false, error: message };
   }
 
   const payoutCents = toCents(payment.seller_payout);
   if (!Number.isSafeInteger(payoutCents) || payoutCents <= 0) {
-    return { ok: false, error: "Seller payout must be greater than zero" };
+    const message = "Seller payout must be greater than zero";
+    await recordSkip("invalid_seller_payout", message);
+    return { ok: false, error: message };
   }
 
   const { data: openIssue } = await admin
@@ -225,9 +249,12 @@ export async function transferSellerPayout(
     .eq("order_id", payment.order_id)
     .in("status", ["open", "investigating"])
     .maybeSingle();
-  if (openIssue) return { ok: false, error: "Open issue exists on this order" };
+  if (openIssue) {
+    const message = "Open issue exists on this order";
+    await recordSkip("open_issue", message);
+    return { ok: false, error: message };
+  }
 
-  const sellerOrgId = payment.order?.lot?.event?.org_id;
   if (!sellerOrgId) return { ok: false, error: "Seller organisation not found" };
 
   const { data: sellerAccountData } = await admin
@@ -241,7 +268,10 @@ export async function transferSellerPayout(
     .maybeSingle();
   const sellerAccount = sellerAccountData as SellerAccount | null;
   const connectBlock = explainConnectBlock(sellerAccount ?? {});
-  if (connectBlock) return { ok: false, error: connectBlock };
+  if (connectBlock) {
+    await recordSkip("seller_connect_not_ready", connectBlock);
+    return { ok: false, error: connectBlock };
+  }
 
   const env: StripeEnv = payment.environment === "live" ? "live" : "sandbox";
   assertLivePaymentsEnabled(env);
