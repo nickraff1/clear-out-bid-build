@@ -16,10 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle, ArrowLeft, Camera, Check, Gavel, Loader2, Tag, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarPlus, Camera, Check, Gavel, Loader2, Tag, Trash2, X } from 'lucide-react';
 import { LOT_CONDITIONS } from '@/lib/constants';
-import { canAddListingToEvent, getEffectiveEventStatus } from '@/lib/event-lifecycle';
+import { canAddListingToEvent } from '@/lib/event-lifecycle';
 import type { ClearanceEvent, ComplianceTag, Category } from '@/types/database';
+import type { Database } from '@/integrations/supabase/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Link } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
@@ -42,6 +43,7 @@ export default function CreateLot() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [loading, setLoading] = useState(false);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [error, setError] = useState('');
   const [events, setEvents] = useState<ClearanceEvent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -77,66 +79,101 @@ export default function CreateLot() {
   const selectedEventClosed = selectedEvent ? !canAddListingToEvent(selectedEvent) : false;
 
   useEffect(() => {
-    if (primaryOrg) {
-      fetchEvents();
-    }
-  }, [primaryOrg]);
-
-  useEffect(() => {
     supabase.from('categories').select('*').order('name').then(({ data }) => {
       if (data) setCategories(data as Category[]);
     });
   }, []);
 
-  const fetchEvents = async () => {
-    const { data } = await supabase
-      .from('clearance_events')
-      .select('*')
-      .eq('org_id', primaryOrg!.id)
-      .in('status', ['draft', 'active'])
-      .order('created_at', { ascending: false });
+  useEffect(() => {
+    let cancelled = false;
 
-    if (data) {
-      setEvents(data);
-      // If no event selected and only one event exists, auto-select it
-      const openEvents = data.filter((e) => canAddListingToEvent(e));
-      if (!formData.event_id && openEvents.length === 1) {
-        setFormData(prev => ({ ...prev, event_id: openEvents[0].id }));
+    if (!primaryOrg) {
+      setEvents([]);
+      setEventsLoading(false);
+      return;
+    }
+
+    const loadEvents = async () => {
+      setEventsLoading(true);
+      try {
+        const { data, error: eventsError } = await supabase
+          .from('clearance_events')
+          .select('*')
+          .eq('org_id', primaryOrg.id)
+          .in('status', ['draft', 'active'])
+          .order('created_at', { ascending: false });
+
+        if (eventsError) throw eventsError;
+        if (!cancelled) setEvents((data ?? []) as ClearanceEvent[]);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load clearance events');
+        }
+      } finally {
+        if (!cancelled) setEventsLoading(false);
       }
-    }
-  };
+    };
 
-  // Auto-create a default "Ongoing listings" event if seller has none
-  const ensureDefaultEvent = async (): Promise<string | null> => {
-    if (formData.event_id) return formData.event_id;
-    const openEvent = events.find((e) => canAddListingToEvent(e));
-    if (openEvent) return openEvent.id;
-    if (!primaryOrg || !user) return null;
-    const now = new Date();
-    const end = new Date(); end.setMonth(end.getMonth() + 3);
-    const { data, error } = await supabase
-      .from('clearance_events')
-      .insert({
-        org_id: primaryOrg.id,
-        created_by: user.id,
-        title: 'Ongoing listings',
-        site_address: primaryOrg.address ?? 'TBC',
-        suburb: primaryOrg.suburb ?? 'TBC',
-        state: primaryOrg.state ?? 'NSW',
-        postcode: primaryOrg.postcode ?? '',
-        pickup_start: now.toISOString(),
-        pickup_end: end.toISOString(),
-        status: 'active',
-      })
-      .select('id').single();
-    if (error) {
-      console.error('ensureDefaultEvent', error);
-      return null;
-    }
-    return data.id;
-  };
+    void loadEvents();
+    return () => { cancelled = true; };
+  }, [primaryOrg]);
 
-  const updateFormData = (field: string, value: any) => {
+  const eligibleEvents = events.filter((event) => canAddListingToEvent(event));
+
+  const eventSelectionCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Choose a clearance event *</CardTitle>
+        <CardDescription>
+          Every listing needs an event containing its pickup location, access requirements and collection window.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {eventsLoading ? (
+          <div className="flex min-h-10 items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading events...
+          </div>
+        ) : eligibleEvents.length > 0 ? (
+          <Select
+            value={formData.event_id || undefined}
+            onValueChange={(value) => setFormData((previous) => ({ ...previous, event_id: value }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select an existing event" />
+            </SelectTrigger>
+            <SelectContent>
+              {eligibleEvents.map((event) => (
+                <SelectItem key={event.id} value={event.id}>
+                  {event.title} ({event.suburb})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            You do not have a current event that can accept listings. Create one to continue.
+          </div>
+        )}
+
+        {selectedEventClosed && (
+          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>This event has expired or closed. Select another event or create a new one.</span>
+          </div>
+        )}
+
+        <Button variant="outline" asChild className="w-full sm:w-auto">
+          <Link to="/app/seller/events/new?next=listing">
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            Create new event
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
+  const updateFormData = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -167,6 +204,15 @@ export default function CreateLot() {
 
   const validate = (publishing: boolean): boolean => {
     setError('');
+
+    if (!formData.event_id) {
+      setError('Select a clearance event before creating the listing');
+      return false;
+    }
+    if (!selectedEvent || selectedEventClosed) {
+      setError('Select a current clearance event before creating the listing');
+      return false;
+    }
     
     if (!formData.category) {
       setError('Please select a category');
@@ -219,24 +265,19 @@ export default function CreateLot() {
   };
 
   const handleSubmit = async (publishing: boolean) => {
-    if (!validate(publishing) || !user) return;
+    if (!validate(publishing) || !user || !primaryOrg) return;
     
     setLoading(true);
     setError('');
 
     try {
-      // Ensure we have an event (auto-create default if seller has none)
-      const eventId = await ensureDefaultEvent();
-      if (!eventId) {
-        setError('Could not create or find a clearance event. Please try again.');
-        setLoading(false);
-        return;
-      }
+      const eventId = formData.event_id;
 
       const { data: currentEvent, error: eventError } = await supabase
         .from('clearance_events')
-        .select('id, pickup_end, status')
+        .select('id, pickup_end, status, org_id')
         .eq('id', eventId)
+        .eq('org_id', primaryOrg!.id)
         .single();
 
       if (eventError) throw eventError;
@@ -247,14 +288,14 @@ export default function CreateLot() {
       }
 
       // Create lot
-      const lotData: any = {
+      const lotData: Database['public']['Tables']['lots']['Insert'] = {
         event_id: eventId,
         category_id: categories.find(c => c.slug === formData.category)?.id ?? null,
         title: formData.title,
         description: formData.description || null,
         quantity: formData.quantity,
         unit: formData.unit,
-        condition: formData.condition,
+        condition: formData.condition as Database['public']['Enums']['lot_condition'],
         pricing_type: formData.pricing_type,
         status: publishing ? 'active' : 'draft',
       };
@@ -319,9 +360,9 @@ export default function CreateLot() {
 
       // Navigate back to listings
       navigate(`/app/seller/lots?created=1`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('CreateLot publish failed:', err);
-      const message = err?.message || 'Failed to create lot';
+      const message = err instanceof Error ? err.message : 'Failed to create lot';
       setError(
         message.includes('event_expired') || message.includes('event_closed')
           ? 'This clearance event has expired or closed. Choose a current event before creating the listing.'
@@ -331,6 +372,27 @@ export default function CreateLot() {
       setLoading(false);
     }
   };
+
+  if (eventsLoading || !selectedEvent || selectedEventClosed) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <div className="mb-6">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold">Add New Lot</h1>
+          <p className="text-muted-foreground">Choose where this material will be collected before adding listing details.</p>
+        </div>
+        {error && (
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+        {eventSelectionCard}
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -345,39 +407,7 @@ export default function CreateLot() {
       </div>
 
       <div className="space-y-6">
-        {/* Event Selection (optional - skipped when seller has no events) */}
-        {events.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Clearance event (optional)</CardTitle>
-            <CardDescription>Group this listing under an existing material drop, or leave blank to list it on its own.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Select value={formData.event_id || 'none'} onValueChange={(v) => updateFormData('event_id', v === 'none' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select an event" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No event — list on its own</SelectItem>
-                {events.map(event => {
-                  const status = getEffectiveEventStatus(event);
-                  return (
-                    <SelectItem key={event.id} value={event.id} disabled={!canAddListingToEvent(event)}>
-                      {event.title} ({event.suburb}){status === 'expired' ? ' - Expired' : ''}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            {selectedEventClosed && (
-              <div className="mt-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>This event has expired or closed. Select another event before creating a listing.</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        )}
+        {eventSelectionCard}
 
         {/* Photos */}
         <Card>

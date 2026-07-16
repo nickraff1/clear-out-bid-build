@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ type EventFormData = {
 export default function CreateEvent() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const { user, primaryOrg } = useAuth();
   const isEditMode = Boolean(id);
   const [currentStep, setCurrentStep] = useState(0);
@@ -159,6 +160,10 @@ export default function CreateEvent() {
         setError('Pickup end must be after pickup start');
         return false;
       }
+      if (new Date(formData.pickup_end) <= new Date()) {
+        setError('Pickup end must be in the future');
+        return false;
+      }
     }
     
     return true;
@@ -230,8 +235,11 @@ export default function CreateEvent() {
 
       if (insertError) throw insertError;
 
-      // Navigate to the event details to add lots
-      navigate(`/app/seller/events/${data.id}?created=true`);
+      if (searchParams.get('next') === 'listing') {
+        navigate(`/app/seller/lots/new?eventId=${data.id}`, { replace: true });
+      } else {
+        navigate(`/app/seller/events/${data.id}?created=true`);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create event');
     } finally {
