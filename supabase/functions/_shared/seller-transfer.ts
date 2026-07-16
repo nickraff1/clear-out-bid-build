@@ -3,7 +3,7 @@
 // recoverable Charge retain the previous platform-balance retry path.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient, type StripeEnv, assertLivePaymentsEnabled } from "./stripe.ts";
-import { explainConnectBlock } from "./connect-status.ts";
+import { explainConnectBlock, summarizeConnectAccount } from "./connect-status.ts";
 
 type Admin = ReturnType<typeof createClient>;
 
@@ -257,7 +257,7 @@ export async function transferSellerPayout(
 
   if (!sellerOrgId) return { ok: false, error: "Seller organisation not found" };
 
-  const { data: sellerAccountData } = await admin
+  const { data: sellerAccountData, error: sellerAccountError } = await admin
     .from("seller_stripe_accounts")
     .select(`
       stripe_account_id, payouts_enabled, capability_transfers,
@@ -266,16 +266,41 @@ export async function transferSellerPayout(
     `)
     .eq("org_id", sellerOrgId)
     .maybeSingle();
-  const sellerAccount = sellerAccountData as SellerAccount | null;
+  if (sellerAccountError) {
+    await recordSkip("seller_connect_lookup_failed", sellerAccountError.message);
+    return { ok: false, error: `Could not load seller Stripe account: ${sellerAccountError.message}` };
+  }
+
+  let sellerAccount = sellerAccountData as SellerAccount | null;
+
+  const env: StripeEnv = payment.environment === "live" ? "live" : "sandbox";
+  assertLivePaymentsEnabled(env);
+  const stripe = createStripeClient(env);
+
+  // Stripe is authoritative. A completed account can otherwise remain blocked
+  // by stale readiness columns when account.updated was not delivered.
+  if (sellerAccount?.stripe_account_id) {
+    try {
+      const stripeAccount = await stripe.accounts.retrieve(sellerAccount.stripe_account_id);
+      const summary = summarizeConnectAccount(stripeAccount);
+      const { error: refreshError } = await admin.from("seller_stripe_accounts").update({
+        ...summary,
+        stripe_environment: env,
+      }).eq("org_id", sellerOrgId).eq("stripe_account_id", sellerAccount.stripe_account_id);
+      if (refreshError) throw new Error(refreshError.message);
+      sellerAccount = { ...sellerAccount, ...summary };
+    } catch (err) {
+      const message = `Could not refresh seller Stripe account: ${(err as Error).message}`;
+      await recordSkip("seller_connect_refresh_failed", message);
+      return { ok: false, error: message };
+    }
+  }
+
   const connectBlock = explainConnectBlock(sellerAccount ?? {});
   if (connectBlock) {
     await recordSkip("seller_connect_not_ready", connectBlock);
     return { ok: false, error: connectBlock };
   }
-
-  const env: StripeEnv = payment.environment === "live" ? "live" : "sandbox";
-  assertLivePaymentsEnabled(env);
-  const stripe = createStripeClient(env);
   const idempotencyKey = `offcutt-seller-payout-${payment.id}`;
 
   try {

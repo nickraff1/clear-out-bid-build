@@ -33,6 +33,8 @@ describe("Stripe source-transaction payouts", () => {
     expect(transfer).toContain('manual_payout_status === "manual_payout_on_hold"');
     expect(transfer).toContain('event_type: "transfer_skipped"');
     expect(transfer).toContain('seller_connect_not_ready');
+    expect(transfer).toContain("summarizeConnectAccount(stripeAccount)");
+    expect(transfer).toContain('seller_connect_refresh_failed');
   });
 
   it("keeps collected-order auto payout trigger environment-safe and observable", () => {
@@ -64,6 +66,19 @@ describe("Stripe source-transaction payouts", () => {
     expect(migration).toContain("stripe_transfer_id IS NULL");
     expect(adminPage).toContain("Stripe object chain");
     expect(adminPage).toContain("GST/tax has not been configured");
+    expect(adminPage).toContain("Pending payout liability");
+    expect(adminPage).toContain("effectiveProcessingStatus");
+  });
+
+  it("repairs stale payout status only when a real Stripe Transfer exists", () => {
+    const migration = read(
+      "supabase/migrations/20260716030000_reconcile_transfer_status.sql",
+    );
+
+    expect(migration).toContain("stripe_transfer_id ~ '^tr_'");
+    expect(migration).toContain("payout_processing_status");
+    expect(migration).toContain("awaiting_stripe_settlement");
+    expect(migration).not.toContain("stripe_transfer_id IS NULL");
   });
 
   it("uses truthful settlement wording for admins and sellers", () => {

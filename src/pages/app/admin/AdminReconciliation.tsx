@@ -78,6 +78,14 @@ function processingVariant(status: string): "success" | "warning" | "destructive
   return "muted";
 }
 
+function effectiveProcessingStatus(row: ReconciliationRow) {
+  if (!row.stripe_transfer_id) return row.payout_processing_status;
+  if (row.payout_processing_status === "awaiting_stripe_settlement" && row.stripe_charge_settlement_status === "pending") {
+    return "awaiting_stripe_settlement";
+  }
+  return "transferred";
+}
+
 function TraceId({ label, value }: { label: string; value: string | null }) {
   const { toast } = useToast();
   return (
@@ -136,7 +144,7 @@ export default function AdminReconciliation() {
     const needle = search.trim().toLowerCase();
     return rows.filter((row) => {
       if (environment !== "all" && row.environment !== environment) return false;
-      if (status !== "all" && row.payout_processing_status !== status) return false;
+      if (status !== "all" && effectiveProcessingStatus(row) !== status) return false;
       if (!needle) return true;
       return [
         row.order_id, row.payment_id, row.buyer_name, row.buyer_email,
@@ -149,8 +157,9 @@ export default function AdminReconciliation() {
   const totals = useMemo(() => filtered.reduce((sum, row) => ({
     charged: sum.charged + Number(row.amount_charged),
     fees: sum.fees + Number(row.platform_fee_total),
-    payouts: sum.payouts + Number(row.seller_payout),
-  }), { charged: 0, fees: 0, payouts: 0 }), [filtered]);
+    transferred: sum.transferred + (row.stripe_transfer_id ? Number(row.seller_payout) : 0),
+    pending: sum.pending + (row.stripe_transfer_id ? 0 : Number(row.seller_payout)),
+  }), { charged: 0, fees: 0, transferred: 0, pending: 0 }), [filtered]);
 
   if (loading) {
     return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -166,7 +175,7 @@ export default function AdminReconciliation() {
               <div className="grid gap-3 sm:grid-cols-3">
                 <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Buyer charged</div><div className="text-xl font-semibold">{money(selected.amount_charged)}</div></CardContent></Card>
                 <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Platform fees</div><div className="text-xl font-semibold">{money(selected.platform_fee_total)}</div></CardContent></Card>
-                <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Seller transfer</div><div className="text-xl font-semibold">{money(selected.seller_payout)}</div></CardContent></Card>
+                <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">{selected.stripe_transfer_id ? "Seller transfer" : "Seller payout due"}</div><div className="text-xl font-semibold">{money(selected.seller_payout)}</div></CardContent></Card>
               </div>
 
               <section className="space-y-2">
@@ -202,8 +211,9 @@ export default function AdminReconciliation() {
                   <div className="flex justify-between gap-4"><span>Order</span><span>{selected.order_status}</span></div>
                   <div className="flex justify-between gap-4"><span>Pickup</span><span>{selected.pickup_status ?? "Not set"}</span></div>
                   <div className="flex justify-between gap-4"><span>Charge settlement</span><span>{selected.stripe_charge_settlement_status}</span></div>
-                  <div className="flex justify-between gap-4"><span>Transfer mode</span><span>{selected.payout_source_transaction_used ? "Linked source transaction" : "Legacy balance transfer"}</span></div>
+                  <div className="flex justify-between gap-4"><span>Transfer mode</span><span>{!selected.stripe_transfer_id ? "Not created" : selected.payout_source_transaction_used ? "Linked source transaction" : "Legacy balance transfer"}</span></div>
                   <div className="flex justify-between gap-4"><span>Attempts</span><span>{selected.payout_attempt_count}</span></div>
+                  {!selected.stripe_transfer_id && selected.payout_attempt_count === 0 && <div className="rounded-md bg-warning/10 p-2 text-warning-foreground">No seller transfer attempt has been recorded.</div>}
                   {selected.payout_last_error && <div className="rounded-md bg-destructive/10 p-2 text-destructive">{selected.payout_last_error}</div>}
                 </div>
               </section>
@@ -220,10 +230,11 @@ export default function AdminReconciliation() {
         <Button variant="outline" onClick={load}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Buyer charges</div><div className="text-xl font-bold">{money(totals.charged)}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Platform fees</div><div className="text-xl font-bold">{money(totals.fees)}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Seller payouts</div><div className="text-xl font-bold">{money(totals.payouts)}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Transfers created</div><div className="text-xl font-bold">{money(totals.transferred)}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-muted-foreground">Pending payout liability</div><div className="text-xl font-bold">{money(totals.pending)}</div></CardContent></Card>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-[minmax(240px,1fr)_180px_220px]">
@@ -244,7 +255,7 @@ export default function AdminReconciliation() {
                 <TableCell className="text-xs"><div>Charged {money(row.amount_charged)}</div><div>Fees {money(row.platform_fee_total)}</div><div>Payout {money(row.seller_payout)}</div></TableCell>
                 <TableCell className="text-xs"><div>PI {shortId(row.stripe_payment_intent_id)}</div><div>CH {shortId(row.stripe_charge_id)}</div><div>TR {shortId(row.stripe_transfer_id)}</div></TableCell>
                 <TableCell><Badge variant={row.tax_calculation_status === "calculated" ? "success" : "warning"}>{row.tax_calculation_status === "calculated" ? "Calculated" : "Not configured"}</Badge></TableCell>
-                <TableCell><Badge variant={processingVariant(row.payout_processing_status)}>{processingLabel(row.payout_processing_status)}</Badge>{row.payout_last_error && <div className="mt-1 max-w-[220px] truncate text-xs text-destructive">{row.payout_last_error}</div>}</TableCell>
+                <TableCell><Badge variant={processingVariant(effectiveProcessingStatus(row))}>{processingLabel(effectiveProcessingStatus(row))}</Badge>{row.payout_last_error && <div className="mt-1 max-w-[220px] truncate text-xs text-destructive">{row.payout_last_error}</div>}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -254,7 +265,7 @@ export default function AdminReconciliation() {
       <div className="space-y-3 md:hidden">
         {filtered.map((row) => (
           <button key={row.payment_id} type="button" onClick={() => setSelected(row)} className="w-full rounded-md border p-4 text-left">
-            <div className="flex items-start justify-between gap-3"><div><div className="font-medium">{row.lot_title}</div><div className="text-xs text-muted-foreground">{row.seller_name} · {row.buyer_name ?? row.buyer_email}</div></div><Badge variant={processingVariant(row.payout_processing_status)}>{processingLabel(row.payout_processing_status)}</Badge></div>
+            <div className="flex items-start justify-between gap-3"><div><div className="font-medium">{row.lot_title}</div><div className="text-xs text-muted-foreground">{row.seller_name} · {row.buyer_name ?? row.buyer_email}</div></div><Badge variant={processingVariant(effectiveProcessingStatus(row))}>{processingLabel(effectiveProcessingStatus(row))}</Badge></div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div><span className="text-muted-foreground">Charged</span><div>{money(row.amount_charged)}</div></div><div><span className="text-muted-foreground">Fees</span><div>{money(row.platform_fee_total)}</div></div><div><span className="text-muted-foreground">Payout</span><div>{money(row.seller_payout)}</div></div></div>
           </button>
         ))}

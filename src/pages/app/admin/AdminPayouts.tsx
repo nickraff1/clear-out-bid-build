@@ -126,6 +126,7 @@ export default function AdminPayouts() {
   const [editing, setEditing] = useState<PayoutRow | null>(null);
   const [draft, setDraft] = useState({ status: "manual_payout_pending", reference: "", notes: "" });
   const [confirmTransfer, setConfirmTransfer] = useState<PayoutRow | null>(null);
+  const [refreshingOrgId, setRefreshingOrgId] = useState<string | null>(null);
   const [refundDialog, setRefundDialog] = useState<{ row: PayoutRow | null; amount: string; notes: string }>({ row: null, amount: "", notes: "" });
 
   const load = async () => {
@@ -160,7 +161,7 @@ export default function AdminPayouts() {
     const orgIds = [...new Set(payoutRows.map((r) => r.order?.lot?.event?.org_id).filter((id): id is string => Boolean(id)))];
     let connectByOrg = new Map<string, ConnectAccount>();
     if (orgIds.length) {
-      const { data: accounts } = await supabase
+      const { data: accounts, error: accountsError } = await supabase
         .from("seller_stripe_accounts")
         .select(`
           org_id, stripe_account_id, connect_readiness_status, payouts_enabled,
@@ -168,6 +169,9 @@ export default function AdminPayouts() {
           requirements_past_due, last_synced_at
         `)
         .in("org_id", orgIds);
+      if (accountsError) {
+        toast({ title: "Could not load Stripe readiness", description: accountsError.message, variant: "destructive" });
+      }
       connectByOrg = new Map(((accounts ?? []) as ConnectAccount[]).map((account) => [account.org_id, account]));
     }
     setRows(payoutRows.map((r) => ({
@@ -240,6 +244,34 @@ export default function AdminPayouts() {
       load();
     }
     setConfirmTransfer(null);
+  };
+
+  const refreshStripe = async (row: PayoutRow) => {
+    const orgId = row.order?.lot?.event?.org_id;
+    if (!orgId) {
+      return toast({ title: "Seller organisation missing", variant: "destructive" });
+    }
+    setRefreshingOrgId(orgId);
+    const { data, error } = await supabase.functions.invoke("stripe-connect-refresh", {
+      body: { org_id: orgId },
+    });
+    if (error || data?.error) {
+      toast({
+        title: "Could not refresh Stripe status",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+    } else if (!data?.refreshed) {
+      toast({
+        title: "No Stripe account found",
+        description: "Reconnect this seller before creating a transfer.",
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: "Stripe status refreshed" });
+    }
+    await load();
+    setRefreshingOrgId(null);
   };
 
   const submitRefund = async () => {
@@ -378,6 +410,16 @@ export default function AdminPayouts() {
                     {connectBlockReason(r._connect) && (
                       <div className="text-xs text-muted-foreground">{connectBlockReason(r._connect)}</div>
                     )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => refreshStripe(r)}
+                      disabled={refreshingOrgId === r.order?.lot?.event?.org_id}
+                    >
+                      <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshingOrgId === r.order?.lot?.event?.org_id ? "animate-spin" : ""}`} />
+                      Refresh Stripe
+                    </Button>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -405,7 +447,8 @@ export default function AdminPayouts() {
                     size="sm"
                     variant="outline"
                     onClick={() => setConfirmTransfer(r)}
-                    disabled={!!r.stripe_transfer_id || r.manual_payout_status === "manual_payout_paid" || !!connectBlockReason(r._connect)}
+                    disabled={!!r.stripe_transfer_id || r.manual_payout_status === "manual_payout_paid"}
+                    title={connectBlockReason(r._connect) ?? "Create seller transfer"}
                   >
                     <Send className="h-3.5 w-3.5 mr-1" />Transfer
                   </Button>
