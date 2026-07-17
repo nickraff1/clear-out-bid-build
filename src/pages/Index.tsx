@@ -50,29 +50,6 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="border-y border-border bg-muted/30">
-        <div className="container py-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <p className="text-3xl md:text-4xl font-bold text-foreground">500+</p>
-              <p className="text-sm text-muted-foreground mt-1">Active Lots</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl md:text-4xl font-bold text-foreground">150+</p>
-              <p className="text-sm text-muted-foreground mt-1">Verified Sellers</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl md:text-4xl font-bold text-foreground">$2M+</p>
-              <p className="text-sm text-muted-foreground mt-1">Materials Sold</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl md:text-4xl font-bold text-foreground">98%</p>
-              <p className="text-sm text-muted-foreground mt-1">Satisfaction Rate</p>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* How It Works */}
       <section className="py-16 md:py-24">
