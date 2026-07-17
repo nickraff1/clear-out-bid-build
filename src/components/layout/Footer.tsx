@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { BRAND } from '@/lib/constants';
+import offcuttLogo from '@/assets/offcutt-logo.svg.asset.json';
 
 export function Footer() {
   return (
