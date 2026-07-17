@@ -9,11 +9,8 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="text-base font-bold text-primary-foreground">O</span>
-              </div>
-              <span className="text-lg font-bold text-foreground">{BRAND.name}</span>
+            <Link to="/" className="flex items-center gap-2 mb-4" aria-label={BRAND.name}>
+              <img src={offcuttLogo.url} alt={`${BRAND.name} logo`} className="h-8 w-auto" />
             </Link>
             <p className="text-sm text-muted-foreground">
               {BRAND.description}
