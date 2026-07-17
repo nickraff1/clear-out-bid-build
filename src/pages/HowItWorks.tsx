@@ -336,7 +336,7 @@ export default function HowItWorks() {
                   <ArrowRight className="h-5 w-5" />
                 </Link>
               </Button>
-              <Button size="xl" variant="outline" className="border-secondary-foreground/20 text-secondary-foreground hover:bg-secondary-foreground/10" asChild>
+              <Button size="xl" variant="outline" className="border-secondary/20 text-secondary hover:bg-secondary/10" asChild>
                 <Link to="/marketplace">
                   Browse Marketplace
                 </Link>
