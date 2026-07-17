@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { ArrowRight, CreditCard, Filter, Loader2, Search, ShoppingCart } from 'lucide-react';
+import { ArrowRight, BookOpen, CreditCard, Filter, Loader2, Search, ShoppingCart } from 'lucide-react';
 import type { Order, Lot, ClearanceEvent } from '@/types/database';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { orderStatusLabel, orderStatusTone, pickupStatusLabel } from '@/lib/order-status';
@@ -153,7 +153,7 @@ export default function BuyerOrders() {
             const target =
               order.status === 'pending_payment' && (!isAuctionOrder || auctionChargeNeedsAction)
                 ? `/app/buyer/checkout/${order.id}`
-                : `/app/orders/${order.id}`;
+                : `/app/orders/${order.id}${isAuctionOrder ? '?guide=1' : ''}`;
             return (
               <div
                 key={order.id}
@@ -195,13 +195,11 @@ export default function BuyerOrders() {
 
                 <Button asChild size="sm" className="md:w-auto">
                   <Link to={target}>
-                    {order.status === 'pending_payment' ? (
+                    {isAuctionOrder && !auctionChargeNeedsAction ? (
+                      <><BookOpen className="h-4 w-4 mr-1" /> Winner guide</>
+                    ) : order.status === 'pending_payment' ? (
                       <>
-                        {isAuctionOrder && !auctionChargeNeedsAction ? (
-                          <>View order <ArrowRight className="h-4 w-4 ml-1" /></>
-                        ) : (
-                          <><CreditCard className="h-4 w-4 mr-1" /> Pay now</>
-                        )}
+                        <CreditCard className="h-4 w-4 mr-1" /> Pay now
                       </>
                     ) : (
                       <>Manage <ArrowRight className="h-4 w-4 ml-1" /></>

@@ -26,6 +26,8 @@ import { LeaveReviewDialog } from '@/components/reviews/LeaveReviewDialog';
 import { OrderMessages } from '@/components/messaging/OrderMessages';
 import { orderStatusLabel } from '@/lib/order-status';
 import { ensureConversation } from '@/lib/conversations';
+import { AuctionWinnerGuide } from '@/components/buyer/AuctionWinnerGuide';
+import type { WinnerGuideAction } from '@/lib/auction-winner-guide';
 
 const REPORT_REASONS = [
   'Pickup issue',
@@ -52,10 +54,12 @@ type OrderDetailRow = {
   buyer_collected_at: string | null;
   seller_confirmed_at: string | null;
   admin_notes: string | null;
+  auction_payment_error: string | null;
   lot: {
     id: string;
     title: string;
     fixed_price: number | null;
+    pricing_type: string;
     status: string;
     media?: Array<{ url: string; is_primary: boolean | null }>;
   } | null;
@@ -119,7 +123,7 @@ export default function OrderDetail() {
       .from('orders')
       .select(`
         *,
-        lot:lots(id, title, fixed_price, status, media:lot_media(url, is_primary)),
+        lot:lots(id, title, fixed_price, pricing_type, status, media:lot_media(url, is_primary)),
         event:clearance_events(
           id, org_id, created_by, title, site_address, suburb, state, postcode,
           pickup_start, pickup_end, access_notes, contact_name, contact_phone,
@@ -156,6 +160,8 @@ export default function OrderDetail() {
 
   const paid = ['paid', 'ready_for_pickup', 'collected'].includes(order.status);
   const completed = order.status === 'collected';
+  const isAuctionOrder = order.lot?.pricing_type === 'auction';
+  const auctionChargeNeedsAction = isAuctionOrder && Boolean(order.auction_payment_error);
 
   // Pricing breakdown: amount already includes 10% buyer service fee.
   // Seller commission is 10% of the base item price.
@@ -290,6 +296,22 @@ export default function OrderDetail() {
     }
   }
 
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function handleWinnerGuideAction(action: WinnerGuideAction) {
+    if (action === 'payment') {
+      navigate(`/app/buyer/checkout/${order.id}`);
+    } else if (action === 'pickup') {
+      scrollToSection('pickup-section');
+    } else if (action === 'collection' || action === 'review') {
+      scrollToSection('collection-section');
+    } else if (action === 'message') {
+      void openConversation();
+    }
+  }
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-1 pl-0">
@@ -320,8 +342,10 @@ export default function OrderDetail() {
         <Alert variant="default" className="border-warning/30 bg-warning/10">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            This order is awaiting payment. The pickup address is hidden until payment is confirmed.
-            {isBuyer && (
+            {isAuctionOrder && !auctionChargeNeedsAction
+              ? 'You won this auction. Offcutt is charging your saved card automatically; pickup details unlock after confirmation.'
+              : 'This order is awaiting payment. The pickup address is hidden until payment is confirmed.'}
+            {isBuyer && (!isAuctionOrder || auctionChargeNeedsAction) && (
               <Button size="sm" className="ml-3" asChild>
                 <Link to={`/app/buyer/checkout/${order.id}`}>Pay now</Link>
               </Button>
@@ -364,6 +388,23 @@ export default function OrderDetail() {
         );
       })()}
 
+      {isBuyer && isAuctionOrder && user && (
+        <AuctionWinnerGuide
+          orderId={order.id}
+          userId={user.id}
+          lotTitle={order.lot?.title ?? 'this auction'}
+          total={total}
+          orderStatus={order.status}
+          pickupStatus={order.pickup_status}
+          proposedPickupAt={order.proposed_pickup_at}
+          proposedByCurrentUser={order.proposed_pickup_by === user.id}
+          agreedPickupAt={order.agreed_pickup_at}
+          paymentError={order.auction_payment_error}
+          hasReviewed={hasReviewed}
+          onAction={handleWinnerGuideAction}
+        />
+      )}
+
       <div className="grid md:grid-cols-3 gap-6">
         {/* Left column */}
         <div className="md:col-span-2 space-y-6">
@@ -390,7 +431,7 @@ export default function OrderDetail() {
           </div>
 
           {/* Pickup details */}
-          <div className="dashboard-card p-4 space-y-3">
+          <div id="pickup-section" className="dashboard-card p-4 space-y-3 scroll-mt-24">
             <h2 className="font-semibold flex items-center gap-2"><Truck className="h-4 w-4" /> Pickup</h2>
 
             <PickupSafetyReminder />
@@ -464,7 +505,7 @@ export default function OrderDetail() {
 
           {/* Pickup code + collection actions */}
           {paid && (
-            <div className="dashboard-card p-4 space-y-3">
+            <div id="collection-section" className="dashboard-card p-4 space-y-3 scroll-mt-24">
               <h2 className="font-semibold flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Collection</h2>
 
               {isBuyer && order.pickup_code && (

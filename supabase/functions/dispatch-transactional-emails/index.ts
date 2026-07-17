@@ -99,6 +99,8 @@ function actionLabelFor(type: string): string {
   if (type.includes('pickup')) return 'View pickup'
   if (type.includes('payout')) return 'View payout'
   if (type.includes('stripe_connect')) return 'Complete payout setup'
+  if (type === 'auction_won') return 'Open winner guide'
+  if (type === 'auction_payment_action_required' || type === 'auction_payment_deadline') return 'Resolve payment'
   if (type.includes('auction') || type === 'outbid') return 'View auction'
   if (type.includes('report') || type.includes('dispute')) return 'View issue'
   return 'Open Offcutt'
@@ -106,6 +108,7 @@ function actionLabelFor(type: string): string {
 
 function emailIntroFor(type: string): string {
   if (type === 'new_message') return 'You received a new message on Offcutt:'
+  if (type === 'auction_won') return 'Congratulations. Your winning order and collection guide are ready.'
   if (type === 'seller_buyer_charged_payout_timing') {
     return 'A buyer has been charged for your sale. Your payout is expected within 24-48 hours after collection and release checks pass.'
   }

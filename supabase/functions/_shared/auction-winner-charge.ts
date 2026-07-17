@@ -30,6 +30,9 @@ async function notifyAuctionPaymentActionNeeded(
     type: "auction_payment_action_required",
     title: "Auction payment needs attention",
     message,
+    link_url: `/app/orders/${order.id}?guide=1`,
+    related_order_id: order.id,
+    related_lot_id: order.lot?.id,
     data: {
       order_id: order.id,
       lot_id: order.lot?.id,

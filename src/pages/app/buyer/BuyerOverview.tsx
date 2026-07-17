@@ -260,7 +260,7 @@ export default function BuyerOverview() {
                     to={
                       order.status === 'pending_payment' && (!isAuctionOrder || auctionChargeNeedsAction)
                         ? `/app/buyer/checkout/${order.id}`
-                        : `/app/orders/${order.id}`
+                        : `/app/orders/${order.id}${isAuctionOrder ? '?guide=1' : ''}`
                     }
                     className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                   >
@@ -270,6 +270,7 @@ export default function BuyerOverview() {
                         {money(Number(order.amount ?? 0))}
                         {order.status === 'pending_payment' && pendingCopy}
                         {(order.status === 'paid' || order.status === 'ready_for_pickup') && ' · Arrange pickup'}
+                        {isAuctionOrder && order.status === 'collected' && ' · Review your win'}
                       </p>
                     </div>
                     <Badge variant={orderStatusTone(order.status)}>

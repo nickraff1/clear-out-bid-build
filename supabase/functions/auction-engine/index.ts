@@ -463,6 +463,9 @@ async function handleCloseAuction(body: CloseAuctionRequest, supabase: any, user
       type: 'auction_won',
       title: 'You won an auction!',
       message: `Congratulations! You won "${lot.title}" for $${totalAmount.toFixed(2)}. Offcutt is charging your saved card automatically.`,
+      link_url: `/app/orders/${order.id}?guide=1`,
+      related_order_id: order.id,
+      related_lot_id: lot_id,
       data: { lot_id, order_id: order.id, amount: totalAmount, base_amount: baseAmount, buyer_fee: buyerFee }
     })
 
